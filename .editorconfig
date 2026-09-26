@@ -1,0 +1,19 @@
+# infra-launcher 用（リポジトリ直下の設定を上書きする）
+
+[*.{cs,axaml,csproj,slnx,json,md}]
+indent_style = space
+indent_size = 4
+
+[*.{json,md}]
+indent_size = 2
+
+# Windows PowerShell 5.1 は BOM がないと日本語を正しく読めない
+[*.ps1]
+charset = utf-8-bom
+indent_style = space
+indent_size = 4
+end_of_line = crlf
+
+[*.bat]
+charset = latin1
+end_of_line = crlf
