@@ -22,7 +22,7 @@ public sealed partial class ManifestClient(HttpClient http)
         }
         catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException or TaskCanceledException && !ct.IsCancellationRequested)
         {
-            throw new ManifestException($"マニフェストを取得できませんでした: {uri} ({e.Message})", e);
+            throw new ManifestException($"サーバーリストを取得できませんでした。アドレスが正しいか確認してください: {uri} ({e.Message})", e);
         }
         return Parse(text);
     }
@@ -36,11 +36,11 @@ public sealed partial class ManifestClient(HttpClient http)
         }
         catch (JsonException e)
         {
-            throw new ManifestException($"マニフェストの JSON が正しくありません: {e.Message}", e);
+            throw new ManifestException($"サーバーリストの形式が正しくありません: {e.Message}", e);
         }
         if (manifest is null)
         {
-            throw new ManifestException("マニフェストが空です");
+            throw new ManifestException("サーバーリストが空です");
         }
         Validate(manifest);
         return manifest;

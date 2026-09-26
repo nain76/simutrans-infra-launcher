@@ -119,7 +119,7 @@ static int Usage()
           infra-launcher launch <manifest> <サーバーの id か名前> [--print-only]
         オプション:
           --data-dir <dir>    ランチャーのデータフォルダ（既定: %LOCALAPPDATA%\InfraLauncher など）
-          --simutrans <exe>   マニフェストにこの OS 用の本体がないときに使う simutrans の実行ファイル
+          --simutrans <exe>   サーバーリストにこの PC 用の本体がないときに使う simutrans の実行ファイル
         """);
     return 2;
 }

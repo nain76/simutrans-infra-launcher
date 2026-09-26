@@ -47,8 +47,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         else
         {
             throw new SyncException(
-                $"サーバー '{server.Name}' のマニフェストには、この OS（{PlatformInfo.CurrentKey}）用の simutrans 本体がありません。" +
-                "設定で手元の simutrans の実行ファイルを指定してください");
+                $"サーバー '{server.Name}' のサーバーリストには、この PC（{PlatformInfo.CurrentKey}）用の simutrans 本体が含まれていません。" +
+                "「設定」で手元の simutrans 本体を指定してください");
         }
 
         var p = server.Pakset;
@@ -140,7 +140,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         if (!actual.Equals(item.Sha256, StringComparison.OrdinalIgnoreCase))
         {
             throw new SyncException(
-                $"{item.Label} のハッシュがマニフェストと一致しません。ダウンロードが壊れているか、サーバー側のマニフェストが古い可能性があります。" +
+                $"{item.Label} のハッシュがサーバーリストの記載と一致しません。ダウンロードが壊れているか、サーバーリストが古い可能性があります。サーバー管理者に確認してください。" +
                 $"（期待: {item.Sha256.ToLowerInvariant()}、実際: {actual}）");
         }
     }

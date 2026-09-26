@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="InfraLauncher.App.ProfileWindow"
+        Title="プロファイルを手動で設定" Width="600" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="16" Spacing="6">
+    <TextBlock Text="接続先のアドレス・pakset・simutrans 本体を自分で指定します。自動同期はしないので、サーバーと同じ pakset を用意しておいてください。"
+               TextWrapping="Wrap" Opacity="0.75" Margin="0,0,0,8" />
+
+    <TextBlock Text="表示名" FontWeight="SemiBold" />
+    <TextBox x:Name="NameBox" Watermark="例: 友達の鯖" />
+
+    <TextBlock Text="接続先のアドレス" FontWeight="SemiBold" Margin="0,10,0,0" />
+    <TextBlock Text="ポートを省略すると 13353 になります" Opacity="0.75" />
+    <TextBox x:Name="AddressBox" Watermark="example.ddns.net:13353" />
+
+    <TextBlock Text="simutrans 本体" FontWeight="SemiBold" Margin="0,10,0,0" />
+    <Grid ColumnDefinitions="*,Auto">
+      <TextBox x:Name="ExeBox" Watermark="C:\Games\simutrans\simutrans.exe" />
+      <Button Grid.Column="1" Content="参照…" Margin="8,0,0,0" Click="OnBrowseExe" />
+    </Grid>
+
+    <TextBlock Text="pakset のフォルダ" FontWeight="SemiBold" Margin="0,10,0,0" />
+    <TextBlock Text="simutrans 本体と同じフォルダにある pakset のフォルダ名です" Opacity="0.75" />
+    <Grid ColumnDefinitions="*,Auto">
+      <TextBox x:Name="PakBox" Watermark="pak128.japan" />
+      <Button Grid.Column="1" Content="参照…" Margin="8,0,0,0" Click="OnBrowsePak" />
+    </Grid>
+
+    <TextBlock x:Name="ErrorText" Foreground="#d13438" TextWrapping="Wrap" IsVisible="False" Margin="0,6,0,0" />
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,10,0,0">
+      <Button Content="キャンセル" Click="OnCancel" />
+      <Button Content="保存" Classes="accent" Click="OnSave" />
+    </StackPanel>
+  </StackPanel>
+</Window>

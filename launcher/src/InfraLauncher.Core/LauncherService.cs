@@ -2,8 +2,8 @@ using InfraLauncher.Core.Models;
 
 namespace InfraLauncher.Core;
 
-/// <summary>1つのマニフェストから読んだサーバー。取得に失敗した場合は Error に理由が入る。</summary>
-public sealed record ManifestSource(string Url, Manifest? Manifest, string? Error);
+/// <summary>1つのサーバーリストを読んだ結果。取得に失敗した場合は Error に理由が入る。</summary>
+public sealed record ManifestSource(ServerListSource List, Manifest? Manifest, string? Error);
 
 /// <summary>CLI と画面の両方から使う、ひととおりの操作をまとめたもの。</summary>
 public sealed class LauncherService(InstallLayout layout, HttpClient http)
@@ -14,18 +14,18 @@ public sealed class LauncherService(InstallLayout layout, HttpClient http)
 
     public LauncherSettings LoadSettings() => LauncherSettings.Load(layout);
 
-    /// <summary>設定にあるマニフェストを全部読む。1つが失敗しても他は読む。</summary>
-    public async Task<IReadOnlyList<ManifestSource>> LoadAllAsync(IEnumerable<string> urls, CancellationToken ct = default)
+    /// <summary>設定にあるサーバーリストを全部読む。1つが失敗しても他は読む。</summary>
+    public async Task<IReadOnlyList<ManifestSource>> LoadAllAsync(IEnumerable<ServerListSource> lists, CancellationToken ct = default)
     {
-        var tasks = urls.Select(async url =>
+        var tasks = lists.Select(async list =>
         {
             try
             {
-                return new ManifestSource(url, await Manifests.LoadAsync(ToUri(url), ct), null);
+                return new ManifestSource(list, await Manifests.LoadAsync(ToUri(list.Url), ct), null);
             }
-            catch (ManifestException e)
+            catch (Exception e) when (e is ManifestException or UriFormatException or ArgumentException)
             {
-                return new ManifestSource(url, null, e.Message);
+                return new ManifestSource(list, null, e.Message);
             }
         });
         return await Task.WhenAll(tasks);
@@ -43,17 +43,18 @@ public sealed class LauncherService(InstallLayout layout, HttpClient http)
         return (printOnly ? null : SimutransRunner.Start(plan.ExePath, args), command);
     }
 
-    /// <summary>お気に入り（マニフェストにないサーバー）は同期せず、手元の simutrans で接続する。</summary>
-    public static (System.Diagnostics.Process? Process, string Command) LaunchFavorite(
-        FavoriteServer favorite, LauncherSettings settings, bool printOnly = false)
+    /// <summary>手動プロファイルは同期せず、指定した simutrans でそのまま接続する。</summary>
+    public static (System.Diagnostics.Process? Process, string Command) LaunchManual(
+        ManualProfile profile, LauncherSettings settings, bool printOnly = false)
     {
-        if (string.IsNullOrWhiteSpace(settings.SimutransExe))
+        var exe = string.IsNullOrWhiteSpace(profile.SimutransExe) ? settings.SimutransExe : profile.SimutransExe;
+        if (string.IsNullOrWhiteSpace(exe))
         {
-            throw new SyncException("お気に入りのサーバーに接続するには、設定で手元の simutrans の実行ファイルを指定してください");
+            throw new SyncException($"プロファイル '{profile.Name}' に simutrans の実行ファイルが指定されていません");
         }
-        var args = LaunchCommandBuilder.Build(favorite.PaksetFolder, ServerAddress.Parse(favorite.Address));
-        var command = LaunchCommandBuilder.ToDisplayString(settings.SimutransExe, args);
-        return (printOnly ? null : SimutransRunner.Start(settings.SimutransExe, args), command);
+        var args = LaunchCommandBuilder.Build(profile.PaksetFolder, ServerAddress.Parse(profile.Address));
+        var command = LaunchCommandBuilder.ToDisplayString(exe, args);
+        return (printOnly ? null : SimutransRunner.Start(exe, args), command);
     }
 
     /// <summary>URL でなければローカルのファイルパスとして扱う。</summary>

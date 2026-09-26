@@ -1,6 +1,6 @@
 # サーバー一覧マニフェスト
 
-ランチャーが読み込むサーバー一覧の JSON ファイルです。Web サーバー（IIS の静的ファイル配信など）に置いて、その URL を友人に伝えます。API サーバーは不要です。
+ランチャーが読み込むサーバー一覧の JSON ファイルです（ランチャーの画面では「サーバーリスト」と呼びます）。Web サーバー（IIS の静的ファイル配信など）に置いて、その URL を友人に伝えます。友人はランチャーの「追加」→「サーバー管理者から共有されたリストを追加」にその URL を入れます。API サーバーは不要です。
 
 - 形式の定義: [manifest.schema.json](manifest.schema.json)（JSON Schema）
 - 記入例: [manifest.sample.json](manifest.sample.json)

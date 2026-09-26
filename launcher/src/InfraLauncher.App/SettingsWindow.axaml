@@ -1,27 +1,18 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="InfraLauncher.App.SettingsWindow"
-        Title="設定" Width="640" SizeToContent="Height" CanResize="False"
+        Title="設定" Width="600" SizeToContent="Height" CanResize="False"
         WindowStartupLocation="CenterOwner">
   <StackPanel Margin="16" Spacing="6">
-    <TextBlock Text="サーバー一覧（マニフェスト）の URL" FontWeight="SemiBold" />
-    <TextBlock Text="1行に1つ。サーバー管理者から教えてもらった URL を入れてください" Opacity="0.7" />
-    <TextBox x:Name="ManifestUrls" AcceptsReturn="True" Height="90" TextWrapping="NoWrap"
-             Watermark="https://example.ddns.net/simutrans/manifest.json" />
-
-    <TextBlock Text="手元の simutrans（任意）" FontWeight="SemiBold" Margin="0,10,0,0" />
-    <TextBlock Text="マニフェストにこの OS 用の本体がないときと、お気に入りに接続するときに使います" Opacity="0.7" TextWrapping="Wrap" />
+    <TextBlock Text="手元の simutrans 本体（任意）" FontWeight="SemiBold" />
+    <TextBlock Text="共有されたサーバーリストに、この PC 用の simutrans 本体が含まれていない場合に使います。手動プロファイルを追加するときの初期値にもなります。"
+               Opacity="0.75" TextWrapping="Wrap" />
     <Grid ColumnDefinitions="*,Auto">
       <TextBox x:Name="SimutransExe" Watermark="C:\Games\simutrans\simutrans.exe" />
       <Button Grid.Column="1" Content="参照…" Margin="8,0,0,0" Click="OnBrowse" />
     </Grid>
 
-    <TextBlock Text="お気に入り（マニフェストにないサーバー）" FontWeight="SemiBold" Margin="0,10,0,0" />
-    <TextBlock Text="1行に「名前, アドレス, pak フォルダ名」。例: 友達の鯖, example.net:13353, pak128.japan" Opacity="0.7" TextWrapping="Wrap" />
-    <TextBox x:Name="Favorites" AcceptsReturn="True" Height="70" TextWrapping="NoWrap" />
-
-    <TextBlock x:Name="ErrorText" Foreground="#d13438" TextWrapping="Wrap" IsVisible="False" />
-    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,10,0,0">
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,16,0,0">
       <Button Content="キャンセル" Click="OnCancel" />
       <Button Content="保存" Classes="accent" Click="OnSave" />
     </StackPanel>

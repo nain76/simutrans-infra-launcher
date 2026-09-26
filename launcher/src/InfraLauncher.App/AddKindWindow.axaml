@@ -1,0 +1,27 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="InfraLauncher.App.AddKindWindow"
+        Title="サーバーを追加" Width="520" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="16" Spacing="12">
+    <TextBlock Text="追加する方法を選んでください" FontSize="16" FontWeight="SemiBold" />
+
+    <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14,12" Click="OnList">
+      <StackPanel Spacing="4">
+        <TextBlock Text="サーバー管理者から共有されたリストを追加" FontWeight="SemiBold" />
+        <TextBlock Text="管理者から教えてもらったアドレスを入れると、そのリストのサーバーがまとめて表示されます。pakset や本体は自動で同期されます。"
+                   TextWrapping="Wrap" Opacity="0.75" />
+      </StackPanel>
+    </Button>
+
+    <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Padding="14,12" Click="OnManual">
+      <StackPanel Spacing="4">
+        <TextBlock Text="プロファイルを手動で設定" FontWeight="SemiBold" />
+        <TextBlock Text="接続先のアドレス・pakset・simutrans 本体を自分で指定します。自動同期はしません。"
+                   TextWrapping="Wrap" Opacity="0.75" />
+      </StackPanel>
+    </Button>
+
+    <Button Content="キャンセル" HorizontalAlignment="Right" Click="OnCancel" />
+  </StackPanel>
+</Window>

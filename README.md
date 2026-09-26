@@ -59,15 +59,28 @@ dotnet publish src/InfraLauncher.App -c Release -r win-x64 --self-contained \
 
 `publish/InfraLauncher.exe`（約21MB）の1ファイルだけで動きます。`PublishTrimmed` で使わないコードを削って小さくしています。Core の JSON 処理はこれに対応するためソース生成を使っているので、JSON で読み書きする型を増やしたら `Json.cs` の `JsonContext` にも追加してください。
 
+## 使い方
+
+画面上の「追加」「編集」「削除」でサーバー一覧を管理します。
+
+- **追加**: 次のどちらかを選びます
+  - **サーバー管理者から共有されたリストを追加**: 管理者から教えてもらった配信アドレス（`https://…/manifest.json` など）か、受け取ったファイルを指定します。リストのサーバーがまとめて表示され、pakset や本体は自動で同期されます
+  - **プロファイルを手動で設定**: 接続先のアドレス・pakset のフォルダ・simutrans 本体を自分で指定します。自動同期はしません
+- **編集 / 削除**: 一覧で選んだものを編集・削除します。共有されたリストのサーバーは内容を管理者が管理しているので、編集ではリストの表示名と配信アドレスを変え、削除ではリストごと消します
+- **☆ / ★**: お気に入りの印です。印を付けたサーバーは一覧の上に並び、「お気に入りだけ表示」で絞り込めます
+- **設定**: 共有されたリストにこの PC 用の simutrans 本体が含まれていないときに使う、手元の simutrans 本体を指定します
+
+画面では、マニフェストのことを「サーバーリスト」と呼んでいます。
+
 ## 動き
 
-1. 設定に登録したマニフェストの URL からサーバー一覧を読む
-2. サーバーを選んで「同期して接続」を押すと、本体と pakset の SHA256 を記録（`installed.json`）と比べ、違うものだけをダウンロードする。ダウンロードしたものは SHA256 を確かめてから展開する
-3. `simutrans -objects <pak>/ -noaddons -load net:<host>:<port>` で起動して接続する
+1. 共有されたサーバーリスト（マニフェスト）を読んで一覧を作る
+2. 共有リストのサーバーを選んで「同期して接続」を押すと、本体と pakset の SHA256 を記録（`installed.json`）と比べ、違うものだけをダウンロードする。ダウンロードしたものは SHA256 を確かめてから展開する
+3. `simutrans -objects <pak>/ -noaddons -load net:<host>:<port>` で起動して接続する（手動プロファイルは 2 を飛ばす）
 
 ランチャーのデータは `%LOCALAPPDATA%\InfraLauncher`（Linux は `~/.local/share/InfraLauncher`）に置かれます。
 
-- `settings.json`: 設定
+- `settings.json`: 設定（サーバーリスト、手動プロファイル、お気に入り）
 - `installed.json`: 展開したものの記録
 - `simutrans/<revision>/`: 本体と pakset
 
