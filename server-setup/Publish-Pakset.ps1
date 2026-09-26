@@ -13,6 +13,9 @@
     アドオンを足すときは、-Source の pakset フォルダに pak をコピーしてからこのスクリプトを実行する。
     ランチャーは次に接続するとき、足したファイルだけを落とす。
 
+    引数を省略すると、Install-DistServer.ps1 が残した publish-settings.json の値を使う
+    （Publish-Pakset.bat をダブルクリックすると、この形で実行される）。
+
     Windows PowerShell 5.1 と PowerShell 7 のどちらでも動く。
 
 .EXAMPLE
@@ -22,10 +25,10 @@
 #>
 [CmdletBinding()]
 param(
-    # サーバーが使っている pakset フォルダ
-    [Parameter(Mandatory = $true)] [string] $Source,
-    # Web サーバーで公開するフォルダ（pakset ごとに分ける）
-    [Parameter(Mandatory = $true)] [string] $Destination,
+    # サーバーが使っている pakset フォルダ（省略すると publish-settings.json の値）
+    [string] $Source,
+    # Web サーバーで公開するフォルダ（pakset ごとに分ける。省略すると publish-settings.json の値）
+    [string] $Destination,
     # 書き換えるサーバーリスト（manifest.json）。省略するとファイル一覧だけ作る
     [string] $Manifest,
     # サーバーリストの中で書き換えるサーバーの id
@@ -72,6 +75,18 @@ function Write-TextFile([string] $path, [string] $text) {
 }
 
 # --- 準備 ---
+if (-not $Source -or -not $Destination) {
+    $settingsPath = Join-Path $PSScriptRoot 'publish-settings.json'
+    if (-not (Test-Path -LiteralPath $settingsPath)) {
+        throw "-Source と -Destination を指定してください（Setup-Server.bat で pakset を公開すると、次からは省略できます）"
+    }
+    $saved = Get-Content -LiteralPath $settingsPath -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (-not $Source) { $Source = $saved.pakset_source }
+    if (-not $Destination) { $Destination = $saved.destination }
+    if (-not $Manifest) { $Manifest = $saved.manifest }
+    if (-not $ServerId) { $ServerId = $saved.server_id }
+    Write-Host "publish-settings.json の設定で公開します: $Source → $Destination"
+}
 $src = Get-FullPath $Source
 $dst = Get-FullPath $Destination
 if (-not (Test-Path -LiteralPath $src -PathType Container)) {

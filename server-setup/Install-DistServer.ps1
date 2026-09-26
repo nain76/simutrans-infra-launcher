@@ -7,7 +7,8 @@
     2. 公開フォルダ（既定: C:\simutrans-dist）を作り、指定ポート（既定: 8080）で公開するサイトを作る
     3. Windows ファイアウォールでそのポートを開ける
     4. サーバーリスト（manifest.json）がなければ作る
-    5. -PaksetSource を指定すると、Publish-Pakset.ps1 で pakset を公開する
+    5. pakset フォルダ（-PaksetSource。なければ質問する）を Publish-Pakset.ps1 で公開し、
+       その設定を publish-settings.json に残す（以後は Publish-Pakset.bat だけで公開し直せる）
     6. 実際にサーバーリストを取得できるか確かめ、友人に伝えるアドレスを表示する
 
     足りない情報は実行中に質問するので、引数なしで実行してもよい。
@@ -33,7 +34,7 @@ param(
     [string] $ServerId = 'friends-a',
     # simutrans サーバーのポート
     [int] $GamePort = 13353,
-    # simutrans サーバーが使っている pakset フォルダ（指定すると公開まで行う）
+    # simutrans サーバーが使っている pakset フォルダのフルパス（省略すると質問する）
     [string] $PaksetSource
 )
 
@@ -114,24 +115,42 @@ if (-not (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContin
 }
 Write-Ok "ルール「$ruleName」があります"
 
-# --- 4. サーバーリスト ---
-Write-Step 'サーバーリスト（manifest.json）を確認しています'
-$manifestPath = Join-Path $DistDir 'manifest.json'
+# --- 4. pakset フォルダ ---
+Write-Step '公開する pakset フォルダを確認しています'
+while (-not $PaksetSource) {
+    $answer = Read-Host 'simutrans サーバーが使っている pakset フォルダのフルパス（例: C:\simutrans-server\pak128.japan。空欄なら今回は公開しない）'
+    if (-not $answer) { break }
+    $answer = $answer.Trim().Trim('"')
+    if (Test-Path -LiteralPath $answer -PathType Container) { $PaksetSource = $answer }
+    else { Write-Warning "フォルダが見つかりません: $answer" }
+}
 $paksetFolder = $null
 if ($PaksetSource) {
     if (-not (Test-Path -LiteralPath $PaksetSource -PathType Container)) {
         throw "pakset フォルダが見つかりません: $PaksetSource"
     }
-    $paksetFolder = Split-Path -Leaf ([System.IO.Path]::GetFullPath($PaksetSource).TrimEnd('\', '/'))
+    $PaksetSource = [System.IO.Path]::GetFullPath($PaksetSource).TrimEnd('\', '/')
+    $paksetFolder = Split-Path -Leaf $PaksetSource
+    Write-Ok "pakset フォルダ: $PaksetSource"
+}
+else {
+    Write-Warning 'pakset は公開しません。あとで Publish-Pakset.bat（または -PaksetSource を付けてこのスクリプト）で公開してください'
 }
 
+# --- 5. サーバーリスト ---
+Write-Step 'サーバーリスト（manifest.json）を確認しています'
+$manifestPath = Join-Path $DistDir 'manifest.json'
 if (Test-Path -LiteralPath $manifestPath) {
-    Write-Ok "既存のサーバーリストをそのまま使います: $manifestPath"
     $data = Get-Content -LiteralPath $manifestPath -Raw -Encoding UTF8 | ConvertFrom-Json
-    if (-not $PublicHost) {
-        $first = @($data.servers)[0]
-        if ($first) { $PublicHost = ($first.address -split ':')[0] }
+    $server = @($data.servers | Where-Object { $_.id -eq $ServerId })
+    if ($server.Count -ne 1) {
+        $ids = (@($data.servers) | ForEach-Object { $_.id }) -join ', '
+        throw "既存のサーバーリストに id が '$ServerId' のサーバーがありません（あるのは: $ids）。-ServerId で指定してください"
     }
+    # 公開先のフォルダ名はサーバーリストの pakset.folder に合わせる
+    $paksetFolder = $server[0].pakset.folder
+    if (-not $PublicHost) { $PublicHost = ($server[0].address -split ':')[0] }
+    Write-Ok "既存のサーバーリストをそのまま使います: $manifestPath"
 }
 else {
     if (-not $PublicHost) { $PublicHost = Read-Value '友人が接続に使うドメイン（例: example.ddns.net）' '' }
@@ -154,14 +173,22 @@ else {
     Write-Ok "サーバーリストを作りました: $manifestPath"
 }
 
-# --- 5. pakset の公開 ---
+# --- 6. pakset の公開 ---
 if ($PaksetSource) {
     Write-Step 'pakset を公開します'
-    & (Join-Path $PSScriptRoot 'Publish-Pakset.ps1') -Source $PaksetSource -Destination (Join-Path $DistDir $paksetFolder) `
+    $publishSettings = [ordered]@{
+        pakset_source = $PaksetSource
+        destination   = (Join-Path $DistDir $paksetFolder)
+        manifest      = $manifestPath
+        server_id     = $ServerId
+    }
+    # Publish-Pakset.bat（引数なしの Publish-Pakset.ps1）が使う設定を残す
+    [System.IO.File]::WriteAllText((Join-Path $PSScriptRoot 'publish-settings.json'), (ConvertTo-Json -InputObject $publishSettings), $Utf8NoBom)
+    & (Join-Path $PSScriptRoot 'Publish-Pakset.ps1') -Source $PaksetSource -Destination $publishSettings.destination `
         -Manifest $manifestPath -ServerId $ServerId
 }
 
-# --- 6. 確認 ---
+# --- 7. 確認 ---
 Write-Step '配信できるか確かめています'
 $localUrl = "http://localhost:$Port/manifest.json"
 try {
@@ -188,7 +215,10 @@ Write-Host "     - 自宅の場合: ルーターのポート転送で TCP $Port 
 Write-Host "  2. 自分の PC のブラウザで $shareUrl が開けるか確かめる"
 Write-Host "  3. 友人にこのアドレスを伝える: $shareUrl"
 Write-Host '     友人はランチャーの「追加」→「サーバー管理者から共有されたリストを追加」に入れる'
-if (-not $PaksetSource) {
-    Write-Host '  4. pakset を公開する: Publish-Pakset.ps1（または -PaksetSource を付けてこのスクリプトをもう一度実行）'
+if ($PaksetSource) {
+    Write-Host '  アドオンを足したあとは: pak をコピー → simutrans サーバーを再起動 → Publish-Pakset.bat をダブルクリック'
+}
+else {
+    Write-Host '  4. pakset を公開する: もう一度 Setup-Server.bat を実行し、pakset フォルダのフルパスを答える'
 }
 Write-Host '============================================================' -ForegroundColor Cyan

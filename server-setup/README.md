@@ -32,9 +32,9 @@ Windows Server
 1. この `server-setup` フォルダを Windows Server の好きな場所にコピーする
 2. **`Setup-Server.bat` をダブルクリック**し、「このアプリがデバイスに変更を加えることを許可しますか？」で「はい」を押す
 3. 質問に答える
+   - simutrans サーバーが使っている **pakset フォルダのフルパス**（例: `C:\simutrans-server\pak128.japan`）。エクスプローラーでフォルダを Shift＋右クリック →「パスのコピー」で貼り付けられます
    - 友人が接続に使うドメイン（例: `example.ddns.net`）
    - ランチャーに表示するサーバー名
-   - pakset のフォルダ名（例: `pak128.japan`）
 4. 最後に表示される「残りの作業」を行う
    - 外から **TCP 8080 番**に届くようにする（下の「8080 番を外から届くようにする」を参照）
    - 自分の PC のブラウザで `http://<ドメイン>:8080/manifest.json` が開けるか確かめる（外から届くかを確かめるため、サーバー自身ではなく自分の PC で開く）
@@ -46,10 +46,12 @@ Windows Server
 2. 公開フォルダ `C:\simutrans-dist` を作り、ポート 8080 で公開する（フォルダの中身の一覧表示はオフ）
 3. Windows ファイアウォールでポート 8080 を開ける
 4. サーバーリスト `manifest.json` がなければ作る。あればそのまま使う
-5. `-PaksetSource` を指定した場合は、pakset も公開する
+5. pakset を公開する。答えた内容は `publish-settings.json` に残り、次からは `Publish-Pakset.bat` だけで公開し直せる
 6. 実際にサーバーリストを取得できるか確かめる
 
-pakset の公開まで一度に済ませるなら、PowerShell を管理者として開いて次のように実行します。
+以前に pakset の名前だけ答えて構築した場合も、もう一度 `Setup-Server.bat` を実行してフルパスを答えれば公開されます（サーバーリストはそのまま使います）。
+
+質問に答える代わりに引数で指定することもできます（PowerShell を管理者として開いて実行）。
 
 ```powershell
 Set-ExecutionPolicy -Scope Process Bypass
@@ -65,7 +67,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 | `-ServerName` | （質問する） | ランチャーに表示するサーバー名 |
 | `-ServerId` | `friends-a` | サーバーリストに書くサーバーの id |
 | `-GamePort` | `13353` | simutrans サーバーのポート |
-| `-PaksetSource` | なし | simutrans サーバーが使っている pakset フォルダ。指定すると公開まで行う |
+| `-PaksetSource` | （質問する） | simutrans サーバーが使っている pakset フォルダのフルパス |
 
 ### 8080 番を外から届くようにする
 
@@ -77,7 +79,10 @@ simutrans の 13353 番を開けたのと同じ場所に、8080 番を足すと�
 | **VPS** | 事業者の管理画面にサーバー手前のファイアウォールがあれば、TCP 8080 を許可する（ConoHa の「セキュリティグループ」、さくらの VPS・Xserver VPS の「パケットフィルター」など）。その仕組みがなければ何もしない。VPS にはルーターがないので、ポート転送は要らない |
 | **自宅など、ルーターの内側** | ルーターの「ポート転送」（「ポートマッピング」「静的 IP マスカレード」とも呼ぶ）で、TCP 8080 をこのサーバーへ転送する |
 
-### pakset を公開する（構築のあと）
+### pakset を公開し直す（構築のあと）
+
+**`Publish-Pakset.bat` をダブルクリック**します（構築のときに答えた設定で公開します）。
+別の設定で公開したいときは、PowerShell で引数を指定して実行します。
 
 ```powershell
 .\Publish-Pakset.ps1 `
@@ -93,8 +98,8 @@ simutrans の 13353 番を開けたのと同じ場所に、8080 番を足すと�
 
 | やりたいこと | やること |
 |---|---|
-| アドオンを足す・入れ替える | ① `C:\simutrans-server\pak128.japan` に pak をコピー → ② simutrans サーバーを再起動 → ③ `Publish-Pakset.ps1` を実行 |
-| アドオンを外す | ① pak を消す → ② 再起動 → ③ `Publish-Pakset.ps1` を実行（外したアドオンを使っているセーブデータは読めなくなることがあります） |
+| アドオンを足す・入れ替える | ① `C:\simutrans-server\pak128.japan` に pak をコピー → ② simutrans サーバーを再起動 → ③ `Publish-Pakset.bat` をダブルクリック |
+| アドオンを外す | ① pak を消す → ② 再起動 → ③ `Publish-Pakset.bat` をダブルクリック（外したアドオンを使っているセーブデータは読めなくなることがあります） |
 | お知らせや状態を変える | `manifest.json` の `message` や `status`（`online` / `offline` / `maintenance`）を書き換える |
 | サーバーを増やす | `manifest.json` の `servers` に項目を足し、そのサーバー用に `Publish-Pakset.ps1` を実行する（`-ServerId` を変える） |
 
@@ -114,8 +119,8 @@ HTTP のままでも動きます。ただし通信経路の途中で `manifest.j
 
 | 引数 | 説明 |
 |---|---|
-| `-Source` | サーバーが使っている pakset フォルダ |
-| `-Destination` | 公開フォルダの中の、pakset 用のフォルダ |
+| `-Source` | サーバーが使っている pakset フォルダ。省略すると `publish-settings.json` の値 |
+| `-Destination` | 公開フォルダの中の、pakset 用のフォルダ。省略すると `publish-settings.json` の値 |
 | `-Manifest` | 書き換えるサーバーリスト。省略するとファイル一覧だけ作る |
 | `-ServerId` | サーバーリストの中で書き換えるサーバーの `id` |
 | `-Version` | 書き込む pakset のバージョン。省略すると日時（例: `2026.09.26-2100`） |
