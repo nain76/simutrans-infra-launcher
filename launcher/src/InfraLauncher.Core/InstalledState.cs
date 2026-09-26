@@ -11,13 +11,13 @@ public sealed class InstalledState
 
     public static InstalledState Load(InstallLayout layout)
     {
-        var state = Json.Load<InstalledState>(layout.InstalledStatePath);
+        var state = Json.Load(layout.InstalledStatePath, Json.Context.InstalledState);
         // 読み込み直後は比較方法が既定に戻るので作り直す
         state.Items = new(state.Items, StringComparer.OrdinalIgnoreCase);
         return state;
     }
 
-    public void Save(InstallLayout layout) => Json.Save(layout.InstalledStatePath, this);
+    public void Save(InstallLayout layout) => Json.Save(layout.InstalledStatePath, this, Json.Context.InstalledState);
 
     public InstalledRecord? Get(string dir) => Items.GetValueOrDefault(Key(dir));
 

@@ -52,8 +52,12 @@ dotnet run --project src/InfraLauncher.Cli -- launch https://example.ddns.net/ma
 友人に配る実行ファイル（.NET のインストール不要）を作るには:
 
 ```sh
-dotnet publish src/InfraLauncher.App -c Release -r win-x64 --self-contained -p:PublishSingleFile=true
+dotnet publish src/InfraLauncher.App -c Release -r win-x64 --self-contained \
+  -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true \
+  -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=true -p:DebugType=none -o publish
 ```
+
+`publish/InfraLauncher.exe`（約21MB）の1ファイルだけで動きます。`PublishTrimmed` で使わないコードを削って小さくしています。Core の JSON 処理はこれに対応するためソース生成を使っているので、JSON で読み書きする型を増やしたら `Json.cs` の `JsonContext` にも追加してください。
 
 ## 動き
 

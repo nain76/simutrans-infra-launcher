@@ -32,7 +32,7 @@ public sealed partial class ManifestClient(HttpClient http)
         Manifest? manifest;
         try
         {
-            manifest = JsonSerializer.Deserialize<Manifest>(json, Json.Options);
+            manifest = JsonSerializer.Deserialize(json, Json.Context.Manifest);
         }
         catch (JsonException e)
         {

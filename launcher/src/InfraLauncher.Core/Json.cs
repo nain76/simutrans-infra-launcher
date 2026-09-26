@@ -1,13 +1,20 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 using System.Text.Unicode;
+using InfraLauncher.Core.Models;
 
 namespace InfraLauncher.Core;
 
+/// <summary>
+/// JSON の読み書き。exe を小さくするために未使用コードを削っても動くよう、
+/// リフレクションではなくソース生成（<see cref="JsonContext"/>）を使う。
+/// </summary>
 internal static class Json
 {
     /// <summary>マニフェストや保存ファイルは snake_case。日本語はエスケープせずに書く。</summary>
-    public static readonly JsonSerializerOptions Options = new()
+    public static readonly JsonContext Context = new(new JsonSerializerOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
         PropertyNameCaseInsensitive = true,
@@ -15,24 +22,29 @@ internal static class Json
         AllowTrailingCommas = true,
         WriteIndented = true,
         Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
-    };
+    });
 
-    public static T Load<T>(string path) where T : new()
+    public static T Load<T>(string path, JsonTypeInfo<T> type) where T : new()
     {
         if (!File.Exists(path))
         {
             return new T();
         }
         using var stream = File.OpenRead(path);
-        return JsonSerializer.Deserialize<T>(stream, Options) ?? new T();
+        return JsonSerializer.Deserialize(stream, type) ?? new T();
     }
 
     /// <summary>書き込み途中で落ちても壊れないよう、一時ファイルに書いてから置き換える。</summary>
-    public static void Save<T>(string path, T value)
+    public static void Save<T>(string path, T value, JsonTypeInfo<T> type)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(path))!);
         var tmp = path + ".tmp";
-        File.WriteAllText(tmp, JsonSerializer.Serialize(value, Options));
+        File.WriteAllText(tmp, JsonSerializer.Serialize(value, type));
         File.Move(tmp, path, overwrite: true);
     }
 }
+
+[JsonSerializable(typeof(Manifest))]
+[JsonSerializable(typeof(LauncherSettings))]
+[JsonSerializable(typeof(InstalledState))]
+internal sealed partial class JsonContext : JsonSerializerContext;

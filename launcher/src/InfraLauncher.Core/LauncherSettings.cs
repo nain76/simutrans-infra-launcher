@@ -11,9 +11,9 @@ public sealed class LauncherSettings
     /// <summary>マニフェストにない、手入力のサーバー。同期はせず、そのまま接続する。</summary>
     public List<FavoriteServer> Favorites { get; set; } = new();
 
-    public static LauncherSettings Load(InstallLayout layout) => Json.Load<LauncherSettings>(layout.SettingsPath);
+    public static LauncherSettings Load(InstallLayout layout) => Json.Load(layout.SettingsPath, Json.Context.LauncherSettings);
 
-    public void Save(InstallLayout layout) => Json.Save(layout.SettingsPath, this);
+    public void Save(InstallLayout layout) => Json.Save(layout.SettingsPath, this, Json.Context.LauncherSettings);
 }
 
 public sealed class FavoriteServer
