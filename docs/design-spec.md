@@ -136,3 +136,24 @@ simutrans -objects pak128.japan/ -noaddons -load net:example.ddns.net:13353
 - [ ] サーバー側: マニフェストの `status` / `players` を定期更新する PowerShell スクリプト
 - [ ] サーバー構築の自動化（PowerShell + NSSM）
 - [ ] 実際の simutrans と pakset を使った、Windows での動作確認
+
+## 検討メモ: アドオンの提出と承認（2026-09-26、今回は見送り）
+
+参考: [AhozuraNS の運用記事](https://ahozura.kasu.me/portal/?p=2195)。Discord bot で提出を受け、GitHub Actions で `makeobj merge` して boot.pak にまとめ、バージョン付き zip を配布している。クライアントは `PakUpdateChecker.exe` でバージョン番号を比べて更新する（ハッシュの確認はない）。
+
+「友人が pak をサーバー側のフォルダに上げ、管理者が承認したらアドオンフォルダへ入れる」運用を検討した結果、**今回は実装しない**ことにした。
+
+### 検討したセキュリティ上のポイント（再開するときのため）
+- **一番危ないのは受け口。** アップロードを受け付ける仕組みを自前で Windows Server に立てると、インターネットに開いた入口になる。自作はせず、既存サービスの受け口（OneDrive / Google Drive の「ファイルのリクエスト」、SFTP、GitHub のプルリクエストなど）を使う前提。
+- **zip の中身:** `.pak` と `.tab` 以外（exe、dll、Squirrel スクリプトの `.nut` など）は取り込まない。
+- **pak 本体:** 実行されないデータだが、simutrans は他人が作った pak を安全に読む前提では作られていない。管理者の承認を必須にし、先頭の印 `Simutrans object file`（`descriptor/writer/root_writer.cc`）とサイズを確かめる。
+- **配布:** 既存の SHA256 確認で改ざんを防げる。
+
+### ソースで確認した制約
+- pak はサーバーの起動時にしか読み込まれないので、反映には再起動が必要。
+- サーバーとクライアントで読み込むオブジェクトが全く同じでないと、チェックサムが合わず接続できない。
+- 一度入れたアドオンを外すと、それを使っているセーブデータが読めなくなることがある。
+- アドオンは `-addons` を付けたときだけ `<user_dir>/addons/<pak名>/` から読まれる（`simmain.cc`）。ランチャーは今 `-noaddons` を付けている。ランチャーが管理する本体なら、`-singleuser` で user_dir を本体フォルダにし、`-addons` と組み合わせれば、ランチャー側で完結できる。
+
+### 今の仕組みでできること
+管理者が手作業で承認したアドオンを pakset の zip に同梱し、サーバーリストの sha256 を書き換えれば、コードを追加しなくても友人に配布できる。ただし pakset 全体をダウンロードし直すことになる。
