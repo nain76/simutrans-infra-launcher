@@ -1,0 +1,46 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="using:InfraLauncher.App"
+        x:Class="InfraLauncher.App.MainWindow"
+        Title="Simutrans ランチャー"
+        Width="880" Height="560" MinWidth="560" MinHeight="360">
+  <DockPanel Margin="16">
+    <!-- 上: タイトルと操作 -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto,Auto" Margin="0,0,0,12">
+      <TextBlock Text="サーバー一覧" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
+      <Button Grid.Column="1" x:Name="RefreshButton" Content="更新" Margin="0,0,8,0" Click="OnRefresh" />
+      <Button Grid.Column="2" Content="設定" Click="OnSettings" />
+    </Grid>
+
+    <!-- 下: 接続ボタンと進み具合 -->
+    <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
+      <ProgressBar x:Name="Progress" IsVisible="False" Minimum="0" Maximum="100" Height="6" />
+      <Grid ColumnDefinitions="*,Auto">
+        <SelectableTextBlock x:Name="StatusText" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <Button Grid.Column="1" x:Name="ConnectButton" Content="同期して接続" IsEnabled="False"
+                Classes="accent" Padding="20,8" Margin="12,0,0,0" Click="OnConnect" />
+      </Grid>
+    </StackPanel>
+
+    <ListBox x:Name="ServerList" SelectionChanged="OnSelectionChanged" DoubleTapped="OnConnect">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="local:ServerRow">
+          <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="4,6">
+            <StackPanel Orientation="Horizontal" Spacing="12">
+              <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" />
+              <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" />
+              <TextBlock Text="{Binding PlayersText}" VerticalAlignment="Center" />
+            </StackPanel>
+            <TextBlock Grid.Column="1" Text="{Binding AddressText}" Opacity="0.7" VerticalAlignment="Center" />
+            <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Message}" IsVisible="{Binding HasMessage}"
+                       TextWrapping="Wrap" Margin="0,4,0,0" />
+            <StackPanel Grid.Row="2" Grid.ColumnSpan="2" Orientation="Horizontal" Spacing="16" Margin="0,4,0,0" Opacity="0.7">
+              <TextBlock Text="{Binding PaksetText}" />
+              <TextBlock Text="{Binding SyncText}" TextWrapping="Wrap" />
+            </StackPanel>
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </DockPanel>
+</Window>

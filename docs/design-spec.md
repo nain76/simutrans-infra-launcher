@@ -107,5 +107,32 @@
 - → ランチャーが実行する起動コマンドは次の形になる:
 
 ```
-simutrans -objects pak128.japan/ -load net:example.ddns.net:13353
+simutrans -objects pak128.japan/ -noaddons -load net:example.ddns.net:13353
 ```
+
+## 決定事項（2026-09-26）
+
+「未決事項 / 次のステップ」のうち、次のことが決まった。
+
+- **技術スタック**: C# / .NET 10 + Avalonia。友人の OS がまだわからないので、まず Windows 向けに完成させる。.NET と Avalonia はどちらも Mac・Linux で動くので、後から対応できる。
+- **マニフェストのホスティング**: 静的な JSON ファイルを置くだけにする（IIS の静的ファイル配信などで十分）。API サーバーは立てない。
+  - 接続人数と稼働状況は、サーバー側の PowerShell スクリプトをタスクスケジューラで定期実行し、JSON の `status` / `players` を書き換えて反映する（次の段階）。
+  - 人数は本体付属の `nettool clients` で取れる（`nettools/nettool.cc`、管理者パスワードが必要）。
+- **起動コマンド**: `simutrans -objects <pak>/ -noaddons -load net:<host>:<port>`
+  - `-noaddons`: 個人のアドオンが混ざるとチェックサムがずれる原因になるので付ける。
+  - pakset のフォルダは本体のデータフォルダから見た位置になり、データフォルダは実行ファイルのあるフォルダ（`simmain.cc`）。そのため pakset は本体と同じフォルダの中に展開する。
+  - 接続先のアドレスとポート、pak のフォルダ名はマニフェストから取る。ポートを省略したら 13353。
+- **同期の判断**: sha256 はダウンロードする zip のハッシュ。展開後のフォルダとは直接比べられないので、「どの sha256 の zip をどこに展開したか」を `installed.json` に記録し、マニフェストと比べる。
+- **マニフェストの形式**: 設計メモの案に `schema_version`、`id`、OS ごとの `engine.builds`、`pakset.folder` / `version` を加えた。定義は `manifest/manifest.schema.json`、説明は `manifest/README.md`。
+
+## 実装の状況（2026-09-26）
+
+- [x] マニフェストの形式（JSON Schema とサンプル）
+- [x] ランチャーの Core: マニフェストの取得と検証、本体と pakset の同期、起動
+  - 同期の手順: SHA256 の確認 → zip slip 対策をして展開 → 置き換え
+  - ユーザーが自分で入れたフォルダは消さずに退避する
+- [x] ランチャーの画面（Avalonia）: サーバー一覧、同期して接続、設定（マニフェストの URL、手元の simutrans、お気に入り）
+- [x] コマンドライン版（動作確認・トラブル調査用）
+- [ ] サーバー側: マニフェストの `status` / `players` を定期更新する PowerShell スクリプト
+- [ ] サーバー構築の自動化（PowerShell + NSSM）
+- [ ] 実際の simutrans と pakset を使った、Windows での動作確認

@@ -1,0 +1,147 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/nain76/TID_simutrans/tools/infra-launcher/manifest/manifest.schema.json",
+  "title": "Simutrans infra launcher server manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "servers"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "servers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/server"
+      }
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{64}$"
+    },
+    "download": {
+      "type": "object",
+      "required": [
+        "url",
+        "sha256"
+      ],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "required": [
+        "id",
+        "name",
+        "address",
+        "pakset"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+$",
+          "description": "変わらない識別子。お気に入りや記録ファイルで使う"
+        },
+        "name": {
+          "type": "string"
+        },
+        "address": {
+          "type": "string",
+          "description": "host または host:port。ポート省略時は 13353"
+        },
+        "status": {
+          "enum": [
+            "online",
+            "offline",
+            "maintenance",
+            "unknown"
+          ]
+        },
+        "players": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "message": {
+          "type": "string"
+        },
+        "engine": {
+          "type": "object",
+          "required": [
+            "revision"
+          ],
+          "properties": {
+            "revision": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.-]+$"
+            },
+            "builds": {
+              "type": "object",
+              "description": "キーは windows-x64 / windows-arm64 / linux-x64 / linux-arm64 / macos-x64 / macos-arm64",
+              "additionalProperties": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/download"
+                  },
+                  {
+                    "type": "object",
+                    "required": [
+                      "exe"
+                    ],
+                    "properties": {
+                      "exe": {
+                        "type": "string",
+                        "description": "zip 展開先から見た実行ファイルの位置。zip の最上位がフォルダ1つだけの場合、そのフォルダは取り除いて展開される"
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "pakset": {
+          "allOf": [
+            {
+              "$ref": "#/$defs/download"
+            },
+            {
+              "type": "object",
+              "required": [
+                "name",
+                "folder"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": "string"
+                },
+                "folder": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z0-9_.+-]+$",
+                  "description": "-objects に渡すフォルダ名。本体の実行ファイルと同じフォルダの中に、この名前で展開される。zip の最上位がフォルダ1つだけの場合、そのフォルダは取り除いて展開される"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}

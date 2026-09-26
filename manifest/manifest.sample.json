@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "updated_at": "2026-09-26T20:00:00+09:00",
+  "servers": [
+    {
+      "id": "friends-a",
+      "name": "友達内輪鯖A",
+      "address": "example.ddns.net:13353",
+      "status": "online",
+      "players": 3,
+      "message": "今日20時から再開します",
+      "engine": {
+        "revision": "r1234-2026-09",
+        "builds": {
+          "windows-x64": {
+            "url": "https://example.com/simutrans/simutrans-r1234-win64.zip",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "exe": "simutrans.exe"
+          }
+        }
+      },
+      "pakset": {
+        "name": "pak128.japan",
+        "version": "2026.09.01",
+        "folder": "pak128.japan",
+        "url": "https://example.com/simutrans/pak128.japan-2026.09.01.zip",
+        "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
+      }
+    }
+  ]
+}
