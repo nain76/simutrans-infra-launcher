@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "servers": [
+    {
+      "id": "friends-a",
+      "name": "友達内輪鯖A",
+      "address": "example.ddns.net:13353",
+      "status": "online",
+      "message": "",
+      "pakset": {
+        "name": "pak128.japan",
+        "folder": "pak128.japan"
+      }
+    }
+  ]
+}
