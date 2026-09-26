@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Simutrans infra launcher pakset file index",
+  "description": "ファイル一覧方式の index.json。server-setup/Publish-Pakset.ps1 が作る。各ファイルは index.json と同じ場所からの相対パスで配信する",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "files"
+  ],
+  "properties": {
+    "schema_version": {
+      "const": 1
+    },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "path",
+          "size",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "pakset フォルダから見た相対パス。区切りは /。.. や絶対パス、実行ファイル（.exe、.dll、.bat など）は不可"
+          },
+          "size": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-fA-F]{64}$"
+          }
+        }
+      }
+    }
+  }
+}

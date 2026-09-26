@@ -42,4 +42,6 @@ public sealed class InstalledRecord
     public string Sha256 { get; set; } = "";
     public string Url { get; set; } = "";
     public DateTimeOffset InstalledAt { get; set; }
+    /// <summary>ファイル一覧方式のときだけ、各ファイルの照合用の記録（キーは pakset フォルダからの相対パス）。</summary>
+    public Dictionary<string, FileStamp>? Files { get; set; }
 }

@@ -35,8 +35,7 @@
       ],
       "properties": {
         "url": {
-          "type": "string",
-          "format": "uri"
+          "$ref": "#/$defs/url"
         },
         "sha256": {
           "$ref": "#/$defs/sha256"
@@ -115,33 +114,88 @@
           }
         },
         "pakset": {
-          "allOf": [
+          "type": "object",
+          "required": [
+            "name",
+            "folder"
+          ],
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "folder": {
+              "type": "string",
+              "pattern": "^[A-Za-z0-9_.+-]+$",
+              "description": "-objects に渡すフォルダ名。本体の実行ファイルと同じフォルダの中に、この名前で置かれる"
+            },
+            "url": {
+              "$ref": "#/$defs/url",
+              "description": "zip 方式: pakset の zip。zip の最上位がフォルダ1つだけの場合、そのフォルダは取り除いて展開される"
+            },
+            "sha256": {
+              "$ref": "#/$defs/sha256",
+              "description": "zip 方式: zip の SHA256"
+            },
+            "index_url": {
+              "$ref": "#/$defs/url",
+              "description": "ファイル一覧方式: index.json（index.schema.json）のアドレス。各ファイルは index.json と同じ場所に置く"
+            },
+            "index_sha256": {
+              "$ref": "#/$defs/sha256",
+              "description": "ファイル一覧方式: index.json の SHA256"
+            }
+          },
+          "oneOf": [
             {
-              "$ref": "#/$defs/download"
+              "required": [
+                "url",
+                "sha256"
+              ],
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "index_url"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "index_sha256"
+                    ]
+                  }
+                ]
+              }
             },
             {
-              "type": "object",
               "required": [
-                "name",
-                "folder"
+                "index_url",
+                "index_sha256"
               ],
-              "properties": {
-                "name": {
-                  "type": "string"
-                },
-                "version": {
-                  "type": "string"
-                },
-                "folder": {
-                  "type": "string",
-                  "pattern": "^[A-Za-z0-9_.+-]+$",
-                  "description": "-objects に渡すフォルダ名。本体の実行ファイルと同じフォルダの中に、この名前で展開される。zip の最上位がフォルダ1つだけの場合、そのフォルダは取り除いて展開される"
-                }
+              "not": {
+                "anyOf": [
+                  {
+                    "required": [
+                      "url"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "sha256"
+                    ]
+                  }
+                ]
               }
             }
           ]
         }
       }
+    },
+    "url": {
+      "type": "string",
+      "description": "絶対アドレス（https://…）か、サーバーリストの場所から見た相対パス（pak128.japan/index.json など）"
     }
   }
 }

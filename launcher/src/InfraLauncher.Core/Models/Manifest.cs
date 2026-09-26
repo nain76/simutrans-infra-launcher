@@ -35,12 +35,37 @@ public sealed class EngineBuild
     public string Exe { get; set; } = "";
 }
 
+/// <summary>
+/// pakset の配り方は2通り。
+/// zip 方式: url と sha256（zip 1つを丸ごと入れ替える）
+/// ファイル一覧方式: index_url と index_sha256（変わったファイルだけを落とす）
+/// </summary>
 public sealed class PaksetInfo
 {
     public string Name { get; set; } = "";
     public string? Version { get; set; }
     /// <summary>-objects に渡すフォルダ名。</summary>
     public string Folder { get; set; } = "";
-    public string Url { get; set; } = "";
+    public string? Url { get; set; }
+    public string? Sha256 { get; set; }
+    public string? IndexUrl { get; set; }
+    public string? IndexSha256 { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool UsesFileIndex => IndexUrl is not null;
+}
+
+/// <summary>ファイル一覧方式の一覧ファイル（index.json）。各ファイルは一覧ファイルと同じ場所からの相対パスで置く。</summary>
+public sealed class PaksetIndex
+{
+    public int SchemaVersion { get; set; }
+    public List<PaksetFile> Files { get; set; } = new();
+}
+
+public sealed class PaksetFile
+{
+    /// <summary>pakset フォルダから見た相対パス。区切りは "/"。</summary>
+    public string Path { get; set; } = "";
+    public long Size { get; set; }
     public string Sha256 { get; set; } = "";
 }

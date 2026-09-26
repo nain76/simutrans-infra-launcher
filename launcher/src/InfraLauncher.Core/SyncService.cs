@@ -8,8 +8,15 @@ public sealed class SyncException(string message, Exception? inner = null) : Exc
 
 public enum SyncItemKind { Engine, Pakset }
 
-/// <summary>1つのダウンロード対象（本体または pakset）と、その展開先。</summary>
-public sealed record SyncItem(SyncItemKind Kind, string Label, string Url, string Sha256, string TargetDir, bool Needed);
+/// <summary>zip を丸ごと入れ替えるか、ファイル一覧で差分だけを落とすか。</summary>
+public enum SyncMethod { Zip, FileIndex }
+
+/// <summary>
+/// 1つのダウンロード対象（本体または pakset）と、その展開先。
+/// ファイル一覧方式では Url と Sha256 は一覧ファイル（index.json）のもの。
+/// </summary>
+public sealed record SyncItem(SyncItemKind Kind, string Label, string Url, string Sha256, string TargetDir, bool Needed,
+    SyncMethod Method = SyncMethod.Zip);
 
 /// <summary>サーバー1つ分の同期計画。</summary>
 public sealed record SyncPlan(ServerEntry Server, string ExePath, string PaksetFolder, IReadOnlyList<SyncItem> Items)
@@ -19,12 +26,21 @@ public sealed record SyncPlan(ServerEntry Server, string ExePath, string PaksetF
 
 public sealed record SyncProgress(SyncItem Item, string Stage, long BytesDone, long? BytesTotal);
 
+/// <summary>同期の結果。Downloads はダウンロードしたファイル（zip）の数、Removed は片付けたファイルの数。</summary>
+public sealed record SyncSummary(int Downloads, long Bytes, int Removed)
+{
+    public SyncSummary Add(SyncSummary o) => new(Downloads + o.Downloads, Bytes + o.Bytes, Removed + o.Removed);
+}
+
 /// <summary>
-/// マニフェストと installed.json を比べ、必要なものだけをダウンロード・展開する。
-/// 手順: ダウンロード → sha256 確認 → 展開先の横の一時フォルダに展開 → 置き換え。
+/// サーバーリストと installed.json を比べ、必要なものだけをダウンロード・展開する。
+/// zip 方式: ダウンロード → sha256 確認 → 展開先の横の一時フォルダに展開 → 置き換え。
+/// ファイル一覧方式: <see cref="FileIndexSync"/> を参照。
 /// </summary>
 public sealed class SyncService(InstallLayout layout, HttpClient http)
 {
+    private readonly FileIndexSync _fileIndex = new(layout, http);
+
     public SyncPlan Plan(ServerEntry server, LauncherSettings settings)
     {
         var state = InstalledState.Load(layout);
@@ -53,96 +69,70 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
 
         var p = server.Pakset;
         var paksetDir = Path.Combine(SimutransPaths.DataDirFor(exe), p.Folder);
-        var paksetNeeded = !Directory.Exists(paksetDir) || !SameHash(state.Get(paksetDir), p.Sha256);
         var label = string.IsNullOrEmpty(p.Version) ? p.Name : $"{p.Name} {p.Version}";
-        items.Add(new SyncItem(SyncItemKind.Pakset, label, p.Url, p.Sha256, paksetDir, paksetNeeded));
+        var (url, sha, method) = p.UsesFileIndex
+            ? (p.IndexUrl!, p.IndexSha256!, SyncMethod.FileIndex)
+            : (p.Url!, p.Sha256!, SyncMethod.Zip);
+        var paksetNeeded = !Directory.Exists(paksetDir) || !SameHash(state.Get(paksetDir), sha);
+        items.Add(new SyncItem(SyncItemKind.Pakset, label, url, sha, paksetDir, paksetNeeded, method));
 
         return new SyncPlan(server, exe, p.Folder, items);
     }
 
-    public async Task SyncAsync(SyncPlan plan, IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
+    public async Task<SyncSummary> SyncAsync(SyncPlan plan, IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
     {
+        var summary = new SyncSummary(0, 0, 0);
         // 本体を先に入れる。本体を入れ直すと中の pakset も消えるので、そのあと pakset を判定し直す
         foreach (var item in plan.Items.OrderBy(i => i.Kind))
         {
+            if (item.Method == SyncMethod.FileIndex)
+            {
+                // 照合は軽いので毎回行い、手元で消えたり書き換わったりしたファイルも直す
+                summary = summary.Add(await _fileIndex.SyncAsync(item, progress, ct));
+                continue;
+            }
             var state = InstalledState.Load(layout);
             var needed = item.Needed || !Directory.Exists(item.TargetDir) || !SameHash(state.Get(item.TargetDir), item.Sha256);
             if (!needed)
             {
                 continue;
             }
-            await InstallAsync(item, progress, ct);
+            summary = summary.Add(await InstallAsync(item, progress, ct));
         }
+        return summary;
     }
 
-    private async Task InstallAsync(SyncItem item, IProgress<SyncProgress>? progress, CancellationToken ct)
+    private async Task<SyncSummary> InstallAsync(SyncItem item, IProgress<SyncProgress>? progress, CancellationToken ct)
     {
         Directory.CreateDirectory(layout.DownloadDir);
         var zipPath = Path.Combine(layout.DownloadDir, $"{item.Sha256.ToLowerInvariant()}.zip");
+        long size;
         try
         {
             await DownloadAsync(item, zipPath, progress, ct);
+            size = new FileInfo(zipPath).Length;
             progress?.Report(new SyncProgress(item, "展開中", 0, null));
             Extract(item, zipPath);
         }
         finally
         {
-            TryDelete(zipPath);
+            Downloader.TryDelete(zipPath);
         }
         progress?.Report(new SyncProgress(item, "完了", 0, null));
+        return new SyncSummary(1, size, 0);
     }
 
     private async Task DownloadAsync(SyncItem item, string zipPath, IProgress<SyncProgress>? progress, CancellationToken ct)
     {
-        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
-        try
+        long? total = null;
+        if (new Uri(item.Url) is { IsFile: true } fileUri && File.Exists(fileUri.LocalPath))
         {
-            var uri = new Uri(item.Url);
-            HttpResponseMessage? response = null;
-            Stream source;
-            long? total;
-            if (uri.IsFile)
-            {
-                source = File.OpenRead(uri.LocalPath);
-                total = source.Length;
-            }
-            else
-            {
-                response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
-                response.EnsureSuccessStatusCode();
-                source = await response.Content.ReadAsStreamAsync(ct);
-                total = response.Content.Headers.ContentLength;
-            }
-
-            using (response)
-            await using (source)
-            await using (var dest = File.Create(zipPath))
-            {
-                var buffer = new byte[81920];
-                long done = 0;
-                int n;
-                progress?.Report(new SyncProgress(item, "ダウンロード中", 0, total));
-                while ((n = await source.ReadAsync(buffer, ct)) > 0)
-                {
-                    hash.AppendData(buffer, 0, n);
-                    await dest.WriteAsync(buffer.AsMemory(0, n), ct);
-                    done += n;
-                    progress?.Report(new SyncProgress(item, "ダウンロード中", done, total));
-                }
-            }
+            total = new FileInfo(fileUri.LocalPath).Length;
         }
-        catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException or TaskCanceledException && !ct.IsCancellationRequested)
-        {
-            throw new SyncException($"{item.Label} をダウンロードできませんでした: {item.Url} ({e.Message})", e);
-        }
-
-        var actual = Convert.ToHexStringLower(hash.GetHashAndReset());
-        if (!actual.Equals(item.Sha256, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new SyncException(
-                $"{item.Label} のハッシュがサーバーリストの記載と一致しません。ダウンロードが壊れているか、サーバーリストが古い可能性があります。サーバー管理者に確認してください。" +
-                $"（期待: {item.Sha256.ToLowerInvariant()}、実際: {actual}）");
-        }
+        long done = 0;
+        progress?.Report(new SyncProgress(item, "ダウンロード中", 0, total));
+        await Downloader.DownloadAsync(http, item.Url, zipPath, item.Sha256, item.Label,
+            n => progress?.Report(new SyncProgress(item, "ダウンロード中", done += n, total)), ct);
     }
 
     private void Extract(SyncItem item, string zipPath)
@@ -246,11 +236,6 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         {
             throw new SyncException($"{what} が展開先の外を指しています");
         }
-    }
-
-    private static void TryDelete(string path)
-    {
-        try { File.Delete(path); } catch (IOException) { } catch (UnauthorizedAccessException) { }
     }
 
     private static void TryDeleteDir(string path)

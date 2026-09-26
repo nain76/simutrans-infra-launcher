@@ -133,6 +133,10 @@ simutrans -objects pak128.japan/ -noaddons -load net:example.ddns.net:13353
   - ユーザーが自分で入れたフォルダは消さずに退避する
 - [x] ランチャーの画面（Avalonia）: サーバー一覧、同期して接続、設定（マニフェストの URL、手元の simutrans、お気に入り）
 - [x] コマンドライン版（動作確認・トラブル調査用）
+- [x] pakset の差分同期（ファイル一覧方式）: 各ファイルを SHA256 で照合し、変わったファイルだけを落とす
+  - 一覧ファイルの SHA256 をサーバーリストに書く。サーバーリスト → 一覧 → 各ファイルと順に確かめられる
+  - サーバーリストのアドレスは相対パスでも書ける
+- [x] サーバー側: pakset を公開してファイル一覧を作り、サーバーリストを書き換える PowerShell スクリプト（`server-setup/Publish-Pakset.ps1`）
 - [ ] サーバー側: マニフェストの `status` / `players` を定期更新する PowerShell スクリプト
 - [ ] サーバー構築の自動化（PowerShell + NSSM）
 - [ ] 実際の simutrans と pakset を使った、Windows での動作確認
@@ -156,4 +160,4 @@ simutrans -objects pak128.japan/ -noaddons -load net:example.ddns.net:13353
 - アドオンは `-addons` を付けたときだけ `<user_dir>/addons/<pak名>/` から読まれる（`simmain.cc`）。ランチャーは今 `-noaddons` を付けている。ランチャーが管理する本体なら、`-singleuser` で user_dir を本体フォルダにし、`-addons` と組み合わせれば、ランチャー側で完結できる。
 
 ### 今の仕組みでできること
-管理者が手作業で承認したアドオンを pakset の zip に同梱し、サーバーリストの sha256 を書き換えれば、コードを追加しなくても友人に配布できる。ただし pakset 全体をダウンロードし直すことになる。
+管理者が手作業で承認したアドオンをサーバーの pakset フォルダに入れ、`Publish-Pakset.ps1` を実行すれば友人に配布できる。ファイル一覧方式なので、友人は足したファイルだけを落とす。

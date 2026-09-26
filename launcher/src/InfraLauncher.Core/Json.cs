@@ -45,6 +45,7 @@ internal static class Json
 }
 
 [JsonSerializable(typeof(Manifest))]
+[JsonSerializable(typeof(PaksetIndex))]
 [JsonSerializable(typeof(LauncherSettings))]
 [JsonSerializable(typeof(InstalledState))]
 internal sealed partial class JsonContext : JsonSerializerContext;

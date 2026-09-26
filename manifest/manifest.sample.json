@@ -26,6 +26,31 @@
         "url": "https://example.com/simutrans/pak128.japan-2026.09.01.zip",
         "sha256": "1111111111111111111111111111111111111111111111111111111111111111"
       }
+    },
+    {
+      "id": "friends-b",
+      "name": "友達内輪鯖B（差分同期）",
+      "address": "example.ddns.net:13354",
+      "status": "maintenance",
+      "players": 0,
+      "message": "アドオン追加のためメンテナンス中",
+      "engine": {
+        "revision": "r1234-2026-09",
+        "builds": {
+          "windows-x64": {
+            "url": "https://example.com/simutrans/simutrans-r1234-win64.zip",
+            "sha256": "0000000000000000000000000000000000000000000000000000000000000000",
+            "exe": "simutrans.exe"
+          }
+        }
+      },
+      "pakset": {
+        "name": "pak128.japan",
+        "version": "2026.09.26-2100",
+        "folder": "pak128.japan",
+        "index_url": "pak128.japan/index.json",
+        "index_sha256": "2222222222222222222222222222222222222222222222222222222222222222"
+      }
     }
   ]
 }

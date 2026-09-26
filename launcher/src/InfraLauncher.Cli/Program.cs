@@ -70,13 +70,10 @@ try
         {
             var server = Find(manifest, positional);
             var plan = service.Sync.Plan(server, settings);
-            if (plan.UpToDate)
-            {
-                Console.WriteLine("すべて最新です。ダウンロードは不要でした");
-                return 0;
-            }
-            await service.Sync.SyncAsync(plan, new ConsoleProgress());
-            Console.WriteLine("同期が完了しました");
+            var summary = await service.Sync.SyncAsync(plan, new ConsoleProgress());
+            Console.WriteLine(summary.Downloads == 0 && summary.Removed == 0
+                ? "すべて最新です。ダウンロードは不要でした"
+                : $"同期が完了しました（ダウンロード {summary.Downloads} 件・{summary.Bytes:N0} バイト、片付け {summary.Removed} 件）");
             return 0;
         }
 

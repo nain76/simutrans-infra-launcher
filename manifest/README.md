@@ -2,8 +2,19 @@
 
 ランチャーが読み込むサーバー一覧の JSON ファイルです（ランチャーの画面では「サーバーリスト」と呼びます）。Web サーバー（IIS の静的ファイル配信など）に置いて、その URL を友人に伝えます。友人はランチャーの「追加」→「サーバー管理者から共有されたリストを追加」にその URL を入れます。API サーバーは不要です。
 
-- 形式の定義: [manifest.schema.json](manifest.schema.json)（JSON Schema）
+- 形式の定義: [manifest.schema.json](manifest.schema.json)（JSON Schema）、ファイル一覧は [index.schema.json](index.schema.json)
 - 記入例: [manifest.sample.json](manifest.sample.json)
+
+## pakset の配り方は2通り
+
+| | zip 方式 | ファイル一覧方式（おすすめ） |
+|---|---|---|
+| 書く項目 | `pakset.url` と `pakset.sha256` | `pakset.index_url` と `pakset.index_sha256` |
+| 置くもの | pakset の zip 1つ | pakset のファイルそのままと、ファイル一覧 `index.json` |
+| アドオンを1つ足したとき | 友人は zip 全体を落とし直す | 友人は足したファイルだけを落とす |
+| 準備 | zip を作って SHA256 を書く | [Publish-Pakset.ps1](../server-setup/README.md) を実行するだけ |
+
+ファイル一覧方式では、ランチャーは接続のたびに手元のファイルを一覧と照合します。そのため、友人が手元の pak を消したり書き換えたりしても元に戻ります。
 
 ## 項目
 
@@ -23,13 +34,27 @@
 | `…builds.<OS>.exe` | | zip を展開した場所から見た実行ファイルの位置（例: `simutrans.exe`） |
 | `servers[].pakset.name` / `.version` | ○ / | 表示用の名前とバージョン |
 | `servers[].pakset.folder` | ○ | `-objects` に渡すフォルダ名。本体の実行ファイルと同じフォルダの中に、この名前で展開される |
-| `servers[].pakset.url` / `.sha256` | ○ | pakset の zip の URL と SHA256 |
+| `servers[].pakset.url` / `.sha256` | ※ | zip 方式: pakset の zip のアドレスと SHA256 |
+| `servers[].pakset.index_url` / `.index_sha256` | ※ | ファイル一覧方式: `index.json` のアドレスと SHA256 |
+
+※ zip 方式とファイル一覧方式のどちらか一方を書きます。
+
+アドレスは `https://…` の絶対アドレスのほか、サーバーリストの場所から見た相対パス（`pak128.japan/index.json` や `engine.zip`）でも書けます。Web 上のサーバーリストから手元のファイル（`file://`）を指すことはできません。
 
 zip の最上位がフォルダ1つだけ（公式配布の `pak128.japan/…` や `simutrans/…` など）の場合、そのフォルダは取り除いて展開されます。配布されている zip をそのまま使えます。
 
 今の OS 用の `engine.builds` がない場合、ランチャーはユーザーが設定した手元の simutrans を使い、pakset だけを同期します。
 
-## SHA256 の求め方
+## ファイル一覧方式の注意
+
+- ファイル一覧に載せられないもの（ランチャーが拒否します）
+  - `..` を含むパス、絶対パス、Windows で作れない名前
+  - 実行ファイルなど（`.exe`、`.dll`、`.bat`、`.ps1`、`.vbs` など）
+- simutrans のスクリプト（`.nut`）は pakset の正式な中身なので載せられます
+- IIS で配信する場合、`.pak` や `.tab` は初期設定では配信されません。`Publish-Pakset.ps1` が必要な `web.config` を公開フォルダに作ります
+- 公開中にファイルを入れ替えると、ちょうど同期中だった友人の同期がハッシュの不一致で止まることがあります。その場合はもう一度接続すれば直ります
+
+## SHA256 の求め方（zip 方式）
 
 zip ファイルそのもののハッシュを書きます。PowerShell なら:
 
@@ -41,5 +66,6 @@ zip の中身を入れ替えたら、ファイル名が同じでも SHA256 を�
 
 ## 更新のしかた
 
-- `engine` と `pakset`: バージョンを上げたときに手で書き換える
+- `pakset`（ファイル一覧方式）: `Publish-Pakset.ps1` が書き換える
+- `engine` と `pakset`（zip 方式）: バージョンを上げたときに手で書き換える
 - `status` / `players` / `message`: 今は手で書き換える。次の段階で、サーバー側の PowerShell スクリプトが `nettool clients` の結果から定期的に書き換える予定
