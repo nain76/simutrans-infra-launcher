@@ -181,7 +181,10 @@ $shareUrl = if ($PublicHost) { "http://${PublicHost}:$Port/manifest.json" } else
 Write-Host ''
 Write-Host '============================================================' -ForegroundColor Cyan
 Write-Host ' 構築が終わりました。残りの作業:' -ForegroundColor Cyan
-Write-Host "  1. ルーターで TCP $Port 番をこのサーバーへ転送する（simutrans の $GamePort 番と同じ要領）"
+Write-Host "  1. 外から TCP $Port 番に届くようにする（simutrans の $GamePort 番を開けたのと同じ場所で）"
+Write-Host "     - VPS の場合: 事業者の管理画面のパケットフィルター / セキュリティグループで TCP $Port を許可する"
+Write-Host "       （その仕組みがない事業者なら不要。Windows のファイアウォールはこのツールで開けました）"
+Write-Host "     - 自宅の場合: ルーターのポート転送で TCP $Port をこのサーバーへ転送する"
 Write-Host "  2. 自分の PC のブラウザで $shareUrl が開けるか確かめる"
 Write-Host "  3. 友人にこのアドレスを伝える: $shareUrl"
 Write-Host '     友人はランチャーの「追加」→「サーバー管理者から共有されたリストを追加」に入れる'
