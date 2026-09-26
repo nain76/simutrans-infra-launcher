@@ -113,7 +113,7 @@ $entry = [ordered]@{
     address = "${PublicHost}:$GamePort"
     status  = 'online'
     message = ''
-    pakset  = [ordered]@{ name = (Split-Path -Leaf $PaksetSource); folder = $PaksetFolder }
+    pakset  = [ordered]@{ name = $PaksetFolder; folder = $PaksetFolder }
 }
 if ($data) {
     $data.servers = @($data.servers) + (New-Object psobject -Property $entry)

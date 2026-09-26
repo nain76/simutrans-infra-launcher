@@ -69,7 +69,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
 
         var p = server.Pakset;
         var paksetDir = Path.Combine(SimutransPaths.DataDirFor(exe), p.Folder);
-        var label = string.IsNullOrEmpty(p.Version) ? p.Name : $"{p.Name} {p.Version}";
+        var label = p.DisplayName;
         var (url, sha, method) = p.UsesFileIndex
             ? (p.IndexUrl!, p.IndexSha256!, SyncMethod.FileIndex)
             : (p.Url!, p.Sha256!, SyncMethod.Zip);

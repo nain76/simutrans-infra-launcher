@@ -44,7 +44,7 @@ public sealed class ServerRow : INotifyPropertyChanged
             },
             PlayersText = server.Players is { } n ? $"{n}人" : "",
             Message = server.Message ?? "",
-            PaksetText = server.Pakset.Version is { Length: > 0 } v ? $"{server.Pakset.Name} {v}" : server.Pakset.Name,
+            PaksetText = server.Pakset.DisplayName,
             SourceText = $"リスト: {list.Name}",
         };
         row.SetPlan(plan, planError);

@@ -53,6 +53,17 @@ public sealed class PaksetInfo
 
     [System.Text.Json.Serialization.JsonIgnore]
     public bool UsesFileIndex => IndexUrl is not null;
+
+    /// <summary>画面に出す名前。フォルダ名が名前と違うときは添える（同じ名前の pakset を見分けるため）。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string DisplayName
+    {
+        get
+        {
+            var name = Folder.Length > 0 && !string.Equals(Folder, Name, StringComparison.OrdinalIgnoreCase) ? $"{Name}（{Folder}）" : Name;
+            return string.IsNullOrEmpty(Version) ? name : $"{name} {Version}";
+        }
+    }
 }
 
 /// <summary>ファイル一覧方式の一覧ファイル（index.json）。各ファイルは一覧ファイルと同じ場所からの相対パスで置く。</summary>

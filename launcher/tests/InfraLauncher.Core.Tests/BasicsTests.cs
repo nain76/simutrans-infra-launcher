@@ -74,3 +74,16 @@ public class SimutransPathsTests
         Assert.Equal("/games/st", SimutransPaths.DataDirFor("/games/st/simutrans.app/Contents/MacOS/simutrans"));
     }
 }
+
+public class PaksetDisplayNameTests
+{
+    [Theory]
+    [InlineData("pak128.japan", "pak128.japan", null, "pak128.japan")]
+    [InlineData("pak128.japan", "pak128.japan", "2026.09.01", "pak128.japan 2026.09.01")]
+    [InlineData("pak128.japan", "pak128.japan-2", "v2", "pak128.japan（pak128.japan-2） v2")]
+    public void ShowsFolderWhenItDiffers(string name, string folder, string? version, string expected)
+    {
+        var p = new InfraLauncher.Core.Models.PaksetInfo { Name = name, Folder = folder, Version = version };
+        Assert.Equal(expected, p.DisplayName);
+    }
+}
