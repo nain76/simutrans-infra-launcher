@@ -156,3 +156,25 @@ public class ManifestFileIndexTests
         Assert.Throws<ManifestException>(() => ManifestClient.ParseIndex(Two("a", "a/b.pak")));
     }
 }
+
+public class EngineTrustTests
+{
+    private static string Manifest(string engineUrl) => $$"""
+        { "schema_version": 1, "servers": [ { "id": "s", "name": "鯖", "address": "h",
+          "engine": { "revision": "r1", "builds": { "windows-x64": { "url": "{{engineUrl}}", "sha256": "{{new string('a', 64)}}", "exe": "simutrans.exe" } } },
+          "pakset": { "name": "p", "folder": "pak", "index_url": "pak/index.json", "index_sha256": "{{new string('b', 64)}}" } } ] }
+        """;
+
+    [Theory]
+    [InlineData("https://example.com/manifest.json", "engine/a.zip", true)]
+    [InlineData("https://example.com/manifest.json", "https://cdn.example.com/a.zip", true)]
+    [InlineData("https://example.com/manifest.json", "http://cdn.example.com/a.zip", false)]
+    [InlineData("http://example.com:8080/manifest.json", "engine/a.zip", false)]
+    [InlineData("http://example.com:8080/manifest.json", "https://cdn.example.com/a.zip", false)]
+    [InlineData("file:///C:/lists/manifest.json", "engine/a.zip", true)]
+    public void AllowsEngineOnlyOverHttps(string listUrl, string engineUrl, bool allowed)
+    {
+        var m = ManifestClient.Parse(Manifest(engineUrl), new Uri(listUrl));
+        Assert.Equal(allowed, m.Servers[0].EngineDownloadAllowed);
+    }
+}

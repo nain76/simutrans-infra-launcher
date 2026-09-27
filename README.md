@@ -20,7 +20,7 @@ Simutrans のマルチプレイ運用を楽にするための外部ツールで�
 | `docs/` | 設計メモなどのドキュメント |
 | `manifest/` | サーバー一覧マニフェストの形式（JSON Schema）とサンプル → [説明](manifest/README.md) |
 | `launcher/` | ランチャー本体（C# / .NET 10 / Avalonia） |
-| `server-setup/` | サーバー側の PowerShell スクリプト（pakset の公開） → [説明](server-setup/README.md) |
+| `server-setup/` | サーバー側の PowerShell スクリプト（配信サーバーの構築、HTTPS 化、pakset と本体の公開） → [説明](server-setup/README.md) |
 
 ### launcher の中身
 
@@ -78,6 +78,7 @@ dotnet publish src/InfraLauncher.App -c Release -r win-x64 --self-contained \
 2. 共有リストのサーバーを選んで「同期して接続」を押すと、足りないものだけをダウンロードする。ダウンロードしたものは SHA256 を確かめてから置く
    - zip 方式: 本体と pakset の zip の SHA256 を記録（`installed.json`）と比べ、違えば zip を丸ごと入れ替える
    - ファイル一覧方式: pakset のファイルを1つずつ一覧と照合し、変わったファイルだけを落とす。一覧にないファイルは片付ける
+   - 本体: サーバーリストに本体があり、サーバーリストを HTTPS で取得した場合だけ、サーバーと同じ本体を入れる。手元のほかのフォルダに同じ中身の pakset ファイルがあればコピーして使う
 3. `simutrans -objects <pak>/ -noaddons -load net:<host>:<port>` で起動して接続する（手動プロファイルは 2 を飛ばす）
 
 ランチャーのデータは `%LOCALAPPDATA%\InfraLauncher`（Linux は `~/.local/share/InfraLauncher`）に置かれます。

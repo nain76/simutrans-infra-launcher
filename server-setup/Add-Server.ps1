@@ -6,7 +6,8 @@
     1. サーバー名・simutrans サーバーのポート・pakset フォルダのフルパスを聞く（引数で指定してもよい）
     2. サーバーリスト（manifest.json）にサーバーを足す。サーバーリストがなければ作る
     3. pakset を公開フォルダにコピーしてファイル一覧を作る（Publish-Pakset.ps1）
-    4. publish-settings.json に登録する。以後は Publish-Pakset.bat で全サーバー分を公開し直せる
+    4. pakset フォルダの1つ上に simutrans 本体があれば、それも公開する（Publish-Engine.ps1）
+    5. publish-settings.json に登録する。以後は Publish-Pakset.bat で全サーバー分を公開し直せる
 
     同じ pakset フォルダを使うサーバーを追加した場合は、公開済みの pakset をそのまま共有する。
     中身の違う pakset を使う場合は、公開用のフォルダ名が重ならないよう自動で名前を変える（例: pak128.japan-2）。
@@ -133,6 +134,17 @@ $entryIds = @($settings.paksets | Where-Object { $_.destination -eq $destination
 
 Write-Step "pakset を公開します（$PaksetFolder）"
 & (Join-Path $PSScriptRoot 'Publish-Pakset.ps1') -Source $PaksetSource -Destination $destination -Manifest $manifestPath -ServerId $entryIds
+
+# simutrans 本体（pakset フォルダの1つ上）も公開する。同じ本体を使うサーバーはまとめて書き換える
+$engineSource = Get-EngineSource $PaksetSource
+if ($engineSource) {
+    Write-Step "simutrans 本体を公開します（$engineSource）"
+    $engineIds = @($settings.paksets | Where-Object { $_.engine_source -eq $engineSource } | ForEach-Object { $_.server_ids })
+    & (Join-Path $PSScriptRoot 'Publish-Engine.ps1') -Source $engineSource -Destination (Join-Path $DistDir 'engine') -Manifest $manifestPath -ServerId $engineIds
+}
+else {
+    Write-Warning "pakset フォルダの1つ上に simutrans 本体（simutrans.exe）が見つからないため、本体は公開しません。友人は手元の simutrans を使います"
+}
 
 # --- ゲーム用ポートを Windows ファイアウォールで開ける ---
 if (Get-Command New-NetFirewallRule -ErrorAction SilentlyContinue) {

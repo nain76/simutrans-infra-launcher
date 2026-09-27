@@ -15,6 +15,7 @@
 
     -Source と -Destination を省略すると、publish-settings.json に登録されたすべての pakset を公開する
     （Setup-Server.bat / Add-Server.bat が登録する。Publish-Pakset.bat をダブルクリックすると、この形で実行される）。
+    このとき、pakset フォルダの1つ上にある simutrans 本体も Publish-Engine.ps1 で公開する。
 
     Windows PowerShell 5.1 と PowerShell 7 のどちらでも動く。
 
@@ -77,6 +78,22 @@ if (-not $Source -and -not $Destination) {
     foreach ($p in $settings.paksets) {
         Write-Step "$($p.pakset_source) を公開します（サーバー: $($p.server_ids -join ', ')）"
         & $PSCommandPath -Source $p.pakset_source -Destination $p.destination -Manifest $settings.manifest -ServerId $p.server_ids -Version $Version
+    }
+
+    # simutrans 本体も公開する（同じ本体を使うサーバーをまとめる）。以前の設定で本体の場所がなければ探して残す
+    $changed = $false
+    foreach ($p in $settings.paksets) {
+        if (-not $p.engine_source) {
+            $p.engine_source = Get-EngineSource $p.pakset_source
+            if ($p.engine_source) { $changed = $true }
+        }
+    }
+    if ($changed) { Save-PublishSettings $settings }
+    $engineDest = Join-Path (Split-Path -Parent $settings.manifest) 'engine'
+    foreach ($group in @($settings.paksets | Where-Object { $_.engine_source } | Group-Object { $_.engine_source })) {
+        $ids = @($group.Group | ForEach-Object { $_.server_ids })
+        Write-Step "simutrans 本体 $($group.Name) を公開します（サーバー: $($ids -join ', ')）"
+        & (Join-Path $PSScriptRoot 'Publish-Engine.ps1') -Source $group.Name -Destination $engineDest -Manifest $settings.manifest -ServerId $ids
     }
     return
 }

@@ -35,7 +35,13 @@ param(
     # simutrans サーバーのポート（省略すると質問する）
     [int] $GamePort,
     # simutrans サーバーが使っている pakset フォルダのフルパス（省略すると質問する）
-    [string] $PaksetSource
+    [string] $PaksetSource,
+    # HTTPS のポート
+    [int] $HttpsPort = 8443,
+    # HTTPS にしない（simutrans 本体は配れなくなる）
+    [switch] $SkipHttps,
+    # 証明書の期限切れなどの連絡先（任意）
+    [string] $Email
 )
 
 Set-StrictMode -Version 2.0
@@ -195,18 +201,42 @@ if (Test-Path -LiteralPath (Join-Path $DistDir 'write-test.txt')) {
     Write-Warning '公開フォルダに write-test.txt が作られました。書き込みを断る設定が効いていません'
 }
 
+# --- 6. HTTPS ---
+$https = @(Get-WebBinding -Name $SiteName -Protocol https | Where-Object { ($_.bindingInformation -split ':')[1] -eq "$HttpsPort" }).Count -gt 0
+if (-not $https -and -not $SkipHttps) {
+    Write-Step 'HTTPS にします（友人に simutrans 本体を配るのに必要です）'
+    $answer = Read-Value "無料の証明書を取って HTTPS（ポート $HttpsPort）にしますか？ 80 番を開けておく必要があります（Y/n）" 'Y'
+    if ($answer -match '^[Yy]') {
+        $httpsArgs = @{ HostName = $PublicHost; HttpsPort = $HttpsPort; SiteName = $SiteName; DistDir = $DistDir }
+        if ($Email) { $httpsArgs['Email'] = $Email }
+        try {
+            & (Join-Path $PSScriptRoot 'Enable-Https.ps1') @httpsArgs
+            $https = $true
+        }
+        catch {
+            Write-Warning "HTTPS にできませんでした: $($_.Exception.Message)"
+            Write-Warning '80 番を外から届くようにしてから、Enable-Https.bat をダブルクリックしてやり直してください'
+        }
+    }
+}
+
 # --- まとめ ---
-$shareUrl = if ($PublicHost) { "http://${PublicHost}:$Port/manifest.json" } else { "http://<ドメイン>:$Port/manifest.json" }
+$hostText = if ($PublicHost) { $PublicHost } else { '<ドメイン>' }
+$shareUrl = if ($https) { "https://${hostText}:$HttpsPort/manifest.json" } else { "http://${hostText}:$Port/manifest.json" }
+$ports = if ($https) { "TCP 80・$HttpsPort・simutrans サーバーのポート" } else { "TCP $Port・simutrans サーバーのポート" }
 Write-Host ''
 Write-Host '============================================================' -ForegroundColor Cyan
 Write-Host ' 構築が終わりました。残りの作業:' -ForegroundColor Cyan
-Write-Host "  1. 外から TCP $Port 番に届くようにする（simutrans の $GamePort 番を開けたのと同じ場所で）"
-Write-Host "     - VPS の場合: 事業者の管理画面のパケットフィルター / セキュリティグループで TCP $Port を許可する"
-Write-Host "       （その仕組みがない事業者なら不要。Windows のファイアウォールはこのツールで開けました）"
-Write-Host "     - 自宅の場合: ルーターのポート転送で TCP $Port をこのサーバーへ転送する"
+Write-Host "  1. 外から $ports に届くようにする（Windows のファイアウォールはこのツールで開けました）"
+Write-Host '     - VPS の場合: 事業者の管理画面のパケットフィルター / セキュリティグループで許可する（その仕組みがなければ不要）'
+Write-Host '     - 自宅の場合: ルーターのポート転送でこのサーバーへ転送する'
 Write-Host "  2. 自分の PC のブラウザで $shareUrl が開けるか確かめる"
 Write-Host "  3. 友人にこのアドレスを伝える: $shareUrl"
 Write-Host '     友人はランチャーの「追加」→「サーバー管理者から共有されたリストを追加」に入れる'
+if (-not $https) {
+    Write-Host '  ※ HTTPS ではないため、友人の PC には simutrans 本体が自動で入りません（各自で入れて「設定」で指定）'
+    Write-Host '     HTTPS にするには Enable-Https.bat をダブルクリック'
+}
 Write-Host '  アドオンを足したあとは: pak をコピー → simutrans サーバーを再起動 → Publish-Pakset.bat をダブルクリック'
 Write-Host '  simutrans サーバーを増やすときは: Add-Server.bat をダブルクリック'
 Write-Host '============================================================' -ForegroundColor Cyan

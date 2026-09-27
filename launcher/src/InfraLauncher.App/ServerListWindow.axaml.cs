@@ -32,6 +32,8 @@ public partial class ServerListWindow : Window
         if (await Dialogs.PickFileAsync(this, "サーバーリストのファイルを選択", Dialogs.JsonFile) is { } path)
         {
             UrlBox.Text = path;
+            Show("手元のファイルを登録すると、pakset なども同じフォルダから探します（動作確認用）。" +
+                 "友人と遊ぶときは、サーバー管理者から教えてもらった https://…/manifest.json を入れてください", error: false);
         }
     }
 

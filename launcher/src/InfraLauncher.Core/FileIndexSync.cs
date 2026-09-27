@@ -70,6 +70,31 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         var staging = Path.Combine(Path.GetDirectoryName(target)!, $".{Path.GetFileName(target)}.partial");
         Directory.CreateDirectory(staging);
         var unique = missing.GroupBy(f => f.Sha256.ToLowerInvariant()).Select(g => g.First()).ToList();
+
+        // 手元のほかの pakset（本体の別リビジョン用など）に同じ中身のファイルがあれば、コピーして使う
+        var reused = 0;
+        var copies = unique.Count > 0 ? LocalCopies(state, target) : new();
+        foreach (var f in unique.ToList())
+        {
+            var tmp = Path.Combine(staging, f.Sha256.ToLowerInvariant());
+            var local = copies.GetValueOrDefault(f.Sha256.ToLowerInvariant())?
+                .FirstOrDefault(c => c.Stamp.Size == f.Size && c.Stamp.Matches(new FileInfo(c.Path))).Path;
+            if (local is null)
+            {
+                continue;
+            }
+            File.Copy(local, tmp, overwrite: true);
+            if (SameSha(await Downloader.HashFileAsync(tmp, ct), f.Sha256))
+            {
+                unique.Remove(f);
+                reused++;
+            }
+        }
+        if (reused > 0)
+        {
+            progress?.Report(new SyncProgress(item, $"手元のファイルを {reused} 件使い回しました", 0, null));
+        }
+
         long total = unique.Sum(f => f.Size), done = 0;
         var finished = 0;
         using (var gate = new SemaphoreSlim(Parallelism))
@@ -140,6 +165,29 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         SaveRecord(state, target, item, newStamps);
         TryDeleteDir(staging);
         return new SyncSummary(unique.Count, total, extras.Count);
+    }
+
+    /// <summary>ほかの展開先の記録にあるファイルを、SHA256 ごとにまとめる（記録どおり変わっていないかは使う直前に確かめる）。</summary>
+    private static Dictionary<string, List<(string Path, FileStamp Stamp)>> LocalCopies(InstalledState state, string target)
+    {
+        var result = new Dictionary<string, List<(string, FileStamp)>>();
+        foreach (var (dir, record) in state.Items)
+        {
+            if (record.Files is null || string.Equals(Path.TrimEndingDirectorySeparator(dir), target, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+            foreach (var (rel, stamp) in record.Files)
+            {
+                var key = stamp.Sha256.ToLowerInvariant();
+                if (!result.TryGetValue(key, out var list))
+                {
+                    result[key] = list = new();
+                }
+                list.Add((Path.Combine(dir, rel.Replace('/', Path.DirectorySeparatorChar)), stamp));
+            }
+        }
+        return result;
     }
 
     /// <summary>一覧ファイルを取得する。同じハッシュのものを取得済みなら使い回す。</summary>

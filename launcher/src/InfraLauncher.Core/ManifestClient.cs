@@ -84,15 +84,19 @@ public sealed partial class ManifestClient(HttpClient http)
                 RequireSha(p.Sha256, $"サーバー '{where}' の pakset.sha256");
             }
 
+            s.EngineDownloadAllowed = false;
             if (s.Engine is { } e)
             {
                 Require(SafeName().IsMatch(e.Revision) && e.Revision.Trim('.').Length > 0, $"サーバー '{where}' の engine.revision が不正です: {e.Revision}");
+                var secure = true;
                 foreach (var (key, b) in e.Builds ?? new())
                 {
                     b.Url = ResolveUrl(b.Url, baseUri, $"サーバー '{where}' の engine.builds.{key}.url");
                     RequireSha(b.Sha256, $"サーバー '{where}' の engine.builds.{key}.sha256");
                     Require(!string.IsNullOrWhiteSpace(b.Exe) && !Path.IsPathRooted(b.Exe), $"サーバー '{where}' の engine.builds.{key}.exe が不正です");
+                    secure &= new Uri(b.Url).Scheme is "https" || new Uri(b.Url).IsFile && baseUri is null or { IsFile: true };
                 }
+                s.EngineDownloadAllowed = secure && (baseUri is null || baseUri.Scheme == "https" || baseUri.IsFile);
             }
         }
     }

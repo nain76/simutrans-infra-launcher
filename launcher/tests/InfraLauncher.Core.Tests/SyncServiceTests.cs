@@ -42,6 +42,7 @@ public sealed class SyncServiceTests : IDisposable
         Id = "s",
         Name = "テスト鯖",
         Address = "example.net",
+        EngineDownloadAllowed = true,
         Engine = new EngineInfo
         {
             Revision = "r1",
@@ -171,5 +172,20 @@ public sealed class SyncServiceTests : IDisposable
                 ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(data) }
                 : new HttpResponseMessage(HttpStatusCode.NotFound));
         }
+    }
+
+    [Fact]
+    public void RefusesEngineFromInsecureList()
+    {
+        var server = Server(Zip(("simutrans.exe", "x")), Zip(("a.pak", "a")));
+        server.EngineDownloadAllowed = false;
+        var e = Assert.Throws<SyncException>(() => _sync.Plan(server, new LauncherSettings()));
+        Assert.Contains("HTTPS", e.Message);
+
+        // 手元の simutrans があればそれを使い、本体はダウンロードしない
+        var local = Path.Combine(_dir, "mine", "simutrans.exe");
+        var plan = _sync.Plan(server, new LauncherSettings { SimutransExe = local });
+        Assert.DoesNotContain(plan.Items, i => i.Kind == SyncItemKind.Engine);
+        Assert.Equal(Path.GetFullPath(local), plan.ExePath);
     }
 }

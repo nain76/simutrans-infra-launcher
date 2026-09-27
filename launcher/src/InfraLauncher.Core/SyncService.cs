@@ -48,6 +48,11 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         string exe;
 
         var build = server.Engine?.Builds?.GetValueOrDefault(PlatformInfo.CurrentKey);
+        var blockedEngine = build is not null && !server.EngineDownloadAllowed;
+        if (blockedEngine)
+        {
+            build = null;
+        }
         if (build is not null)
         {
             var engineDir = layout.EngineDir(server.Engine!.Revision);
@@ -59,6 +64,12 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         else if (!string.IsNullOrWhiteSpace(settings.SimutransExe))
         {
             exe = Path.GetFullPath(settings.SimutransExe);
+        }
+        else if (blockedEngine)
+        {
+            throw new SyncException(
+                $"サーバー '{server.Name}' のサーバーリストが HTTPS ではないため、安全のため simutrans 本体は自動で入れません。" +
+                "「編集」で配信アドレスを https:// で始まるものに変えるか、「設定」で手元の simutrans 本体を指定してください");
         }
         else
         {

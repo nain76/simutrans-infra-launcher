@@ -10,10 +10,10 @@
     <TextBox x:Name="NameBox" Watermark="例: 友達グループのサーバー" />
 
     <TextBlock Text="配信アドレス" FontWeight="SemiBold" Margin="0,10,0,0" />
-    <TextBlock Text="サーバー管理者から教えてもらったアドレスを貼り付けてください。受け取ったファイル（.json）がある場合は「ファイルを選択」で選べます。"
+    <TextBlock Text="サーバー管理者から教えてもらったアドレス（https:// で始まるもの）を貼り付けてください。"
                TextWrapping="Wrap" Opacity="0.75" />
     <Grid ColumnDefinitions="*,Auto">
-      <TextBox x:Name="UrlBox" Watermark="http://example.ddns.net:8080/manifest.json" />
+      <TextBox x:Name="UrlBox" Watermark="https://example.ddns.net:8443/manifest.json" />
       <Button Grid.Column="1" Content="ファイルを選択…" Margin="8,0,0,0" Click="OnBrowse" />
     </Grid>
 

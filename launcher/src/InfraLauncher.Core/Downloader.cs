@@ -20,6 +20,12 @@ internal static class Downloader
             Stream source;
             if (uri.IsFile)
             {
+                if (!File.Exists(uri.LocalPath))
+                {
+                    throw new SyncException(
+                        $"{what} が手元に見つかりません: {uri.LocalPath}。サーバーリストを手元のファイルとして登録していると、" +
+                        "pakset なども同じフォルダから探します。「編集」で配信アドレスを、サーバー管理者から教えてもらった http(s)://…/manifest.json に変えてください");
+                }
                 source = File.OpenRead(uri.LocalPath);
             }
             else

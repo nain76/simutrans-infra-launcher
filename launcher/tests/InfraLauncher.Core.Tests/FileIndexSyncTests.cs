@@ -190,6 +190,28 @@ public sealed class FileIndexSyncTests : IDisposable
         Assert.Contains(_server.Log, u => u.Contains("%E6%97%A5") && u.Contains("%20"));
     }
 
+    [Fact]
+    public async Task ReusesFilesFromAnotherLocalCopy()
+    {
+        // 本体のリビジョンが変わって pakset の置き場所が変わっても、手元の同じファイルは落とし直さない
+        var files = new Dictionary<string, string> { ["a.pak"] = "aaaa", ["b.pak"] = "bbbb" };
+        var s = Publish(files);
+        await Sync(s);
+
+        var other = Path.Combine(_dir, "simutrans2");
+        Directory.CreateDirectory(other);
+        File.WriteAllText(Path.Combine(other, "simutrans.exe"), "");
+        files["c.pak"] = "cccc";
+        var s2 = Publish(files);
+        _server.Log.Clear();
+
+        var r = await _sync.SyncAsync(_sync.Plan(s2, new LauncherSettings { SimutransExe = Path.Combine(other, "simutrans.exe") }));
+        Assert.Equal(1, r.Downloads);
+        Assert.Equal(1, FileRequests);
+        Assert.Equal("aaaa", File.ReadAllText(Path.Combine(other, "pak128.japan", "a.pak")));
+        Assert.Equal("cccc", File.ReadAllText(Path.Combine(other, "pak128.japan", "c.pak")));
+    }
+
     private sealed class FakeServer : HttpMessageHandler
     {
         public Dictionary<string, byte[]> Files { get; } = new();

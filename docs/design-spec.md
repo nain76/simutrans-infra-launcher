@@ -137,6 +137,8 @@ simutrans -objects pak128.japan/ -noaddons -load net:example.ddns.net:13353
   - 一覧ファイルの SHA256 をサーバーリストに書く。サーバーリスト → 一覧 → 各ファイルと順に確かめられる
   - サーバーリストのアドレスは相対パスでも書ける
 - [x] サーバー側: pakset を公開してファイル一覧を作り、サーバーリストを書き換える PowerShell スクリプト（`server-setup/Publish-Pakset.ps1`）
+- [x] サーバー側の構築ツール: IIS、読み出し専用の配信、複数サーバー、HTTPS 化（win-acme）
+- [x] simutrans 本体の配布: サーバーの本体を zip で公開。ランチャーは HTTPS で取得したサーバーリストからだけ本体を入れる（通信途中のすり替え対策）
 - [ ] サーバー側: マニフェストの `status` / `players` を定期更新する PowerShell スクリプト
 - [ ] サーバー構築の自動化（PowerShell + NSSM）
 - [ ] 実際の simutrans と pakset を使った、Windows での動作確認

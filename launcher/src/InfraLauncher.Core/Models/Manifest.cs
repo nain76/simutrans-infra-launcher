@@ -18,6 +18,14 @@ public sealed class ServerEntry
     public string? Message { get; set; }
     public EngineInfo? Engine { get; set; }
     public PaksetInfo Pakset { get; set; } = new();
+
+    /// <summary>
+    /// このサーバーの本体（実行ファイル）を自動で入れてよいか。
+    /// 通信途中で本体をすり替えられないよう、HTTPS で取得したサーバーリストで、本体のアドレスも HTTPS のときだけ許す
+    /// （手元のファイルのサーバーリストは許す）。<see cref="ManifestClient"/> が設定する。
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool EngineDownloadAllowed { get; set; }
 }
 
 public sealed class EngineInfo
