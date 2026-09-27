@@ -4,7 +4,8 @@ using InfraLauncher.Core.Models;
 // コマンドライン版。動作確認とトラブル調査用。
 //   list   <manifest>            サーバー一覧と同期の状態
 //   sync   <manifest> <server>   同期だけ行う
-//   launch <manifest> <server>   同期して起動（--print-only で起動せずにコマンドを表示）
+//   launch <manifest> <server>   同期して起動（--print-only で起動せずにコマンドを表示。
+//                                配布元から入れた本体を初めて起動するときは --trust で承認する）
 // 共通オプション: --data-dir <dir>（ランチャーのデータフォルダ）, --simutrans <exe>（手元の本体）
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -12,6 +13,7 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 var positional = new List<string>();
 string? dataDir = null, simutransExe = null;
 var printOnly = false;
+var trust = false;
 for (var i = 0; i < args.Length; i++)
 {
     switch (args[i])
@@ -19,6 +21,7 @@ for (var i = 0; i < args.Length; i++)
         case "--data-dir" when i + 1 < args.Length: dataDir = args[++i]; break;
         case "--simutrans" when i + 1 < args.Length: simutransExe = args[++i]; break;
         case "--print-only": printOnly = true; break;
+        case "--trust": trust = true; break;
         case "-h" or "--help": return Usage();
         default: positional.Add(args[i]); break;
     }
@@ -80,8 +83,32 @@ try
         case "launch":
         {
             var server = Find(manifest, positional);
-            var (_, command) = await service.SyncAndLaunchAsync(server, settings, printOnly, new ConsoleProgress());
-            Console.WriteLine(printOnly ? command : $"起動しました: {command}");
+            await service.SyncServerAsync(server, settings, new ConsoleProgress());
+            var info = service.PrepareLaunch(server, settings);
+            if (printOnly)
+            {
+                Console.WriteLine(info.Command);
+                return 0;
+            }
+            if (info.NeedsApproval)
+            {
+                Console.WriteLine($"配布元から入れた simutrans 本体をまだ承認していません: {info.EngineLabel}");
+                Console.WriteLine($"  場所:     {info.ExePath}");
+                Console.WriteLine($"  配布元:   {info.SourceUrl}");
+                Console.WriteLine($"  SHA256:   {info.ExeSha256}");
+                if (!trust)
+                {
+                    Console.WriteLine("内容を確かめてから、--trust を付けてもう一度実行してください");
+                    return 3;
+                }
+                // --simutrans などの一時的な指定は保存せず、承認だけを保存する
+                var saved = service.LoadSettings();
+                saved.Approve(info.ExeSha256);
+                saved.Save(layout);
+                settings.Approve(info.ExeSha256);
+            }
+            LauncherService.Launch(info, settings);
+            Console.WriteLine($"起動しました: {info.Command}");
             return 0;
         }
 
@@ -113,7 +140,7 @@ static int Usage()
         使い方:
           infra-launcher list   <manifest の URL かパス>
           infra-launcher sync   <manifest> <サーバーの id か名前>
-          infra-launcher launch <manifest> <サーバーの id か名前> [--print-only]
+          infra-launcher launch <manifest> <サーバーの id か名前> [--print-only] [--trust]
         オプション:
           --data-dir <dir>    ランチャーのデータフォルダ（既定: %LOCALAPPDATA%\InfraLauncher など）
           --simutrans <exe>   サーバーリストにこの PC 用の本体がないときに使う simutrans の実行ファイル

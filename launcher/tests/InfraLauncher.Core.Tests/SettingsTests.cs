@@ -52,17 +52,37 @@ public sealed class SettingsTests : IDisposable
     [Fact]
     public void ManualProfileUsesItsOwnExeOrDefault()
     {
+        var def = Path.Combine(_dir, "default", "simutrans");
+        var mine = Path.Combine(_dir, "mine", "simutrans");
+        foreach (var f in new[] { def, mine })
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(f)!);
+            File.WriteAllText(f, f);
+        }
         var profile = new ManualProfile { Name = "p", Address = "example.net", PaksetFolder = "pak128.japan" };
-        var settings = new LauncherSettings { SimutransExe = "/games/default/simutrans" };
+        var settings = new LauncherSettings { SimutransExe = def };
 
-        var (_, cmd) = LauncherService.LaunchManual(profile, settings, printOnly: true);
-        Assert.Equal("/games/default/simutrans -objects pak128.japan/ -noaddons -load net:example.net:13353", cmd);
+        var info = LauncherService.PrepareManual(profile, settings);
+        Assert.Equal(["-objects", "pak128.japan/", "-noaddons", "-load", "net:example.net:13353"], info.Args);
+        Assert.Equal(def, info.ExePath);
+        // 本人が指定した simutrans なので承認は要らない
+        Assert.False(info.ManagedEngine);
+        Assert.False(info.NeedsApproval);
 
-        profile.SimutransExe = "/games/mine/simutrans";
-        (_, cmd) = LauncherService.LaunchManual(profile, settings, printOnly: true);
-        Assert.StartsWith("/games/mine/simutrans ", cmd);
+        profile.SimutransExe = mine;
+        Assert.Equal(mine, LauncherService.PrepareManual(profile, settings).ExePath);
 
         profile.SimutransExe = null;
-        Assert.Throws<SyncException>(() => LauncherService.LaunchManual(profile, new LauncherSettings(), printOnly: true));
+        Assert.Throws<SyncException>(() => LauncherService.PrepareManual(profile, new LauncherSettings()));
+    }
+
+    [Fact]
+    public void ApprovalIsCaseInsensitiveAndUnique()
+    {
+        var s = new LauncherSettings();
+        s.Approve("ABCDEF");
+        s.Approve("abcdef");
+        Assert.Single(s.ApprovedExecutables);
+        Assert.True(s.IsApproved("AbCdEf"));
     }
 }

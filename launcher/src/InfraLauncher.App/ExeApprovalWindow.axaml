@@ -1,0 +1,28 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="InfraLauncher.App.ExeApprovalWindow"
+        Title="simutrans 本体の実行の確認" Width="640" SizeToContent="Height" CanResize="False"
+        WindowStartupLocation="CenterOwner">
+  <StackPanel Margin="16" Spacing="10">
+    <TextBlock x:Name="Heading" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+    <TextBlock TextWrapping="Wrap" Opacity="0.8"
+               Text="ランチャーがサーバーの配布元からダウンロードした実行ファイルです。配布元に心当たりがない場合は実行しないでください。「フォルダを開く」から、ウイルス対策ソフトで確かめることもできます。承認すると、同じ本体は次から確認なしで起動します（本体が変わるとまた確認します）。" />
+    <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,4,0,0">
+      <TextBlock Text="本体" FontWeight="SemiBold" Margin="0,2,12,2" />
+      <SelectableTextBlock Grid.Column="1" x:Name="EngineText" TextWrapping="Wrap" Margin="0,2" />
+      <TextBlock Grid.Row="1" Text="配布元" FontWeight="SemiBold" Margin="0,2,12,2" />
+      <SelectableTextBlock Grid.Row="1" Grid.Column="1" x:Name="SourceText" TextWrapping="Wrap" Margin="0,2" />
+      <TextBlock Grid.Row="2" Text="場所" FontWeight="SemiBold" Margin="0,2,12,2" />
+      <SelectableTextBlock Grid.Row="2" Grid.Column="1" x:Name="PathText" TextWrapping="Wrap" Margin="0,2" />
+      <TextBlock Grid.Row="3" Text="SHA256" FontWeight="SemiBold" Margin="0,2,12,2" />
+      <SelectableTextBlock Grid.Row="3" Grid.Column="1" x:Name="ShaText" TextWrapping="Wrap" FontFamily="Consolas,monospace" Margin="0,2" />
+    </Grid>
+    <Grid ColumnDefinitions="Auto,*,Auto" Margin="0,8,0,0">
+      <Button Content="フォルダを開く" Click="OnOpenFolder" />
+      <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8">
+        <Button Content="キャンセル" Click="OnCancel" />
+        <Button Content="承認して起動" Classes="accent" Click="OnApprove" />
+      </StackPanel>
+    </Grid>
+  </StackPanel>
+</Window>

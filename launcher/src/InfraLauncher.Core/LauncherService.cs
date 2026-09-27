@@ -5,6 +5,12 @@ namespace InfraLauncher.Core;
 /// <summary>1つのサーバーリストを読んだ結果。取得に失敗した場合は Error に理由が入る。</summary>
 public sealed record ManifestSource(ServerListSource List, Manifest? Manifest, string? Error);
 
+/// <summary>
+/// 起動に必要な情報。ManagedEngine はランチャーが配布元から入れた本体か（そうなら初回に承認が要る）。
+/// </summary>
+public sealed record LaunchInfo(string ExePath, IReadOnlyList<string> Args, string Command, string ExeSha256,
+    bool ManagedEngine, bool NeedsApproval, string? EngineLabel, string? SourceUrl);
+
 /// <summary>CLI と画面の両方から使う、ひととおりの操作をまとめたもの。</summary>
 public sealed class LauncherService(InstallLayout layout, HttpClient http)
 {
@@ -31,21 +37,33 @@ public sealed class LauncherService(InstallLayout layout, HttpClient http)
         return await Task.WhenAll(tasks);
     }
 
-    /// <summary>同期して起動する。起動したプロセスと、実際に使ったコマンドを返す。</summary>
-    public async Task<(System.Diagnostics.Process? Process, string Command)> SyncAndLaunchAsync(
-        ServerEntry server, LauncherSettings settings, bool printOnly = false,
-        IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
+    /// <summary>同期する（本体と pakset のインストール・更新）。起動はしない。</summary>
+    public async Task<SyncSummary> SyncServerAsync(ServerEntry server, LauncherSettings settings,
+        IProgress<SyncProgress>? progress = null, CancellationToken ct = default) =>
+        await Sync.SyncAsync(Sync.Plan(server, settings), progress, ct);
+
+    /// <summary>
+    /// 起動の準備。同期が済んでいることを確かめ、実行ファイルの SHA256 を求め、ユーザーの承認が要るかを判断する。
+    /// ランチャーが配布元から入れた本体は、同じ SHA256 のものを一度承認するまで起動しない。
+    /// </summary>
+    public LaunchInfo PrepareLaunch(ServerEntry server, LauncherSettings settings)
     {
         var plan = Sync.Plan(server, settings);
-        await Sync.SyncAsync(plan, progress, ct);
+        if (!plan.UpToDate)
+        {
+            throw new SyncException("まだ同期が済んでいません。先に「同期」を押してください");
+        }
+        var engine = plan.Items.FirstOrDefault(i => i.Kind == SyncItemKind.Engine);
         var args = LaunchCommandBuilder.Build(plan.PaksetFolder, ServerAddress.Parse(server.Address));
-        var command = LaunchCommandBuilder.ToDisplayString(plan.ExePath, args);
-        return (printOnly ? null : SimutransRunner.Start(plan.ExePath, args), command);
+        var sha = HashExe(plan.ExePath);
+        return new LaunchInfo(plan.ExePath, args, LaunchCommandBuilder.ToDisplayString(plan.ExePath, args), sha,
+            ManagedEngine: engine is not null,
+            NeedsApproval: engine is not null && !settings.IsApproved(sha),
+            EngineLabel: engine?.Label, SourceUrl: engine?.Url);
     }
 
-    /// <summary>手動プロファイルは同期せず、指定した simutrans でそのまま接続する。</summary>
-    public static (System.Diagnostics.Process? Process, string Command) LaunchManual(
-        ManualProfile profile, LauncherSettings settings, bool printOnly = false)
+    /// <summary>手動プロファイルの起動の準備。本人が指定した simutrans なので承認は要らない。</summary>
+    public static LaunchInfo PrepareManual(ManualProfile profile, LauncherSettings settings)
     {
         var exe = string.IsNullOrWhiteSpace(profile.SimutransExe) ? settings.SimutransExe : profile.SimutransExe;
         if (string.IsNullOrWhiteSpace(exe))
@@ -53,8 +71,34 @@ public sealed class LauncherService(InstallLayout layout, HttpClient http)
             throw new SyncException($"プロファイル '{profile.Name}' に simutrans の実行ファイルが指定されていません");
         }
         var args = LaunchCommandBuilder.Build(profile.PaksetFolder, ServerAddress.Parse(profile.Address));
-        var command = LaunchCommandBuilder.ToDisplayString(exe, args);
-        return (printOnly ? null : SimutransRunner.Start(exe, args), command);
+        return new LaunchInfo(Path.GetFullPath(exe), args, LaunchCommandBuilder.ToDisplayString(exe, args), HashExe(exe),
+            ManagedEngine: false, NeedsApproval: false, EngineLabel: null, SourceUrl: null);
+    }
+
+    /// <summary>
+    /// 起動する。承認が要る本体が未承認なら起動しない。準備のあとで実行ファイルが書き換えられていないかも確かめる。
+    /// </summary>
+    public static System.Diagnostics.Process Launch(LaunchInfo info, LauncherSettings settings)
+    {
+        if (info.ManagedEngine && !settings.IsApproved(info.ExeSha256))
+        {
+            throw new SyncException("この simutrans 本体はまだ実行を承認していません");
+        }
+        if (!string.Equals(HashExe(info.ExePath), info.ExeSha256, StringComparison.OrdinalIgnoreCase))
+        {
+            throw new SyncException("確認したあとで simutrans 本体が書き換えられました。もう一度「起動」を押してください");
+        }
+        return SimutransRunner.Start(info.ExePath, info.Args);
+    }
+
+    private static string HashExe(string exe)
+    {
+        if (!File.Exists(exe))
+        {
+            throw new FileNotFoundException($"simutrans の実行ファイルが見つかりません: {exe}", exe);
+        }
+        using var stream = File.OpenRead(exe);
+        return Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(stream));
     }
 
     /// <summary>URL でなければローカルのファイルパスとして扱う。</summary>

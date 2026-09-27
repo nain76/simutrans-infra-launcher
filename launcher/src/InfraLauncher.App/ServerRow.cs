@@ -61,7 +61,7 @@ public sealed class ServerRow : INotifyPropertyChanged
         Message = "",
         PaksetText = profile.PaksetFolder,
         SourceText = "手動プロファイル",
-        _syncText = "自動同期なし",
+        _syncText = "自動同期なし（そのまま起動できます）",
     };
 
     public static ServerRow Error(ServerListSource list, string error) => new(ServerRowKind.ListError, "")
@@ -91,9 +91,14 @@ public sealed class ServerRow : INotifyPropertyChanged
     public string PaksetText { get; private init; } = "";
     public string SourceText { get; private init; } = "";
     public bool CanFavorite => Kind != ServerRowKind.ListError;
+    /// <summary>「同期」できるか（共有リストのサーバーだけ）。</summary>
+    public bool CanSync => Kind == ServerRowKind.Listed && _planError is null;
+    /// <summary>「起動」できるか。共有リストのサーバーは同期が済んでいること。</summary>
+    public bool IsReady => Kind == ServerRowKind.Manual || Kind == ServerRowKind.Listed && Plan is { UpToDate: true };
+    public SyncPlan? Plan { get; private set; }
+    private string? _planError;
     /// <summary>読み込めなかった行は☆を見えなくするが、場所は残して左を揃える。</summary>
     public double FavoriteOpacity => CanFavorite ? 1 : 0;
-    public bool CanConnect => Kind != ServerRowKind.ListError;
 
     public bool IsFavorite
     {
@@ -111,10 +116,14 @@ public sealed class ServerRow : INotifyPropertyChanged
 
     public void SetPlan(SyncPlan? plan, string? error)
     {
+        Plan = plan;
+        _planError = error;
         SyncText = error is not null ? $"同期できません: {error}"
             : plan is null ? ""
-            : plan.UpToDate ? "✔ 最新"
-            : "↓ 要同期: " + string.Join("、", plan.Items.Where(i => i.Needed).Select(i => i.Label));
+            : plan.UpToDate ? "✔ 同期済み（起動できます）"
+            : "↓ 要同期: " + string.Join("、", plan.Items.Where(i => i.Needed).Select(i => i.Label)) + "（「同期」を押してください）";
+        OnPropertyChanged(nameof(IsReady));
+        OnPropertyChanged(nameof(CanSync));
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;

@@ -16,7 +16,7 @@ public enum SyncMethod { Zip, FileIndex }
 /// ファイル一覧方式では Url と Sha256 は一覧ファイル（index.json）のもの。
 /// </summary>
 public sealed record SyncItem(SyncItemKind Kind, string Label, string Url, string Sha256, string TargetDir, bool Needed,
-    SyncMethod Method = SyncMethod.Zip);
+    SyncMethod Method = SyncMethod.Zip, string? ExePath = null);
 
 /// <summary>サーバー1つ分の同期計画。</summary>
 public sealed record SyncPlan(ServerEntry Server, string ExePath, string PaksetFolder, IReadOnlyList<SyncItem> Items)
@@ -58,8 +58,12 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
             var engineDir = layout.EngineDir(server.Engine!.Revision);
             exe = Path.GetFullPath(Path.Combine(engineDir, build.Exe));
             EnsureInside(engineDir, exe, "engine の exe");
-            var needed = !File.Exists(exe) || !SameHash(state.Get(engineDir), build.Sha256);
-            items.Add(new SyncItem(SyncItemKind.Engine, $"simutrans {server.Engine.Revision}", build.Url, build.Sha256, engineDir, needed));
+            var record = state.Get(engineDir);
+            // インストール後に実行ファイルが書き換えられていたら、入れ直す
+            var exeChanged = record?.Files?.Values.FirstOrDefault() is { } stamp && !stamp.Matches(new FileInfo(exe));
+            var needed = !File.Exists(exe) || !SameHash(record, build.Sha256) || exeChanged;
+            items.Add(new SyncItem(SyncItemKind.Engine, $"simutrans {server.Engine.Revision}", build.Url, build.Sha256, engineDir, needed,
+                ExePath: exe));
         }
         else if (!string.IsNullOrWhiteSpace(settings.SimutransExe))
         {
@@ -103,7 +107,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
                 continue;
             }
             var state = InstalledState.Load(layout);
-            var needed = item.Needed || !Directory.Exists(item.TargetDir) || !SameHash(state.Get(item.TargetDir), item.Sha256);
+            var needed = item.Needed || !Directory.Exists(item.TargetDir) || !SameHash(state.Get(item.TargetDir), item.Sha256)
+                || item.ExePath is not null && !File.Exists(item.ExePath);
             if (!needed)
             {
                 continue;
@@ -181,7 +186,14 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
             {
                 MarkExecutables(target);
             }
-            state.Set(target, new InstalledRecord { Sha256 = item.Sha256.ToLowerInvariant(), Url = item.Url, InstalledAt = DateTimeOffset.Now });
+            var record = new InstalledRecord { Sha256 = item.Sha256.ToLowerInvariant(), Url = item.Url, InstalledAt = DateTimeOffset.Now };
+            if (item.ExePath is not null && File.Exists(item.ExePath))
+            {
+                // 実行ファイルのサイズと更新日時を覚えておき、あとで書き換えられていないか確かめる
+                var info = new FileInfo(item.ExePath);
+                record.Files = new() { [Path.GetRelativePath(target, item.ExePath).Replace('\\', '/')] = FileStamp.From(info, "") };
+            }
+            state.Set(target, record);
             state.Save(layout);
         }
         finally

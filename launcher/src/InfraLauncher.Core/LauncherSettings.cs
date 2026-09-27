@@ -15,6 +15,12 @@ public sealed class LauncherSettings
     /// <summary>サーバーリストに今の OS 用の本体が含まれていないときに使う、手元の simutrans の実行ファイル。</summary>
     public string? SimutransExe { get; set; }
 
+    /// <summary>
+    /// ユーザーが実行を承認した本体（ランチャーが配布元から入れたもの）の SHA256。
+    /// 本体が更新されたり書き換えられたりして SHA256 が変わると、もう一度確認する。
+    /// </summary>
+    public List<string> ApprovedExecutables { get; set; } = new();
+
     /// <summary>古い形式の設定（manifest_urls）。読み込み時に <see cref="ServerLists"/> へ移す。</summary>
     [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
     public List<string>? ManifestUrls { get; set; }
@@ -31,6 +37,16 @@ public sealed class LauncherSettings
     }
 
     public void Save(InstallLayout layout) => Json.Save(layout.SettingsPath, this, Json.Context.LauncherSettings);
+
+    public bool IsApproved(string sha256) => ApprovedExecutables.Contains(sha256, StringComparer.OrdinalIgnoreCase);
+
+    public void Approve(string sha256)
+    {
+        if (!IsApproved(sha256))
+        {
+            ApprovedExecutables.Add(sha256.ToLowerInvariant());
+        }
+    }
 
     public bool IsFavorite(string key) => FavoriteKeys.Contains(key);
 

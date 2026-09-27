@@ -110,8 +110,8 @@ public partial class MainWindow : Window
     private void UpdateButtons()
     {
         var row = Selected;
-        ConnectButton.IsEnabled = !_busy && row is { CanConnect: true };
-        ConnectButton.Content = row?.Kind == ServerRowKind.Listed ? "同期して接続" : "接続";
+        SyncButton.IsEnabled = !_busy && row is { CanSync: true };
+        LaunchButton.IsEnabled = !_busy && row is { IsReady: true };
         EditButton.IsEnabled = !_busy && row is not null;
         DeleteButton.IsEnabled = !_busy && row is not null;
         AddButton.IsEnabled = !_busy;
@@ -228,43 +228,88 @@ public partial class MainWindow : Window
         }
     }
 
-    private async void OnConnect(object? sender, RoutedEventArgs e)
+    private void OnDoubleTapped(object? sender, RoutedEventArgs e)
     {
-        if (_busy || Selected is not { CanConnect: true } row)
+        // ダブルクリックは、起動できるなら起動、まだなら同期（同期だけでは何も実行しない）
+        if (Selected is { IsReady: true })
+        {
+            OnLaunch(sender, e);
+        }
+        else if (Selected is { CanSync: true })
+        {
+            OnSync(sender, e);
+        }
+    }
+
+    /// <summary>本体と pakset をサーバーと同じ状態にする。起動はしない。</summary>
+    private async void OnSync(object? sender, RoutedEventArgs e)
+    {
+        if (_busy || Selected is not { CanSync: true, Server: { } server } row)
         {
             return;
         }
-        SetBusy(true, $"{row.Name} に接続する準備をしています…");
+        SetBusy(true, $"{row.Name} を同期しています…");
         try
         {
-            string command;
-            if (row.Server is { } server)
+            var progress = new Progress<SyncProgress>(p =>
             {
-                var progress = new Progress<SyncProgress>(p =>
+                StatusText.Text = $"{p.Item.Label}: {p.Stage}";
+                Progress.IsIndeterminate = p.BytesTotal is not > 0;
+                if (p.BytesTotal is > 0)
                 {
-                    StatusText.Text = $"{p.Item.Label}: {p.Stage}";
-                    Progress.IsIndeterminate = p.BytesTotal is not > 0;
-                    if (p.BytesTotal is > 0)
-                    {
-                        Progress.Value = p.BytesDone * 100.0 / p.BytesTotal.Value;
-                    }
-                });
-                (_, command) = await _service.SyncAndLaunchAsync(server, _settings, progress: progress);
-                row.SetPlan(_service.Sync.Plan(server, _settings), null);
-            }
-            else
-            {
-                (_, command) = LauncherService.LaunchManual(row.Profile!, _settings);
-            }
-            StatusText.Text = $"起動しました: {command}";
+                    Progress.Value = p.BytesDone * 100.0 / p.BytesTotal.Value;
+                }
+            });
+            var summary = await _service.SyncServerAsync(server, _settings, progress);
+            row.SetPlan(_service.Sync.Plan(server, _settings), null);
+            StatusText.Text = summary.Downloads == 0 && summary.Removed == 0
+                ? $"{row.Name}: すでに最新です。「起動」で接続できます"
+                : $"{row.Name}: 同期しました（ダウンロード {summary.Downloads} 件）。「起動」で接続できます";
         }
-        catch (Exception ex) when (ex is SyncException or FormatException or FileNotFoundException or System.ComponentModel.Win32Exception)
+        catch (Exception ex) when (ex is SyncException or FormatException or FileNotFoundException)
         {
             StatusText.Text = $"エラー: {ex.Message}";
         }
         finally
         {
             SetBusy(false);
+        }
+    }
+
+    /// <summary>simutrans を起動して接続する。配布元から入れた本体は、初回（と中身が変わったとき）に確認する。</summary>
+    private async void OnLaunch(object? sender, RoutedEventArgs e)
+    {
+        if (_busy || Selected is not { IsReady: true } row)
+        {
+            return;
+        }
+        try
+        {
+            var info = row.Server is { } server
+                ? _service.PrepareLaunch(server, _settings)
+                : LauncherService.PrepareManual(row.Profile!, _settings);
+            if (info.NeedsApproval)
+            {
+                var dialog = new ExeApprovalWindow(info, row.Name, row.List?.Name);
+                if (!await dialog.ShowDialog<bool>(this))
+                {
+                    StatusText.Text = "起動を取りやめました";
+                    return;
+                }
+                _settings.Approve(info.ExeSha256);
+                _settings.Save(_service.Layout);
+            }
+            LauncherService.Launch(info, _settings);
+            StatusText.Text = $"起動しました: {info.Command}";
+        }
+        catch (Exception ex) when (ex is SyncException or FormatException or FileNotFoundException or System.ComponentModel.Win32Exception)
+        {
+            StatusText.Text = $"エラー: {ex.Message}";
+            if (row.Server is { } s)
+            {
+                try { row.SetPlan(_service.Sync.Plan(s, _settings), null); } catch (SyncException) { }
+            }
+            UpdateButtons();
         }
     }
 
