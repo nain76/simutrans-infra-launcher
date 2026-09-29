@@ -80,17 +80,25 @@ if (-not $Source -and -not $Destination) {
         & $PSCommandPath -Source $p.pakset_source -Destination $p.destination -Manifest $settings.manifest -ServerId $p.server_ids -Version $Version
     }
 
-    # simutrans 本体も公開する（同じ本体を使うサーバーをまとめる）。以前の設定で本体の場所がなければ探して残す
+    # simutrans 本体も公開する（同じ本体を使うサーバーをまとめる）。
+    # 本体の exe が決まっていなければ探し、見つからなければ質問する（空欄と答えたら 'none' を残し、次からは聞かない）
     $changed = $false
     foreach ($p in $settings.paksets) {
+        if ($p.engine_source -and $p.engine_source -ne 'none' -and (Test-Path -LiteralPath $p.engine_source -PathType Container)) {
+            # 以前の版はフォルダを入れていた
+            $p.engine_source = Find-SimutransExe $p.engine_source
+            $changed = $true
+        }
         if (-not $p.engine_source) {
-            $p.engine_source = Get-EngineSource $p.pakset_source
-            if ($p.engine_source) { $changed = $true }
+            Write-Step "$($p.pakset_source) を使うサーバーの simutrans 本体を探しています"
+            $exe = Resolve-EngineExe $p.pakset_source
+            $p.engine_source = if ($exe) { $exe } else { 'none' }
+            $changed = $true
         }
     }
     if ($changed) { Save-PublishSettings $settings }
     $engineDest = Join-Path (Split-Path -Parent $settings.manifest) 'engine'
-    foreach ($group in @($settings.paksets | Where-Object { $_.engine_source } | Group-Object { $_.engine_source })) {
+    foreach ($group in @($settings.paksets | Where-Object { $_.engine_source -and $_.engine_source -ne 'none' } | Group-Object { $_.engine_source })) {
         $ids = @($group.Group | ForEach-Object { $_.server_ids })
         Write-Step "simutrans 本体 $($group.Name) を公開します（サーバー: $($ids -join ', ')）"
         & (Join-Path $PSScriptRoot 'Publish-Engine.ps1') -Source $group.Name -Destination $engineDest -Manifest $settings.manifest -ServerId $ids

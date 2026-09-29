@@ -4,9 +4,9 @@
 
 .DESCRIPTION
     友人のランチャーは、サーバーと同じ本体を自動で入れて起動する（本体が違うとチェックサムがずれることがあるため）。
-    1. -Source（simutrans 本体のフォルダ。simutrans.exe がある場所）のファイルを集める
+    1. -Source（simutrans 本体の exe）があるフォルダのファイルを集める
        pakset のフォルダ（直下に .pak があるフォルダ）、save / screenshot / addons / maps フォルダ、
-       セーブデータ（.sve）やログは含めない
+       セーブデータ（.sve）やログ、makeobj / nettool などの本体以外の exe は含めない
     2. 中身から識別名（revision）を決め、前回と同じなら zip を作り直さない
     3. -Destination に zip を置き、サーバーリストの該当サーバーの engine を書き換える
     4. どのサーバーも使わなくなった古い zip を消す
@@ -18,7 +18,7 @@
 #>
 [CmdletBinding()]
 param(
-    # simutrans 本体のフォルダ（simutrans.exe がある場所）
+    # simutrans 本体の exe のフルパス（フォルダを渡すと中の exe を探す）
     [Parameter(Mandatory = $true)] [string] $Source,
     # zip を置くフォルダ（サーバーリストと同じフォルダかその下）
     [Parameter(Mandatory = $true)] [string] $Destination,
@@ -38,12 +38,19 @@ $ExcludedDirs = @('save', 'screenshot', 'addons', 'maps')
 $ExcludedExtensions = @('.sve', '.log', '.tmp', '.bak')
 $ExcludedFiles = @('settings.xml')
 
-$src = Get-FullPath $Source
 $dst = Get-FullPath $Destination
 $manifestPath = Get-FullPath $Manifest
-$exe = Find-SimutransExe $src
-if (-not $exe) {
-    throw "simutrans 本体（simutrans.exe）が見つかりません: $src"
+$given = Get-FullPath $Source
+if (Test-Path -LiteralPath $given -PathType Leaf) {
+    $exe = $given
+    $src = Split-Path -Parent $exe
+}
+else {
+    $src = $given
+    $exe = Find-SimutransExe $src
+    if (-not $exe) {
+        throw "simutrans 本体の exe を決められません: $src（exe のフルパスを指定してください）"
+    }
 }
 $manifestDir = Split-Path -Parent $manifestPath
 if (-not $dst.StartsWith($manifestDir + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
@@ -66,6 +73,8 @@ foreach ($f in Get-ChildItem -LiteralPath $src -Recurse -File -Force) {
     if ($ExcludedExtensions -contains $f.Extension.ToLowerInvariant()) { continue }
     $rel = $f.FullName.Substring($src.Length + 1).Replace('\', '/')
     if ($ExcludedFiles -contains $rel.ToLowerInvariant()) { continue }
+    # makeobj や nettool などの本体以外の exe は友人に配らない
+    if ($rel -notmatch '/' -and $f.Extension -ieq '.exe' -and $f.FullName -ne $exe -and $f.Name -match $NotEngineExe) { continue }
     $files += [pscustomobject]@{ Rel = $rel; File = $f }
 }
 $files = @($files | Sort-Object -Property Rel -CaseSensitive)

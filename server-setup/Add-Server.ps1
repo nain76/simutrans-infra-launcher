@@ -136,14 +136,20 @@ Write-Step "pakset を公開します（$PaksetFolder）"
 & (Join-Path $PSScriptRoot 'Publish-Pakset.ps1') -Source $PaksetSource -Destination $destination -Manifest $manifestPath -ServerId $entryIds
 
 # simutrans 本体（pakset フォルダの1つ上）も公開する。同じ本体を使うサーバーはまとめて書き換える
-$engineSource = Get-EngineSource $PaksetSource
+$publishEntry = @($settings.paksets | Where-Object { $_.destination -eq $destination })[0]
+if (-not $publishEntry.engine_source) {
+    $exe = Resolve-EngineExe $PaksetSource
+    $publishEntry.engine_source = if ($exe) { $exe } else { 'none' }
+    Save-PublishSettings $settings
+}
+$engineSource = if ($publishEntry.engine_source -ne 'none') { $publishEntry.engine_source } else { $null }
 if ($engineSource) {
     Write-Step "simutrans 本体を公開します（$engineSource）"
     $engineIds = @($settings.paksets | Where-Object { $_.engine_source -eq $engineSource } | ForEach-Object { $_.server_ids })
     & (Join-Path $PSScriptRoot 'Publish-Engine.ps1') -Source $engineSource -Destination (Join-Path $DistDir 'engine') -Manifest $manifestPath -ServerId $engineIds
 }
 else {
-    Write-Warning "pakset フォルダの1つ上に simutrans 本体（simutrans.exe）が見つからないため、本体は公開しません。友人は手元の simutrans を使います"
+    Write-Warning "simutrans 本体は公開しません。友人は手元の simutrans を使います"
 }
 
 # --- ゲーム用ポートを Windows ファイアウォールで開ける ---

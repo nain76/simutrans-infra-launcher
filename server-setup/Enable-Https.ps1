@@ -7,7 +7,8 @@
     本体を友人に配るには、このスクリプトで HTTPS にしておく。
 
     1. Windows ファイアウォールで TCP 80（証明書の確認用）と HTTPS のポート（既定 8443）を開ける
-    2. win-acme（証明書を取るツール）を GitHub から入れる。公開されている SHA256 と電子署名を確かめる
+    2. win-acme（証明書を取るツール）を GitHub の公式の配布元から HTTPS で入れる。GitHub が SHA256 を公開していれば照合する
+       （win-acme は作者が自分で作った証明書で署名しているため、Windows の電子署名の確認は通らない）
     3. 証明書を取り、IIS のサイトに HTTPS のポートを追加する。更新は win-acme が自動で行う（タスクスケジューラ）
     4. HTTPS でサーバーリストを取得できるか確かめる
 
@@ -82,17 +83,19 @@ if (-not (Test-Path -LiteralPath $wacs)) {
         Write-Ok "SHA256 を確かめました（$($asset.name)）"
     }
     else {
-        Write-Warning 'GitHub に SHA256 が載っていないため、電子署名だけで確かめます'
+        Write-Host '   GitHub に SHA256 が載っていないため、公式の配布元から HTTPS で取得したことを確認の根拠にします'
     }
     New-Item -ItemType Directory -Force -Path $ToolDir | Out-Null
     Expand-Archive -LiteralPath $zip -DestinationPath $ToolDir -Force
     Remove-Item -LiteralPath $zip -Force
 }
-$signature = Get-AuthenticodeSignature -LiteralPath $wacs
-if ($signature.Status -ne 'Valid') {
-    throw "win-acme（$wacs）の電子署名を確かめられませんでした（$($signature.Status)）。フォルダを消してもう一度実行してください"
+if (-not (Test-Path -LiteralPath $wacs)) {
+    throw "win-acme（wacs.exe）が見つかりません: $ToolDir。フォルダを消してもう一度実行してください"
 }
-Write-Ok "win-acme: $wacs（署名: $($signature.SignerCertificate.Subject)）"
+# 参考表示。win-acme は作者が自分で作った証明書（CN=WACS）で署名しているため、Windows の確認は Valid にならない
+$signature = Get-AuthenticodeSignature -LiteralPath $wacs
+$signer = if ($signature.SignerCertificate) { $signature.SignerCertificate.Subject } else { '署名なし' }
+Write-Ok "win-acme: $wacs（署名者: $signer）"
 
 # --- 3. 証明書の取得と IIS への設定 ---
 Write-Step "$HostName の証明書を取り、ポート $HttpsPort で HTTPS を有効にします"

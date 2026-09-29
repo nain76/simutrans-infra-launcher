@@ -42,7 +42,8 @@ function Get-FullPath([string] $path) {
     "paksets": [ { "pakset_source": "...", "destination": "...", "server_ids": ["friends-a"], "engine_source": "..." } ]
   }
   同じ pakset フォルダを使うサーバーは、1つの項目の server_ids にまとめる。
-  engine_source は simutrans 本体のフォルダ（pakset フォルダの1つ上。simutrans.exe がある場所）。なければ本体は公開しない。
+  engine_source は simutrans 本体の exe のフルパス（ふつうは pakset フォルダの1つ上にある）。なければ本体は公開しない。
+  以前の版ではフォルダを入れていたので、フォルダが入っていたら中の exe を探す。
 #>
 function Get-PublishSettings {
     $result = [ordered]@{ manifest = $null; paksets = @() }
@@ -83,19 +84,43 @@ function Add-PublishEntry($settings, [string] $source, [string] $destination, [s
     }
 }
 
-# simutrans 本体の実行ファイルを探す（simutrans.exe、なければ simutrans*.exe）
+# simutrans と一緒に置かれることが多い、本体ではない exe
+$NotEngineExe = '^(makeobj|nettool|unins|uninstall|setup|update|vc_?redist)'
+
+# フォルダ直下の exe のうち、本体の候補（makeobj などを除く）
+function Get-ExeCandidates([string] $dir) {
+    if (-not $dir -or -not (Test-Path -LiteralPath $dir -PathType Container)) { return @() }
+    return @(Get-ChildItem -LiteralPath $dir -Filter '*.exe' -File | Where-Object { $_.Name -notmatch $NotEngineExe })
+}
+
+# simutrans 本体の実行ファイルを探す。simutrans.exe → simutrans*.exe → 候補が1つだけならそれ。決められなければ $null
 function Find-SimutransExe([string] $dir) {
-    if (-not $dir -or -not (Test-Path -LiteralPath $dir -PathType Container)) { return $null }
-    $exes = @(Get-ChildItem -LiteralPath $dir -Filter '*.exe' -File | Where-Object { $_.Name -match '^simutrans.*\.exe$' })
+    $exes = @(Get-ExeCandidates $dir)
     $main = @($exes | Where-Object { $_.Name -ieq 'simutrans.exe' })
     if ($main.Count -gt 0) { return $main[0].FullName }
-    if ($exes.Count -gt 0) { return $exes[0].FullName }
+    $named = @($exes | Where-Object { $_.Name -match '^simutrans.*\.exe$' })
+    if ($named.Count -gt 0) { return $named[0].FullName }
+    if ($exes.Count -eq 1) { return $exes[0].FullName }
     return $null
 }
 
-# pakset フォルダの1つ上に simutrans 本体があれば、そのフォルダを返す
+# 本体の exe を決める。見つからなければ候補を出して質問する（空欄なら本体は配らない）
+function Resolve-EngineExe([string] $paksetSource) {
+    $dir = Split-Path -Parent $paksetSource
+    $exe = Find-SimutransExe $dir
+    if ($exe) { return $exe }
+    $names = (Get-ExeCandidates $dir | ForEach-Object { $_.Name }) -join ', '
+    if (-not $names) { $names = '（exe がありません）' }
+    Write-Warning "simutrans 本体の exe を決められませんでした。$dir にある exe: $names"
+    while ($true) {
+        $answer = (Read-Host 'simutrans 本体の exe のフルパス（空欄なら本体は配らない）').Trim().Trim('"')
+        if (-not $answer) { return $null }
+        if ((Test-Path -LiteralPath $answer -PathType Leaf) -and $answer -match '\.exe$') { return (Get-FullPath $answer) }
+        Write-Warning "exe ファイルが見つかりません: $answer"
+    }
+}
+
+# pakset フォルダの1つ上に simutrans 本体が見つかれば、その exe のフルパスを返す（質問はしない）
 function Get-EngineSource([string] $paksetSource) {
-    $parent = Split-Path -Parent $paksetSource
-    if (Find-SimutransExe $parent) { return $parent }
-    return $null
+    return Find-SimutransExe (Split-Path -Parent $paksetSource)
 }
