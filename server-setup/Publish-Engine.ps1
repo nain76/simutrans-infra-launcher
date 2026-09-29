@@ -4,10 +4,11 @@
 
 .DESCRIPTION
     友人のランチャーは、サーバーと同じ本体を自動で入れて起動する（本体が違うとチェックサムがずれることがあるため）。
-    1. -Source（simutrans 本体の exe）があるフォルダのファイルを集める
-       pakset のフォルダ（直下に .pak があるフォルダ）、save / screenshot / addons / maps フォルダ、
-       セーブデータ（.sve）やログは含めない。フォルダ直下は本体の exe と .dll だけにする
-       （ほかの版の exe、makeobj / nettool、json やバッチファイルなどのサーバー用のファイルは配らない）
+    1. -Source（simutrans 本体の exe）があるフォルダから、配るものだけを集める（許可リスト方式）
+       - 推奨設定は engine-files.default.json。engine-files.json があればそちらを使う（カスタム）
+       - 本体の exe は必ず入れる
+       - 絶対に配らないもの（設定でも変わらない）: スクリプトやバッチファイル、本体以外の exe（nettool / makeobj / ほかの版）、
+         セーブデータ（.sve）、settings.xml、ログ、save / screenshot / addons フォルダ、pakset のフォルダ
     2. 中身から識別名（revision）を決め、前回と同じなら zip を作り直さない
     3. -Destination に zip を置き、サーバーリストの該当サーバーの engine を書き換える
     4. どのサーバーも使わなくなった古い zip を消す
@@ -35,9 +36,33 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.IO.Compression
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
-$ExcludedDirs = @('save', 'screenshot', 'addons', 'maps')
-$ExcludedExtensions = @('.sve', '.log', '.tmp', '.bak')
-$ExcludedFiles = @('settings.xml')
+# 絶対に配らないもの（engine-files.json に書いても変わらない）
+$NeverFolders = @('save', 'screenshot', 'addons')
+$NeverFiles = @('*.bat', '*.cmd', '*.ps1', '*.psm1', '*.vbs', '*.vbe', '*.js', '*.jse', '*.wsf', '*.hta', '*.lnk', '*.url', '*.reg',
+    '*.exe', '*.com', '*.scr', '*.msi', '*.sve', '*.log', 'settings.xml', '*pwdhash*')
+
+# 配るもの（推奨設定。engine-files.json があればそちらを使う）
+$rulesPath = Join-Path $PSScriptRoot 'engine-files.json'
+$rulesName = 'engine-files.json（カスタム）'
+if (-not (Test-Path -LiteralPath $rulesPath)) {
+    $rulesPath = Join-Path $PSScriptRoot 'engine-files.default.json'
+    $rulesName = '推奨設定（engine-files.default.json）'
+}
+if (Test-Path -LiteralPath $rulesPath) {
+    $rules = Read-JsonFile $rulesPath
+    $IncludeFolders = @($rules.folders)
+    $IncludeFiles = @($rules.files)
+}
+else {
+    $rulesName = '推奨設定（組み込み）'
+    $IncludeFolders = @('ai', 'config', 'font', 'music', 'scenario', 'script', 'skin', 'text', 'themes')
+    $IncludeFiles = @('*.dll', 'license*.txt', 'copyright*.txt', 'readme*.txt')
+}
+
+function Test-Like([string] $name, [string[]] $patterns) {
+    foreach ($pattern in $patterns) { if ($name -like $pattern) { return $true } }
+    return $false
+}
 
 $dst = Get-FullPath $Destination
 $manifestPath = Get-FullPath $Manifest
@@ -58,27 +83,36 @@ if (-not $dst.StartsWith($manifestDir + [System.IO.Path]::DirectorySeparatorChar
     throw "-Destination はサーバーリストと同じフォルダの下にしてください: $dst"
 }
 
-# --- 1. 含めるファイルを集める ---
-$skipDirs = @()
-foreach ($d in Get-ChildItem -LiteralPath $src -Directory -Force) {
-    $isPakset = $null -ne (Get-ChildItem -LiteralPath $d.FullName -Filter '*.pak' -File -Force | Select-Object -First 1)
-    if ($isPakset -or ($ExcludedDirs -contains $d.Name.ToLowerInvariant())) {
-        $skipDirs += $d.FullName + [System.IO.Path]::DirectorySeparatorChar
+# --- 1. 配るファイルを集める ---
+$files = @([pscustomobject]@{ Rel = (Split-Path -Leaf $exe); File = (Get-Item -LiteralPath $exe) })
+$skippedFolders = @()
+$neverItems = @()
+foreach ($item in Get-ChildItem -LiteralPath $src -Force) {
+    if ($item.PSIsContainer) {
+        $isPakset = $null -ne (Get-ChildItem -LiteralPath $item.FullName -Filter '*.pak' -File -Force | Select-Object -First 1)
+        if ($isPakset -or ($NeverFolders -contains $item.Name.ToLowerInvariant())) { $neverItems += "$($item.Name)\"; continue }
+        if (-not ($IncludeFolders -contains $item.Name.ToLowerInvariant())) { $skippedFolders += $item.Name; continue }
+        foreach ($f in Get-ChildItem -LiteralPath $item.FullName -Recurse -File -Force) {
+            # フォルダの中でも、スクリプトや exe などは配らない
+            if (Test-Like $f.Name $NeverFiles) { $neverItems += $f.FullName.Substring($src.Length + 1); continue }
+            $files += [pscustomobject]@{ Rel = $f.FullName.Substring($src.Length + 1).Replace('\', '/'); File = $f }
+        }
+    }
+    elseif ($item.FullName -ne $exe) {
+        if (Test-Like $item.Name $NeverFiles) { $neverItems += $item.Name; continue }
+        if (Test-Like $item.Name $IncludeFiles) { $files += [pscustomobject]@{ Rel = $item.Name; File = $item } }
     }
 }
-$files = @()
-foreach ($f in Get-ChildItem -LiteralPath $src -Recurse -File -Force) {
-    $skip = $false
-    foreach ($d in $skipDirs) { if ($f.FullName.StartsWith($d, [System.StringComparison]::OrdinalIgnoreCase)) { $skip = $true; break } }
-    if ($skip) { continue }
-    if ($ExcludedExtensions -contains $f.Extension.ToLowerInvariant()) { continue }
-    $rel = $f.FullName.Substring($src.Length + 1).Replace('\', '/')
-    if ($ExcludedFiles -contains $rel.ToLowerInvariant()) { continue }
-    # フォルダ直下は、本体の exe と .dll だけにする（ほかの版の exe、json やバッチファイルなどのサーバー用のファイルは配らない）
-    if ($rel -notmatch '/' -and $f.FullName -ne $exe -and $f.Extension -ine '.dll') { continue }
-    $files += [pscustomobject]@{ Rel = $rel; File = $f }
-}
 $files = @($files | Sort-Object -Property Rel -CaseSensitive)
+
+Write-Host "   配るものの設定: $rulesName"
+Write-Host ("   配るフォルダ: {0}" -f ((@($files | Where-Object { $_.Rel -match '/' } | ForEach-Object { ($_.Rel -split '/')[0] } | Sort-Object -Unique)) -join ', '))
+if ($skippedFolders.Count -gt 0) { Write-Host ("   配らなかったフォルダ: {0}（配るには engine-files.json の folders に足す）" -f ($skippedFolders -join ', ')) }
+if ($neverItems.Count -gt 0) {
+    $shown = @($neverItems | Select-Object -First 12)
+    $more = if ($neverItems.Count -gt $shown.Count) { " ほか $($neverItems.Count - $shown.Count) 件" } else { '' }
+    Write-Host ("   絶対に配らないもの: {0}{1}" -f ($shown -join ', '), $more)
+}
 
 # --- 2. 識別名（中身が同じなら同じ名前になる） ---
 $lines = foreach ($f in $files) {

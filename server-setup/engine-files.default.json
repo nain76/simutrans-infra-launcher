@@ -1,0 +1,5 @@
+{
+  "_comment": "simutrans 本体として友人に配るファイルの推奨設定。変えたいときは、このファイルを engine-files.json という名前でコピーして編集する（engine-files.json があればそちらを使う）。本体の exe と、絶対に配らないもの（スクリプトやバッチファイル、ほかの exe、セーブデータ、settings.xml、ログ、save / screenshot / addons、pakset）は、ここに書いても変わらない。",
+  "folders": ["ai", "config", "font", "music", "scenario", "script", "skin", "text", "themes"],
+  "files": ["*.dll", "license*.txt", "copyright*.txt", "readme*.txt"]
+}

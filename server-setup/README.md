@@ -154,8 +154,16 @@ C:\simutrans-dist\                 ← 8080 番で公開（増やしても1つ�
   1. その simutrans サーバーのポート（`-server 8634` など）で**動いているプロセスの exe**。サーバーの本体を新しい版に入れ替えたときも、次の公開で追従します
   2. `simutrans.exe`、または `simutrans*.exe` / `sim-*.exe`（OTRP の `sim-WinGDI64-OTRPv57_0_1.exe` など）が1つだけならそれ
   3. 決められなければ、フォルダ内の exe を新しい順に並べるので、番号で選びます（空欄なら本体は配りません）
-- zip に入れるもの: 選んだ exe と `.dll`（フォルダ直下はこれだけ）、`config` / `text` などのサブフォルダ
-- zip に入れないもの: ほかの版の exe、makeobj / nettool、json やバッチファイルなどのフォルダ直下のファイル、pakset のフォルダ、`save` / `screenshot` / `addons` / `maps` フォルダ、セーブデータ（.sve）、ログ
+- zip に入れるものは**許可リスト方式**で決めます（決めたものだけを入れるので、サーバーにファイルが増えても勝手には配りません）
+
+  | 区分 | 中身 |
+  |---|---|
+  | 推奨（既定で入れる） | 選んだ本体の exe、`.dll`、`ai` `config` `font` `music` `scenario` `script` `skin` `text` `themes` フォルダ、`license*.txt` `copyright*.txt` `readme*.txt` |
+  | 既定では入れない | `maps`、`generated-scripts`、`history.txt` など上にないもの（カスタムで足せる） |
+  | 絶対に入れない（カスタムでも不可） | `.bat` `.cmd` `.ps1` `.vbs` などのスクリプト、本体以外の exe（Nettool / makeobj / ほかの版）、`.sve`（セーブデータやパスワード）、`settings.xml`、ログ、`save` `screenshot` `addons` フォルダ、pakset のフォルダ |
+
+- **カスタム:** [engine-files.default.json](engine-files.default.json) を `engine-files.json` という名前でコピーして、`folders`（フォルダ）と `files`（フォルダ直下のファイル。`*` が使える）を編集します。`engine-files.json` があればそちらを使います
+- 公開のたびに「配るフォルダ」「配らなかったフォルダ」「絶対に配らないもの」を表示するので、確かめてください
 - 中身が前回と同じなら zip は作り直しません。どのサーバーも使わなくなった古い zip は消します
 - 本体は Windows 版だけです。Mac や Linux の友人は、手元の simutrans をランチャーの「設定」で指定します
 
