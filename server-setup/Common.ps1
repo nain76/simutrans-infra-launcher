@@ -87,36 +87,65 @@ function Add-PublishEntry($settings, [string] $source, [string] $destination, [s
 # simutrans と一緒に置かれることが多い、本体ではない exe
 $NotEngineExe = '^(makeobj|nettool|unins|uninstall|setup|update|vc_?redist)'
 
-# フォルダ直下の exe のうち、本体の候補（makeobj などを除く）
+# フォルダ直下の exe のうち、本体の候補（makeobj などを除く）。新しい順
 function Get-ExeCandidates([string] $dir) {
     if (-not $dir -or -not (Test-Path -LiteralPath $dir -PathType Container)) { return @() }
-    return @(Get-ChildItem -LiteralPath $dir -Filter '*.exe' -File | Where-Object { $_.Name -notmatch $NotEngineExe })
+    return @(Get-ChildItem -LiteralPath $dir -Filter '*.exe' -File | Where-Object { $_.Name -notmatch $NotEngineExe } |
+        Sort-Object LastWriteTime -Descending)
 }
 
-# simutrans 本体の実行ファイルを探す。simutrans.exe → simutrans*.exe → 候補が1つだけならそれ。決められなければ $null
+# 指定したポートで simutrans サーバー（-server <port>）として動いているプロセスの exe を探す
+function Find-RunningServerExe([string] $dir, [int[]] $ports) {
+    if (-not $dir -or -not $ports -or -not (Get-Command Get-CimInstance -ErrorAction SilentlyContinue)) { return $null }
+    try {
+        $prefix = (Get-FullPath $dir) + [System.IO.Path]::DirectorySeparatorChar
+        foreach ($proc in Get-CimInstance Win32_Process -ErrorAction Stop) {
+            if (-not $proc.ExecutablePath -or -not $proc.CommandLine) { continue }
+            if (-not $proc.ExecutablePath.StartsWith($prefix, [System.StringComparison]::OrdinalIgnoreCase)) { continue }
+            if ($proc.CommandLine -match '-server\s+(\d+)' -and ($ports -contains [int]$Matches[1])) { return $proc.ExecutablePath }
+        }
+    }
+    catch { }
+    return $null
+}
+
+# simutrans 本体の実行ファイルを名前から探す。
+# simutrans.exe → simutrans*.exe / sim-*.exe（OTRP の sim-WinGDI64-OTRPv57.exe など）が1つだけ → 候補が1つだけ。決められなければ $null
 function Find-SimutransExe([string] $dir) {
     $exes = @(Get-ExeCandidates $dir)
     $main = @($exes | Where-Object { $_.Name -ieq 'simutrans.exe' })
     if ($main.Count -gt 0) { return $main[0].FullName }
-    $named = @($exes | Where-Object { $_.Name -match '^simutrans.*\.exe$' })
-    if ($named.Count -gt 0) { return $named[0].FullName }
+    $named = @($exes | Where-Object { $_.Name -match '^(simutrans|sim-).*\.exe$' })
+    if ($named.Count -eq 1) { return $named[0].FullName }
     if ($exes.Count -eq 1) { return $exes[0].FullName }
     return $null
 }
 
-# 本体の exe を決める。見つからなければ候補を出して質問する（空欄なら本体は配らない）
-function Resolve-EngineExe([string] $paksetSource) {
+# 本体の exe を決める。動いているサーバーの exe → 名前 → 番号で選んでもらう（空欄なら本体は配らない）
+function Resolve-EngineExe([string] $paksetSource, [int[]] $ports) {
     $dir = Split-Path -Parent $paksetSource
+    $running = Find-RunningServerExe $dir $ports
+    if ($running) {
+        Write-Ok "動いている simutrans サーバーの本体を使います: $(Split-Path -Leaf $running)"
+        return $running
+    }
     $exe = Find-SimutransExe $dir
     if ($exe) { return $exe }
-    $names = (Get-ExeCandidates $dir | ForEach-Object { $_.Name }) -join ', '
-    if (-not $names) { $names = '（exe がありません）' }
-    Write-Warning "simutrans 本体の exe を決められませんでした。$dir にある exe: $names"
+    $candidates = @(Get-ExeCandidates $dir)
+    if ($candidates.Count -eq 0) {
+        Write-Warning "$dir に simutrans 本体の exe が見つかりません。本体は配りません"
+        return $null
+    }
+    Write-Host "   $dir に exe が複数あります。simutrans サーバーの起動に使っている本体を選んでください（新しい順）"
+    for ($i = 0; $i -lt $candidates.Count; $i++) {
+        Write-Host ("     {0}. {1}（{2:yyyy/MM/dd}）" -f ($i + 1), $candidates[$i].Name, $candidates[$i].LastWriteTime)
+    }
     while ($true) {
-        $answer = (Read-Host 'simutrans 本体の exe のフルパス（空欄なら本体は配らない）').Trim().Trim('"')
+        $answer = (Read-Host "番号（空欄なら本体は配らない）").Trim()
         if (-not $answer) { return $null }
-        if ((Test-Path -LiteralPath $answer -PathType Leaf) -and $answer -match '\.exe$') { return (Get-FullPath $answer) }
-        Write-Warning "exe ファイルが見つかりません: $answer"
+        $n = 0
+        if ([int]::TryParse($answer, [ref]$n) -and $n -ge 1 -and $n -le $candidates.Count) { return $candidates[$n - 1].FullName }
+        Write-Warning "1〜$($candidates.Count) の番号で答えてください"
     }
 }
 

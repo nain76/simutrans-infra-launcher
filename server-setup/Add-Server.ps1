@@ -138,7 +138,7 @@ Write-Step "pakset を公開します（$PaksetFolder）"
 # simutrans 本体（pakset フォルダの1つ上）も公開する。同じ本体を使うサーバーはまとめて書き換える
 $publishEntry = @($settings.paksets | Where-Object { $_.destination -eq $destination })[0]
 if (-not $publishEntry.engine_source) {
-    $exe = Resolve-EngineExe $PaksetSource
+    $exe = Resolve-EngineExe $PaksetSource @($GamePort)
     $publishEntry.engine_source = if ($exe) { $exe } else { 'none' }
     Save-PublishSettings $settings
 }

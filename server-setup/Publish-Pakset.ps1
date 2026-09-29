@@ -81,7 +81,9 @@ if (-not $Source -and -not $Destination) {
     }
 
     # simutrans 本体も公開する（同じ本体を使うサーバーをまとめる）。
-    # 本体の exe が決まっていなければ探し、見つからなければ質問する（空欄と答えたら 'none' を残し、次からは聞かない）
+    # 動いているサーバーの exe が分かればそれを使う（本体を入れ替えたときに追従する）。
+    # 決まっていなければ探し、見つからなければ選んでもらう（空欄と答えたら 'none' を残し、次からは聞かない）
+    $servers = @((Read-JsonFile $settings.manifest).servers)
     $changed = $false
     foreach ($p in $settings.paksets) {
         if ($p.engine_source -and $p.engine_source -ne 'none' -and (Test-Path -LiteralPath $p.engine_source -PathType Container)) {
@@ -89,9 +91,16 @@ if (-not $Source -and -not $Destination) {
             $p.engine_source = Find-SimutransExe $p.engine_source
             $changed = $true
         }
-        if (-not $p.engine_source) {
+        $ports = @($servers | Where-Object { $p.server_ids -contains $_.id } | ForEach-Object { [int](($_.address -split ':')[-1]) })
+        $running = Find-RunningServerExe (Split-Path -Parent $p.pakset_source) $ports
+        if ($running -and $p.engine_source -ne $running) {
+            Write-Ok "動いている simutrans サーバーの本体に合わせます: $(Split-Path -Leaf $running)"
+            $p.engine_source = $running
+            $changed = $true
+        }
+        if (-not $p.engine_source -or ($p.engine_source -ne 'none' -and -not (Test-Path -LiteralPath $p.engine_source -PathType Leaf))) {
             Write-Step "$($p.pakset_source) を使うサーバーの simutrans 本体を探しています"
-            $exe = Resolve-EngineExe $p.pakset_source
+            $exe = Resolve-EngineExe $p.pakset_source $ports
             $p.engine_source = if ($exe) { $exe } else { 'none' }
             $changed = $true
         }

@@ -149,8 +149,13 @@ C:\simutrans-dist\                 ← 8080 番で公開（増やしても1つ�
 
 **サーバーと同じ simutrans 本体を、友人の PC に自動で入れられます。** 友人は simutrans を入れていなくても、ランチャーで「同期して接続」を押すだけで遊べます。サーバーと同じ本体なので、本体の違いによるチェックサムのずれも起きません。
 
-- pakset を公開するとき、**pakset フォルダの1つ上（simutrans.exe がある場所）にある本体**も zip にして公開します（`Publish-Engine.ps1`。`Add-Server.bat` と `Publish-Pakset.bat` が自動で呼びます）
-- zip に入れないもの: pakset のフォルダ、`save` / `screenshot` / `addons` / `maps` フォルダ、セーブデータ（.sve）、ログ
+- pakset を公開するとき、**pakset フォルダの1つ上にある本体**も zip にして公開します（`Publish-Engine.ps1`。`Add-Server.bat` と `Publish-Pakset.bat` が自動で呼びます）
+- どの exe を配るかは次の順で決めます
+  1. その simutrans サーバーのポート（`-server 8634` など）で**動いているプロセスの exe**。サーバーの本体を新しい版に入れ替えたときも、次の公開で追従します
+  2. `simutrans.exe`、または `simutrans*.exe` / `sim-*.exe`（OTRP の `sim-WinGDI64-OTRPv57_0_1.exe` など）が1つだけならそれ
+  3. 決められなければ、フォルダ内の exe を新しい順に並べるので、番号で選びます（空欄なら本体は配りません）
+- zip に入れるもの: 選んだ exe と `.dll`（フォルダ直下はこれだけ）、`config` / `text` などのサブフォルダ
+- zip に入れないもの: ほかの版の exe、makeobj / nettool、json やバッチファイルなどのフォルダ直下のファイル、pakset のフォルダ、`save` / `screenshot` / `addons` / `maps` フォルダ、セーブデータ（.sve）、ログ
 - 中身が前回と同じなら zip は作り直しません。どのサーバーも使わなくなった古い zip は消します
 - 本体は Windows 版だけです。Mac や Linux の友人は、手元の simutrans をランチャーの「設定」で指定します
 

@@ -6,7 +6,8 @@
     友人のランチャーは、サーバーと同じ本体を自動で入れて起動する（本体が違うとチェックサムがずれることがあるため）。
     1. -Source（simutrans 本体の exe）があるフォルダのファイルを集める
        pakset のフォルダ（直下に .pak があるフォルダ）、save / screenshot / addons / maps フォルダ、
-       セーブデータ（.sve）やログ、makeobj / nettool などの本体以外の exe は含めない
+       セーブデータ（.sve）やログは含めない。フォルダ直下は本体の exe と .dll だけにする
+       （ほかの版の exe、makeobj / nettool、json やバッチファイルなどのサーバー用のファイルは配らない）
     2. 中身から識別名（revision）を決め、前回と同じなら zip を作り直さない
     3. -Destination に zip を置き、サーバーリストの該当サーバーの engine を書き換える
     4. どのサーバーも使わなくなった古い zip を消す
@@ -73,8 +74,8 @@ foreach ($f in Get-ChildItem -LiteralPath $src -Recurse -File -Force) {
     if ($ExcludedExtensions -contains $f.Extension.ToLowerInvariant()) { continue }
     $rel = $f.FullName.Substring($src.Length + 1).Replace('\', '/')
     if ($ExcludedFiles -contains $rel.ToLowerInvariant()) { continue }
-    # makeobj や nettool などの本体以外の exe は友人に配らない
-    if ($rel -notmatch '/' -and $f.Extension -ieq '.exe' -and $f.FullName -ne $exe -and $f.Name -match $NotEngineExe) { continue }
+    # フォルダ直下は、本体の exe と .dll だけにする（ほかの版の exe、json やバッチファイルなどのサーバー用のファイルは配らない）
+    if ($rel -notmatch '/' -and $f.FullName -ne $exe -and $f.Extension -ine '.dll') { continue }
     $files += [pscustomobject]@{ Rel = $rel; File = $f }
 }
 $files = @($files | Sort-Object -Property Rel -CaseSensitive)
@@ -87,7 +88,11 @@ $sha = [System.Security.Cryptography.SHA256]::Create()
 $fingerprint = ([System.BitConverter]::ToString($sha.ComputeHash($Utf8NoBom.GetBytes(($lines -join "`n")))) -replace '-', '').ToLowerInvariant()
 $version = (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion
 if (-not $version) { $version = (Get-Item -LiteralPath $exe).VersionInfo.FileVersion }
-$version = if ($version) { ($version -replace '[^A-Za-z0-9_.-]+', '-').Trim('-', '.') } else { '' }
+if (-not $version) {
+    # 版の情報がない exe（OTRP の sim-WinGDI64-OTRPv57_0_1.exe など）は名前を使う
+    $version = [System.IO.Path]::GetFileNameWithoutExtension($exe)
+}
+$version = ($version -replace '[^A-Za-z0-9_.-]+', '-').Trim('-', '.')
 $revision = if ($version) { "$version-$($fingerprint.Substring(0, 8))" } else { "r-$($fingerprint.Substring(0, 8))" }
 
 # --- 3. zip を作って公開する ---
