@@ -91,10 +91,23 @@ public sealed partial class ManifestClient(HttpClient http)
                 var secure = true;
                 foreach (var (key, b) in e.Builds ?? new())
                 {
-                    b.Url = ResolveUrl(b.Url, baseUri, $"サーバー '{where}' の engine.builds.{key}.url");
-                    RequireSha(b.Sha256, $"サーバー '{where}' の engine.builds.{key}.sha256");
-                    Require(!string.IsNullOrWhiteSpace(b.Exe) && !Path.IsPathRooted(b.Exe), $"サーバー '{where}' の engine.builds.{key}.exe が不正です");
-                    secure &= new Uri(b.Url).Scheme is "https" || new Uri(b.Url).IsFile && baseUri is null or { IsFile: true };
+                    var what = $"サーバー '{where}' の engine.builds.{key}";
+                    var engineZip = b.Url is not null || b.Sha256 is not null;
+                    var engineIndex = b.IndexUrl is not null || b.IndexSha256 is not null;
+                    Require(engineZip != engineIndex, $"{what} には、url と sha256（zip 方式）か、index_url と index_sha256（ファイル一覧方式）のどちらか一方を書いてください");
+                    string url;
+                    if (engineIndex)
+                    {
+                        url = b.IndexUrl = ResolveUrl(b.IndexUrl, baseUri, $"{what}.index_url");
+                        RequireSha(b.IndexSha256, $"{what}.index_sha256");
+                    }
+                    else
+                    {
+                        url = b.Url = ResolveUrl(b.Url, baseUri, $"{what}.url");
+                        RequireSha(b.Sha256, $"{what}.sha256");
+                    }
+                    Require(IsSafeRelativePath(b.Exe), $"{what}.exe が不正です");
+                    secure &= new Uri(url).Scheme is "https" || new Uri(url).IsFile && baseUri is null or { IsFile: true };
                 }
                 s.EngineDownloadAllowed = secure && (baseUri is null || baseUri.Scheme == "https" || baseUri.IsFile);
             }
@@ -122,9 +135,13 @@ public sealed partial class ManifestClient(HttpClient http)
         return resolved.AbsoluteUri;
     }
 
-    /// <summary>ファイル一覧（index.json）を解析して検証する。</summary>
-    public static PaksetIndex ParseIndex(string json)
+    /// <summary>
+    /// ファイル一覧（index.json）を解析して検証する。
+    /// <paramref name="engineExe"/> を渡すと本体のファイル一覧として扱い、その実行ファイルと、直下の .dll だけは許す。
+    /// </summary>
+    public static PaksetIndex ParseIndex(string json, string? engineExe = null)
     {
+        var kind = engineExe is null ? "pakset" : "simutrans 本体";
         PaksetIndex? index;
         try
         {
@@ -132,27 +149,39 @@ public sealed partial class ManifestClient(HttpClient http)
         }
         catch (JsonException e)
         {
-            throw new ManifestException($"pakset のファイル一覧の形式が正しくありません: {e.Message}", e);
+            throw new ManifestException($"{kind}のファイル一覧の形式が正しくありません: {e.Message}", e);
         }
-        Require(index is not null, "pakset のファイル一覧が空です");
+        Require(index is not null, $"{kind}のファイル一覧が空です");
         Require(index!.SchemaVersion == SupportedSchemaVersion, $"対応していないファイル一覧の schema_version です: {index.SchemaVersion}");
+
+        var componentIds = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var c in index.Components ?? new())
+        {
+            Require(SafeName().IsMatch(c.Id) && componentIds.Add(c.Id), $"{kind}のファイル一覧の部品の id が不正か重複しています: {c.Id}");
+        }
 
         var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var dirs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var f in index.Files)
         {
-            Require(IsSafeRelativePath(f.Path), $"pakset のファイル一覧に使えないパスがあります: {f.Path}");
-            Require(!BlockedExtensions.Contains(Path.GetExtension(f.Path)), $"pakset のファイル一覧に実行ファイルなどが含まれています: {f.Path}");
-            Require(files.Add(f.Path), $"pakset のファイル一覧でパスが重複しています: {f.Path}");
-            Require(f.Size >= 0, $"pakset のファイル一覧のサイズが不正です: {f.Path}");
-            RequireSha(f.Sha256, $"pakset のファイル一覧の {f.Path} の sha256");
+            Require(IsSafeRelativePath(f.Path), $"{kind}のファイル一覧に使えないパスがあります: {f.Path}");
+            var ext = Path.GetExtension(f.Path);
+            var allowedExecutable = engineExe is not null
+                && (string.Equals(f.Path, engineExe, StringComparison.OrdinalIgnoreCase)
+                    || ext.Equals(".dll", StringComparison.OrdinalIgnoreCase) && !f.Path.Contains('/'));
+            Require(allowedExecutable || !BlockedExtensions.Contains(ext), $"{kind}のファイル一覧に実行ファイルなどが含まれています: {f.Path}");
+            Require(files.Add(f.Path), $"{kind}のファイル一覧でパスが重複しています: {f.Path}");
+            Require(f.Size >= 0, $"{kind}のファイル一覧のサイズが不正です: {f.Path}");
+            RequireSha(f.Sha256, $"{kind}のファイル一覧の {f.Path} の sha256");
+            Require(f.Component is null || componentIds.Contains(f.Component), $"{kind}のファイル一覧の {f.Path} の部品がありません: {f.Component}");
             var parts = f.Path.Split('/');
             for (var i = 1; i < parts.Length; i++)
             {
                 dirs.Add(string.Join('/', parts[..i]));
             }
         }
-        Require(!files.Overlaps(dirs), "pakset のファイル一覧に、ファイルとフォルダで同じ名前のものがあります");
+        Require(!files.Overlaps(dirs), $"{kind}のファイル一覧に、ファイルとフォルダで同じ名前のものがあります");
+        Require(engineExe is null || files.Contains(engineExe), $"{kind}のファイル一覧に実行ファイル {engineExe} がありません");
         return index;
     }
 

@@ -12,6 +12,7 @@ Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 var positional = new List<string>();
 string? dataDir = null, simutransExe = null;
+string? installDir = null, components = null;
 var printOnly = false;
 var trust = false;
 for (var i = 0; i < args.Length; i++)
@@ -20,6 +21,8 @@ for (var i = 0; i < args.Length; i++)
     {
         case "--data-dir" when i + 1 < args.Length: dataDir = args[++i]; break;
         case "--simutrans" when i + 1 < args.Length: simutransExe = args[++i]; break;
+        case "--install-dir" when i + 1 < args.Length: installDir = args[++i]; break;
+        case "--components" when i + 1 < args.Length: components = args[++i]; break;
         case "--print-only": printOnly = true; break;
         case "--trust": trust = true; break;
         case "-h" or "--help": return Usage();
@@ -41,6 +44,13 @@ if (simutransExe is not null)
     settings.SimutransExe = simutransExe;
 }
 
+// インストール設定（ダウンロード先と本体の部品）。--components は recommended か、部品の id をカンマで並べる
+InstallOptions? options = installDir is null && components is null ? null : new InstallOptions
+{
+    InstallRoot = installDir,
+    Components = components is null or "recommended" ? null : components.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
+};
+
 try
 {
     var manifest = await service.Manifests.LoadAsync(LauncherService.ToUri(positional[1]));
@@ -56,7 +66,7 @@ try
                 }
                 try
                 {
-                    var plan = service.Sync.Plan(s, settings);
+                    var plan = service.Sync.Plan(s, settings, options);
                     foreach (var item in plan.Items)
                     {
                         Console.WriteLine($"  {item.Label}: {(item.Needed ? "要同期" : "最新")}  → {item.TargetDir}");
@@ -72,7 +82,7 @@ try
         case "sync":
         {
             var server = Find(manifest, positional);
-            var plan = service.Sync.Plan(server, settings);
+            var plan = service.Sync.Plan(server, settings, options);
             var summary = await service.Sync.SyncAsync(plan, new ConsoleProgress());
             Console.WriteLine(summary.Downloads == 0 && summary.Removed == 0
                 ? "すべて最新です。ダウンロードは不要でした"
@@ -83,8 +93,8 @@ try
         case "launch":
         {
             var server = Find(manifest, positional);
-            await service.SyncServerAsync(server, settings, new ConsoleProgress());
-            var info = service.PrepareLaunch(server, settings);
+            await service.SyncServerAsync(server, settings, new ConsoleProgress(), options: options);
+            var info = service.PrepareLaunch(server, settings, options);
             if (printOnly)
             {
                 Console.WriteLine(info.Command);
@@ -143,6 +153,8 @@ static int Usage()
           infra-launcher launch <manifest> <サーバーの id か名前> [--print-only] [--trust]
         オプション:
           --data-dir <dir>    ランチャーのデータフォルダ（既定: %LOCALAPPDATA%\InfraLauncher など）
+          --install-dir <dir> 本体と pakset のダウンロード先
+          --components <c>    本体の部品。recommended（既定）か、部品の id をカンマで並べる（例: music,maps）
           --simutrans <exe>   サーバーリストにこの PC 用の本体がないときに使う simutrans の実行ファイル
         """);
     return 2;

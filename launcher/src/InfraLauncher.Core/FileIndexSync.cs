@@ -16,9 +16,11 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
 
     public async Task<SyncSummary> SyncAsync(SyncItem item, IProgress<SyncProgress>? progress, CancellationToken ct)
     {
-        var index = await LoadIndexAsync(item, ct);
-        var indexUri = new Uri(item.Url);
         var target = Path.GetFullPath(item.TargetDir);
+        var exeRel = item.ExePath is null ? null : Path.GetRelativePath(target, item.ExePath).Replace('\\', '/');
+        var index = await LoadIndexAsync(item.Url, item.Sha256, item.Label, exeRel, ct);
+        var indexUri = new Uri(item.Url);
+        var wanted = ComponentSelection.SelectFiles(index, item.Components);
         var state = InstalledState.Load(layout);
         var record = state.Get(target);
         var managed = record is not null;
@@ -28,7 +30,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         progress?.Report(new SyncProgress(item, "確認中", 0, null));
         var newStamps = new Dictionary<string, FileStamp>(StringComparer.OrdinalIgnoreCase);
         var missing = new List<PaksetFile>();
-        foreach (var f in index.Files)
+        foreach (var f in wanted)
         {
             var local = LocalPath(target, f.Path);
             var info = new FileInfo(local);
@@ -49,15 +51,25 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             missing.Add(f);
         }
 
-        var keep = new HashSet<string>(index.Files.Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
-        var extras = Directory.Exists(target)
-            ? Directory.EnumerateFiles(target, "*", SearchOption.AllDirectories)
-                .Select(p => Path.GetRelativePath(target, p).Replace('\\', '/'))
-                .Where(rel => !keep.Contains(rel))
-                .ToList()
-            : new List<string>();
+        var keep = new HashSet<string>(wanted.Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
+        List<string> extras;
+        if (item.DeleteUnknown)
+        {
+            // pakset: サーバーと完全に同じにするため、一覧にないファイルは片付ける
+            extras = Directory.Exists(target)
+                ? Directory.EnumerateFiles(target, "*", SearchOption.AllDirectories)
+                    .Select(p => Path.GetRelativePath(target, p).Replace('\\', '/'))
+                    .Where(rel => !keep.Contains(rel))
+                    .ToList()
+                : new List<string>();
+        }
+        else
+        {
+            // 本体: フォルダの中には pakset やユーザーのファイルもあるので、ランチャーが入れたファイルだけを片付ける
+            extras = stamps.Keys.Where(rel => !keep.Contains(rel) && File.Exists(LocalPath(target, rel))).ToList();
+        }
 
-        if (missing.Count == 0 && extras.Count == 0 && managed && SameSha(record!.Sha256, item.Sha256))
+        if (missing.Count == 0 && extras.Count == 0 && managed && SameSha(record!.Sha256, item.Sha256) && record.Selection == item.Selection)
         {
             if (!newStamps.OrderBy(k => k.Key).SequenceEqual(stamps.OrderBy(k => k.Key)))
             {
@@ -160,7 +172,14 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         {
             Discard(rel);
         }
-        RemoveEmptyDirectories(target);
+        if (item.DeleteUnknown)
+        {
+            RemoveEmptyDirectories(target);
+        }
+        if (item.ExePath is not null && !OperatingSystem.IsWindows() && File.Exists(item.ExePath))
+        {
+            File.SetUnixFileMode(item.ExePath, File.GetUnixFileMode(item.ExePath) | UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute);
+        }
 
         SaveRecord(state, target, item, newStamps);
         TryDeleteDir(staging);
@@ -190,21 +209,21 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         return result;
     }
 
-    /// <summary>一覧ファイルを取得する。同じハッシュのものを取得済みなら使い回す。</summary>
-    private async Task<PaksetIndex> LoadIndexAsync(SyncItem item, CancellationToken ct)
+    /// <summary>一覧ファイルを取得する。同じハッシュのものを取得済みなら使い回す。engineExe を渡すと本体の一覧として検証する。</summary>
+    internal async Task<PaksetIndex> LoadIndexAsync(string url, string sha256, string label, string? engineExe, CancellationToken ct)
     {
         var dir = Path.Combine(layout.Root, "indexes");
         Directory.CreateDirectory(dir);
-        var cached = Path.Combine(dir, $"{item.Sha256.ToLowerInvariant()}.json");
-        if (!File.Exists(cached) || !SameSha(await Downloader.HashFileAsync(cached, ct), item.Sha256))
+        var cached = Path.Combine(dir, $"{sha256.ToLowerInvariant()}.json");
+        if (!File.Exists(cached) || !SameSha(await Downloader.HashFileAsync(cached, ct), sha256))
         {
             var tmp = cached + ".tmp";
-            await Downloader.DownloadAsync(http, item.Url, tmp, item.Sha256, $"{item.Label} のファイル一覧", null, ct);
+            await Downloader.DownloadAsync(http, url, tmp, sha256, $"{label} のファイル一覧", null, ct);
             File.Move(tmp, cached, overwrite: true);
         }
         try
         {
-            return ManifestClient.ParseIndex(await File.ReadAllTextAsync(cached, ct));
+            return ManifestClient.ParseIndex(await File.ReadAllTextAsync(cached, ct), engineExe);
         }
         catch (ManifestException e)
         {
@@ -220,6 +239,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             Url = item.Url,
             InstalledAt = DateTimeOffset.Now,
             Files = stamps,
+            Selection = item.Selection,
         });
         state.Save(layout);
     }

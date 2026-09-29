@@ -39,16 +39,16 @@ public sealed class LauncherService(InstallLayout layout, HttpClient http)
 
     /// <summary>同期する（本体と pakset のインストール・更新）。起動はしない。</summary>
     public async Task<SyncSummary> SyncServerAsync(ServerEntry server, LauncherSettings settings,
-        IProgress<SyncProgress>? progress = null, CancellationToken ct = default) =>
-        await Sync.SyncAsync(Sync.Plan(server, settings), progress, ct);
+        IProgress<SyncProgress>? progress = null, CancellationToken ct = default, InstallOptions? options = null) =>
+        await Sync.SyncAsync(Sync.Plan(server, settings, options), progress, ct);
 
     /// <summary>
     /// 起動の準備。同期が済んでいることを確かめ、実行ファイルの SHA256 を求め、ユーザーの承認が要るかを判断する。
     /// ランチャーが配布元から入れた本体は、同じ SHA256 のものを一度承認するまで起動しない。
     /// </summary>
-    public LaunchInfo PrepareLaunch(ServerEntry server, LauncherSettings settings)
+    public LaunchInfo PrepareLaunch(ServerEntry server, LauncherSettings settings, InstallOptions? options = null)
     {
-        var plan = Sync.Plan(server, settings);
+        var plan = Sync.Plan(server, settings, options);
         if (!plan.UpToDate)
         {
             throw new SyncException("まだ同期が済んでいません。先に「同期」を押してください");

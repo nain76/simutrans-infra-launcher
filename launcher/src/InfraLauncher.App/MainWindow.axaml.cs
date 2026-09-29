@@ -43,7 +43,7 @@ public partial class MainWindow : Window
                 {
                     SyncPlan? plan = null;
                     string? error = null;
-                    try { plan = _service.Sync.Plan(server, _settings); }
+                    try { plan = _service.Sync.Plan(server, _settings, OptionsFor(src.List, server)); }
                     catch (SyncException ex) { error = ex.Message; }
                     rows.Add(ServerRow.Listed(src.List, server, plan, error));
                 }
@@ -111,6 +111,7 @@ public partial class MainWindow : Window
     {
         var row = Selected;
         SyncButton.IsEnabled = !_busy && row is { CanSync: true };
+        InstallOptionsButton.IsEnabled = !_busy && row is { Kind: ServerRowKind.Listed, Server.EngineDownloadAllowed: true };
         LaunchButton.IsEnabled = !_busy && row is { IsReady: true };
         EditButton.IsEnabled = !_busy && row is not null;
         DeleteButton.IsEnabled = !_busy && row is not null;
@@ -186,6 +187,13 @@ public partial class MainWindow : Window
             _settings.FavoriteKeys = _settings.FavoriteKeys
                 .Select(k => k.StartsWith(oldPrefix, StringComparison.Ordinal) ? newPrefix + k[oldPrefix.Length..] : k)
                 .ToList();
+            // インストール設定も引き継ぐ
+            foreach (var key in _settings.ServerInstall.Keys.Where(k => k.StartsWith(oldPrefix, StringComparison.Ordinal)).ToList())
+            {
+                var value = _settings.ServerInstall[key];
+                _settings.ServerInstall.Remove(key);
+                _settings.ServerInstall[newPrefix + key[oldPrefix.Length..]] = value;
+            }
             list.Name = edited.Name;
             list.Url = edited.Url;
             _settings.Save(_service.Layout);
@@ -223,6 +231,10 @@ public partial class MainWindow : Window
             var prefix = FavoriteKeys.ForListed(list, "");
             _settings.ServerLists.Remove(list);
             _settings.FavoriteKeys.RemoveAll(k => k.StartsWith(prefix, StringComparison.Ordinal));
+            foreach (var key in _settings.ServerInstall.Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).ToList())
+            {
+                _settings.ServerInstall.Remove(key);
+            }
             _settings.Save(_service.Layout);
             await RefreshAsync();
         }
@@ -260,8 +272,19 @@ public partial class MainWindow : Window
                     Progress.Value = p.BytesDone * 100.0 / p.BytesTotal.Value;
                 }
             });
-            var summary = await _service.SyncServerAsync(server, _settings, progress);
-            row.SetPlan(_service.Sync.Plan(server, _settings), null);
+            // 本体を配っているサーバーを初めて同期するときは、先にインストール設定を決めてもらう
+            if (server.EngineDownloadAllowed && !_settings.ServerInstall.ContainsKey(row.FavoriteKey))
+            {
+                if (!await EditInstallOptionsAsync(row))
+                {
+                    StatusText.Text = "同期を取りやめました";
+                    return;
+                }
+                SetBusy(true, $"{row.Name} を同期しています…");
+            }
+            var options = OptionsFor(row);
+            var summary = await _service.SyncServerAsync(server, _settings, progress, options: options);
+            row.SetPlan(_service.Sync.Plan(server, _settings, options), null);
             StatusText.Text = summary.Downloads == 0 && summary.Removed == 0
                 ? $"{row.Name}: すでに最新です。「起動」で接続できます"
                 : $"{row.Name}: 同期しました（ダウンロード {summary.Downloads} 件）。「起動」で接続できます";
@@ -286,7 +309,7 @@ public partial class MainWindow : Window
         try
         {
             var info = row.Server is { } server
-                ? _service.PrepareLaunch(server, _settings)
+                ? _service.PrepareLaunch(server, _settings, OptionsFor(row))
                 : LauncherService.PrepareManual(row.Profile!, _settings);
             if (info.NeedsApproval)
             {
@@ -307,18 +330,69 @@ public partial class MainWindow : Window
             StatusText.Text = $"エラー: {ex.Message}";
             if (row.Server is { } s)
             {
-                try { row.SetPlan(_service.Sync.Plan(s, _settings), null); } catch (SyncException) { }
+                try { row.SetPlan(_service.Sync.Plan(s, _settings, OptionsFor(row)), null); } catch (SyncException) { }
             }
             UpdateButtons();
         }
     }
 
+    private InstallOptions? OptionsFor(ServerRow row) => _settings.ServerInstall.GetValueOrDefault(row.FavoriteKey);
+
+    private InstallOptions? OptionsFor(ServerListSource list, InfraLauncher.Core.Models.ServerEntry server) =>
+        _settings.ServerInstall.GetValueOrDefault(FavoriteKeys.ForListed(list, server.Id));
+
+    private async void OnInstallOptions(object? sender, RoutedEventArgs e)
+    {
+        if (_busy || Selected is not { Kind: ServerRowKind.Listed, Server: { } server } row)
+        {
+            return;
+        }
+        SetBusy(true, "本体のファイル構成を取得しています…");
+        try
+        {
+            if (await EditInstallOptionsAsync(row))
+            {
+                row.SetPlan(_service.Sync.Plan(server, _settings, OptionsFor(row)), null);
+                StatusText.Text = "インストール設定を保存しました。「同期」で反映します";
+            }
+        }
+        catch (Exception ex) when (ex is SyncException or FormatException)
+        {
+            StatusText.Text = $"エラー: {ex.Message}";
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
+    /// <summary>インストール設定の画面を出して保存する。保存したら true。</summary>
+    private async Task<bool> EditInstallOptionsAsync(ServerRow row)
+    {
+        var server = row.Server!;
+        var index = await _service.Sync.LoadEngineIndexAsync(server);
+        if (index is null)
+        {
+            // zip 方式の本体など、部品を選べないサーバーはダウンロード先だけ選べるようにする
+            index = new InfraLauncher.Core.Models.PaksetIndex { SchemaVersion = 1 };
+        }
+        var dialog = new InstallOptionsWindow(row.Name, _service.Sync.InstallRoot(_settings, null), OptionsFor(row), index, server.Pakset.DisplayName);
+        if (!await dialog.ShowDialog<bool>(this) || dialog.Result is null)
+        {
+            return false;
+        }
+        _settings.ServerInstall[row.FavoriteKey] = dialog.Result;
+        _settings.Save(_service.Layout);
+        return true;
+    }
+
     private async void OnSettings(object? sender, RoutedEventArgs e)
     {
-        var window = new SettingsWindow(_settings.SimutransExe);
+        var window = new SettingsWindow(_settings.SimutransExe, _settings.InstallRoot, _service.Layout.DefaultInstallRoot);
         if (await window.ShowDialog<bool>(this))
         {
             _settings.SimutransExe = window.Result;
+            _settings.InstallRoot = window.InstallRootResult;
             _settings.Save(_service.Layout);
             await RefreshAsync();
         }

@@ -15,8 +15,11 @@ public enum SyncMethod { Zip, FileIndex }
 /// 1つのダウンロード対象（本体または pakset）と、その展開先。
 /// ファイル一覧方式では Url と Sha256 は一覧ファイル（index.json）のもの。
 /// </summary>
+/// Components は本体の部品の選び方（null なら推奨）。Selection はそれを文字列にしたもの（記録と比べる）。
+/// DeleteUnknown は一覧にないファイルを片付けるか（pakset は片付ける。本体はランチャーが入れたものだけ片付ける）。
 public sealed record SyncItem(SyncItemKind Kind, string Label, string Url, string Sha256, string TargetDir, bool Needed,
-    SyncMethod Method = SyncMethod.Zip, string? ExePath = null);
+    SyncMethod Method = SyncMethod.Zip, string? ExePath = null,
+    IReadOnlyCollection<string>? Components = null, string? Selection = null, bool DeleteUnknown = true);
 
 /// <summary>サーバー1つ分の同期計画。</summary>
 public sealed record SyncPlan(ServerEntry Server, string ExePath, string PaksetFolder, IReadOnlyList<SyncItem> Items)
@@ -41,7 +44,24 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
 {
     private readonly FileIndexSync _fileIndex = new(layout, http);
 
-    public SyncPlan Plan(ServerEntry server, LauncherSettings settings)
+    /// <summary>ダウンロード先のフォルダ。サーバーごとの設定 → 全体の設定 → 既定の順。</summary>
+    public string InstallRoot(LauncherSettings settings, InstallOptions? options) =>
+        Path.GetFullPath(options?.InstallRoot is { Length: > 0 } r ? r
+            : settings.InstallRoot is { Length: > 0 } g ? g
+            : layout.DefaultInstallRoot);
+
+    /// <summary>本体のファイル一覧（部品の一覧とサイズを画面に出すため）。本体を落とせないサーバーなら null。</summary>
+    public async Task<PaksetIndex?> LoadEngineIndexAsync(ServerEntry server, CancellationToken ct = default)
+    {
+        var build = server.Engine?.Builds?.GetValueOrDefault(PlatformInfo.CurrentKey);
+        if (build is not { UsesFileIndex: true } || !server.EngineDownloadAllowed)
+        {
+            return null;
+        }
+        return await _fileIndex.LoadIndexAsync(build.IndexUrl!, build.IndexSha256!, $"simutrans {server.Engine!.Revision}", build.Exe, ct);
+    }
+
+    public SyncPlan Plan(ServerEntry server, LauncherSettings settings, InstallOptions? options = null)
     {
         var state = InstalledState.Load(layout);
         var items = new List<SyncItem>();
@@ -55,15 +75,27 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         }
         if (build is not null)
         {
-            var engineDir = layout.EngineDir(server.Engine!.Revision);
+            var engineDir = Path.Combine(InstallRoot(settings, options), server.Engine!.Revision);
             exe = Path.GetFullPath(Path.Combine(engineDir, build.Exe));
             EnsureInside(engineDir, exe, "engine の exe");
             var record = state.Get(engineDir);
             // インストール後に実行ファイルが書き換えられていたら、入れ直す
-            var exeChanged = record?.Files?.Values.FirstOrDefault() is { } stamp && !stamp.Matches(new FileInfo(exe));
-            var needed = !File.Exists(exe) || !SameHash(record, build.Sha256) || exeChanged;
-            items.Add(new SyncItem(SyncItemKind.Engine, $"simutrans {server.Engine.Revision}", build.Url, build.Sha256, engineDir, needed,
-                ExePath: exe));
+            var exeRel = Path.GetRelativePath(engineDir, exe).Replace('\\', '/');
+            var exeChanged = record?.Files?.FirstOrDefault(kv => string.Equals(kv.Key, exeRel, StringComparison.OrdinalIgnoreCase)).Value is { } stamp
+                && !stamp.Matches(new FileInfo(exe));
+            var engineLabel = $"simutrans {server.Engine.Revision}";
+            if (build.UsesFileIndex)
+            {
+                var selection = options?.Components is { } c ? "custom:" + string.Join(',', c.Order(StringComparer.Ordinal)) : "recommended";
+                var needed = !File.Exists(exe) || !SameHash(record, build.IndexSha256!) || record?.Selection != selection || exeChanged;
+                items.Add(new SyncItem(SyncItemKind.Engine, engineLabel, build.IndexUrl!, build.IndexSha256!, engineDir, needed, SyncMethod.FileIndex,
+                    ExePath: exe, Components: options?.Components, Selection: selection, DeleteUnknown: false));
+            }
+            else
+            {
+                var needed = !File.Exists(exe) || !SameHash(record, build.Sha256!) || exeChanged;
+                items.Add(new SyncItem(SyncItemKind.Engine, engineLabel, build.Url!, build.Sha256!, engineDir, needed, ExePath: exe));
+            }
         }
         else if (!string.IsNullOrWhiteSpace(settings.SimutransExe))
         {

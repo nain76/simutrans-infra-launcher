@@ -1,5 +1,10 @@
 {
-  "_comment": "simutrans 本体として友人に配るファイルの推奨設定。変えたいときは、このファイルを engine-files.json という名前でコピーして編集する（engine-files.json があればそちらを使う）。本体の exe と、絶対に配らないもの（スクリプトやバッチファイル、ほかの exe、セーブデータ、settings.xml、ログ、save / screenshot / addons、pakset）は、ここに書いても変わらない。",
-  "folders": ["ai", "config", "font", "music", "scenario", "script", "skin", "text", "themes"],
-  "files": ["*.dll", "license*.txt", "copyright*.txt", "readme*.txt"]
+  "_comment": "simutrans 本体として友人に配るファイルの推奨設定。部品（components）ごとに、フォルダ（folders）とフォルダ直下のファイル（files、* が使える）を書く。required: 必須（友人は外せない）、recommended: 推奨（友人が「推奨」を選ぶと落とす）、どちらもなし: 任意（友人が「カスタム」で選んだときだけ落とす）。変えたいときは、このファイルを engine-files.json という名前でコピーして編集する（engine-files.json があればそちらを使う）。本体の exe はいつも最初の必須の部品に入る。絶対に配らないもの（スクリプトやバッチファイル、ほかの exe、セーブデータ、settings.xml、ログ、save / screenshot / addons、pakset）は、ここに書いても配らない。",
+  "components": [
+    { "id": "core", "name": "本体と設定・スクリプト", "required": true,
+      "folders": ["ai", "config", "font", "scenario", "script", "text"], "files": ["*.dll"] },
+    { "id": "music", "name": "音楽", "recommended": true, "folders": ["music"] },
+    { "id": "themes", "name": "テーマ・スキン", "recommended": true, "folders": ["skin", "themes"] },
+    { "id": "docs", "name": "ライセンス・説明書", "recommended": true, "files": ["license*.txt", "copyright*.txt", "readme*.txt"] }
+  ]
 }

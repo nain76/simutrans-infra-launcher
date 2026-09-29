@@ -1,0 +1,165 @@
+using System.Net;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using InfraLauncher.Core;
+using InfraLauncher.Core.Models;
+
+namespace InfraLauncher.Core.Tests;
+
+public sealed class EngineComponentsTests : IDisposable
+{
+    private const string Base = "https://x/engine/r1/";
+    private readonly string _dir = Directory.CreateTempSubdirectory("infralauncher-comp-").FullName;
+    private readonly Server _server = new();
+    private readonly InstallLayout _layout;
+    private readonly LauncherService _service;
+
+    public EngineComponentsTests()
+    {
+        _layout = new InstallLayout(Path.Combine(_dir, "data"));
+        _service = new LauncherService(_layout, new HttpClient(_server));
+    }
+
+    public void Dispose() => Directory.Delete(_dir, recursive: true);
+
+    private static string Sha(byte[] b) => Convert.ToHexStringLower(SHA256.HashData(b));
+
+    private static readonly IndexComponent[] Components =
+    [
+        new() { Id = "core", Name = "本体と設定", Required = true },
+        new() { Id = "music", Name = "音楽", Recommended = true },
+        new() { Id = "maps", Name = "マップ画像" },
+    ];
+
+    /// <summary>本体のファイルを置き、部品付きの一覧を作って、それを指すサーバー情報を返す。</summary>
+    private ServerEntry Publish(params (string Path, string Content, string Component)[] files)
+    {
+        var index = new PaksetIndex { SchemaVersion = 1, Components = Components.ToList() };
+        foreach (var (path, content, component) in files)
+        {
+            var bytes = Encoding.UTF8.GetBytes(content);
+            _server.Files[Base + path] = bytes;
+            index.Files.Add(new PaksetFile { Path = path, Size = bytes.Length, Sha256 = Sha(bytes), Component = component });
+        }
+        var json = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(index, new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower }));
+        _server.Files[Base + "index.json"] = json;
+
+        var pak = Encoding.UTF8.GetBytes("pak");
+        _server.Files["https://x/pak/a.pak"] = pak;
+        var pakIndex = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(
+            new PaksetIndex { SchemaVersion = 1, Files = [new PaksetFile { Path = "a.pak", Size = pak.Length, Sha256 = Sha(pak) }] },
+            new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower }));
+        _server.Files["https://x/pak/index.json"] = pakIndex;
+
+        return new ServerEntry
+        {
+            Id = "s", Name = "鯖", Address = "h:1", EngineDownloadAllowed = true,
+            Engine = new EngineInfo
+            {
+                Revision = "r1",
+                Builds = new() { [PlatformInfo.CurrentKey] = new EngineBuild { IndexUrl = Base + "index.json", IndexSha256 = Sha(json), Exe = "sim.exe" } },
+            },
+            Pakset = new PaksetInfo { Name = "p", Folder = "p", IndexUrl = "https://x/pak/index.json", IndexSha256 = Sha(pakIndex) },
+        };
+    }
+
+    private ServerEntry Default() => Publish(
+        ("sim.exe", "exe", "core"), ("config/simuconf.tab", "conf", "core"),
+        ("music/a.ogg", "music", "music"), ("maps/map.png", "map", "maps"));
+
+    [Fact]
+    public async Task RecommendedGetsRequiredAndRecommended()
+    {
+        var server = Default();
+        await _service.SyncServerAsync(server, new LauncherSettings());
+        var dir = _layout.EngineDir("r1");
+        Assert.True(File.Exists(Path.Combine(dir, "sim.exe")));
+        Assert.True(File.Exists(Path.Combine(dir, "config", "simuconf.tab")));
+        Assert.True(File.Exists(Path.Combine(dir, "music", "a.ogg")));
+        Assert.False(File.Exists(Path.Combine(dir, "maps", "map.png")));
+        Assert.True(File.Exists(Path.Combine(dir, "p", "a.pak")));
+        Assert.True(_service.Sync.Plan(server, new LauncherSettings()).UpToDate);
+    }
+
+    [Fact]
+    public async Task CustomSelectionAddsAndRemovesOnlyOwnFiles()
+    {
+        var server = Default();
+        var settings = new LauncherSettings();
+        await _service.SyncServerAsync(server, settings);
+        var dir = _layout.EngineDir("r1");
+        File.WriteAllText(Path.Combine(dir, "my-notes.txt"), "user file");
+
+        // カスタム: 音楽を外してマップを足す
+        var custom = new InstallOptions { Components = ["maps"] };
+        Assert.False(_service.Sync.Plan(server, settings, custom).UpToDate);
+        await _service.SyncServerAsync(server, settings, options: custom);
+
+        Assert.True(File.Exists(Path.Combine(dir, "maps", "map.png")));
+        Assert.False(File.Exists(Path.Combine(dir, "music", "a.ogg")));
+        Assert.True(File.Exists(Path.Combine(dir, "sim.exe")));
+        // ランチャーが入れていないファイルと、中の pakset は触らない
+        Assert.Equal("user file", File.ReadAllText(Path.Combine(dir, "my-notes.txt")));
+        Assert.True(File.Exists(Path.Combine(dir, "p", "a.pak")));
+        Assert.True(_service.Sync.Plan(server, settings, custom).UpToDate);
+        // 推奨に戻すと、また同期が必要になる
+        Assert.False(_service.Sync.Plan(server, settings).UpToDate);
+    }
+
+    [Fact]
+    public async Task InstallsIntoChosenFolder()
+    {
+        var server = Default();
+        var root = Path.Combine(_dir, "games", "simutrans");
+        await _service.SyncServerAsync(server, new LauncherSettings(), options: new InstallOptions { InstallRoot = root });
+        Assert.True(File.Exists(Path.Combine(root, "r1", "sim.exe")));
+        Assert.True(File.Exists(Path.Combine(root, "r1", "p", "a.pak")));
+
+        // 全体の既定のフォルダも使える
+        var global = Path.Combine(_dir, "global");
+        await _service.SyncServerAsync(server, new LauncherSettings { InstallRoot = global });
+        Assert.True(File.Exists(Path.Combine(global, "r1", "sim.exe")));
+        var info = _service.PrepareLaunch(server, new LauncherSettings { InstallRoot = global });
+        Assert.Equal(Path.Combine(global, "r1", "sim.exe"), info.ExePath);
+    }
+
+    [Theory]
+    [InlineData("other.exe", "core")]
+    [InlineData("config/lib.dll", "core")]
+    [InlineData("run.bat", "core")]
+    [InlineData("a.txt", "unknown")]
+    public async Task RejectsUnsafeEngineIndex(string path, string component)
+    {
+        var server = Publish(("sim.exe", "exe", "core"), (path, "x", component));
+        await Assert.ThrowsAsync<SyncException>(() => _service.SyncServerAsync(server, new LauncherSettings()));
+    }
+
+    [Fact]
+    public async Task AllowsTopLevelDll()
+    {
+        var server = Publish(("sim.exe", "exe", "core"), ("SDL2.dll", "dll", "core"));
+        await _service.SyncServerAsync(server, new LauncherSettings());
+        Assert.True(File.Exists(Path.Combine(_layout.EngineDir("r1"), "SDL2.dll")));
+    }
+
+    [Fact]
+    public async Task ListsComponentsForTheDialog()
+    {
+        var index = await _service.Sync.LoadEngineIndexAsync(Default());
+        Assert.NotNull(index);
+        Assert.Equal(["core", "music", "maps"], index!.Components!.Select(c => c.Id));
+        Assert.Equal(2, ComponentSelection.SelectFiles(index, ["maps"]).Count(f => f.Component == "core"));
+        Assert.Single(ComponentSelection.SelectFiles(index, ["maps"]), f => f.Component == "maps");
+    }
+
+    private sealed class Server : HttpMessageHandler
+    {
+        public Dictionary<string, byte[]> Files { get; } = new();
+
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(Files.TryGetValue(request.RequestUri!.AbsoluteUri, out var data)
+                ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(data) }
+                : new HttpResponseMessage(HttpStatusCode.NotFound));
+    }
+}

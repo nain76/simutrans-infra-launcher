@@ -35,12 +35,22 @@ public sealed class EngineInfo
     public Dictionary<string, EngineBuild>? Builds { get; set; }
 }
 
+/// <summary>
+/// OS ごとの本体。配り方は2通り。
+/// zip 方式: url と sha256
+/// ファイル一覧方式: index_url と index_sha256（部品ごとに選んで落とせる。変わったファイルだけを落とす）
+/// </summary>
 public sealed class EngineBuild
 {
-    public string Url { get; set; } = "";
-    public string Sha256 { get; set; } = "";
+    public string? Url { get; set; }
+    public string? Sha256 { get; set; }
+    public string? IndexUrl { get; set; }
+    public string? IndexSha256 { get; set; }
     /// <summary>展開先から見た実行ファイルの相対パス。</summary>
     public string Exe { get; set; } = "";
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool UsesFileIndex => IndexUrl is not null;
 }
 
 /// <summary>
@@ -78,7 +88,18 @@ public sealed class PaksetInfo
 public sealed class PaksetIndex
 {
     public int SchemaVersion { get; set; }
+    /// <summary>部品の一覧（本体のファイル一覧だけ）。なければ全ファイルを落とす。</summary>
+    public List<IndexComponent>? Components { get; set; }
     public List<PaksetFile> Files { get; set; } = new();
+}
+
+/// <summary>本体の部品（音楽、テーマなど）。必須の部品は外せない。推奨の部品は「推奨」を選んだときに落とす。</summary>
+public sealed class IndexComponent
+{
+    public string Id { get; set; } = "";
+    public string Name { get; set; } = "";
+    public bool Required { get; set; }
+    public bool Recommended { get; set; }
 }
 
 public sealed class PaksetFile
@@ -87,4 +108,6 @@ public sealed class PaksetFile
     public string Path { get; set; } = "";
     public long Size { get; set; }
     public string Sha256 { get; set; } = "";
+    /// <summary>属する部品の id（本体のファイル一覧だけ）。</summary>
+    public string? Component { get; set; }
 }

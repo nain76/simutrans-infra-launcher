@@ -15,6 +15,12 @@ public sealed class LauncherSettings
     /// <summary>サーバーリストに今の OS 用の本体が含まれていないときに使う、手元の simutrans の実行ファイル。</summary>
     public string? SimutransExe { get; set; }
 
+    /// <summary>本体と pakset をダウンロードする既定のフォルダ。空なら &lt;データフォルダ&gt;/simutrans。</summary>
+    public string? InstallRoot { get; set; }
+
+    /// <summary>サーバーごとのインストール設定（ダウンロード先と部品の選び方）。キーは <see cref="FavoriteKeys.ForListed"/>。</summary>
+    public Dictionary<string, InstallOptions> ServerInstall { get; set; } = new();
+
     /// <summary>
     /// ユーザーが実行を承認した本体（ランチャーが配布元から入れたもの）の SHA256。
     /// 本体が更新されたり書き換えられたりして SHA256 が変わると、もう一度確認する。
@@ -58,6 +64,21 @@ public sealed class LauncherSettings
             FavoriteKeys.Add(key);
         }
     }
+}
+
+/// <summary>
+/// サーバーごとのインストール設定。
+/// InstallRoot: ダウンロード先（空なら既定のフォルダ）。本体はこの下の &lt;リビジョン&gt; フォルダに入り、pakset はその中に入る
+/// Components: 落とす本体の部品。null なら「推奨」（サーバーが推奨する部品。サーバー側で推奨が変われば追従する）、
+///             リストなら「カスタム」（必須の部品は書かなくても落とす）
+/// </summary>
+public sealed class InstallOptions
+{
+    public string? InstallRoot { get; set; }
+    public List<string>? Components { get; set; }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool IsCustom => Components is not null;
 }
 
 /// <summary>共有されたサーバーリスト。表示名と配信アドレス（URL かファイルのパス）。</summary>

@@ -17,6 +17,9 @@ public sealed class InstallLayout(string root)
 
     public string DownloadDir => Path.Combine(Root, "downloads");
 
-    /// <summary>本体はリビジョンごとに別フォルダに置く。pakset はこの中（実行ファイルの横）に展開される。</summary>
-    public string EngineDir(string revision) => Path.Combine(Root, "simutrans", revision);
+    /// <summary>本体と pakset の既定のダウンロード先。設定で変えられる。</summary>
+    public string DefaultInstallRoot => Path.Combine(Root, "simutrans");
+
+    /// <summary>既定のダウンロード先での本体のフォルダ。本体はリビジョンごとに別フォルダに置き、pakset はこの中（実行ファイルの横）に入る。</summary>
+    public string EngineDir(string revision) => Path.Combine(DefaultInstallRoot, revision);
 }

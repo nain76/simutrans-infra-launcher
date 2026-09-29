@@ -19,7 +19,7 @@ Windows Server
 │
 └─ C:\simutrans-dist\                ← IIS でポート 8080 番で公開するフォルダ（構築ツールが作る）
      ├─ manifest.json                ← サーバーリスト（構築ツールが作る。お知らせなどは手で書き換える）
-     ├─ engine\                      ← simutrans 本体の zip（Publish-Engine.ps1 が作る）
+     ├─ engine\                      ← simutrans 本体（版ごとのフォルダ。Publish-Engine.ps1 が作る）
      └─ pak128.japan\                ← Publish-Pakset.ps1 が作る
           ├─ index.json
           ├─ web.config
@@ -149,22 +149,27 @@ C:\simutrans-dist\                 ← 8080 番で公開（増やしても1つ�
 
 **サーバーと同じ simutrans 本体を、友人の PC に自動で入れられます。** 友人は simutrans を入れていなくても、ランチャーで「同期して接続」を押すだけで遊べます。サーバーと同じ本体なので、本体の違いによるチェックサムのずれも起きません。
 
-- pakset を公開するとき、**pakset フォルダの1つ上にある本体**も zip にして公開します（`Publish-Engine.ps1`。`Add-Server.bat` と `Publish-Pakset.bat` が自動で呼びます）
+- pakset を公開するとき、**pakset フォルダの1つ上にある本体**も部品ごとに公開します（`Publish-Engine.ps1`。`Add-Server.bat` と `Publish-Pakset.bat` が自動で呼びます）
 - どの exe を配るかは次の順で決めます
   1. その simutrans サーバーのポート（`-server 8634` など）で**動いているプロセスの exe**。サーバーの本体を新しい版に入れ替えたときも、次の公開で追従します
   2. `simutrans.exe`、または `simutrans*.exe` / `sim-*.exe`（OTRP の `sim-WinGDI64-OTRPv57_0_1.exe` など）が1つだけならそれ
   3. 決められなければ、フォルダ内の exe を新しい順に並べるので、番号で選びます（空欄なら本体は配りません）
-- zip に入れるものは**許可リスト方式**で決めます（決めたものだけを入れるので、サーバーにファイルが増えても勝手には配りません）
+- 配るものは**許可リスト方式**で、**部品（コンポーネント）ごと**に決めます。友人はランチャーの「インストール設定」で「推奨」か「カスタム」を選べます
 
-  | 区分 | 中身 |
-  |---|---|
-  | 推奨（既定で入れる） | 選んだ本体の exe、`.dll`、`ai` `config` `font` `music` `scenario` `script` `skin` `text` `themes` フォルダ、`license*.txt` `copyright*.txt` `readme*.txt` |
-  | 既定では入れない | `maps`、`generated-scripts`、`history.txt` など上にないもの（カスタムで足せる） |
-  | 絶対に入れない（カスタムでも不可） | `.bat` `.cmd` `.ps1` `.vbs` などのスクリプト、本体以外の exe（Nettool / makeobj / ほかの版）、`.sve`（セーブデータやパスワード）、`settings.xml`、ログ、`save` `screenshot` `addons` フォルダ、pakset のフォルダ |
+  | 部品（推奨設定） | 中身 | 扱い |
+  |---|---|---|
+  | 本体と設定・スクリプト | 選んだ本体の exe、`.dll`、`ai` `config` `font` `scenario` `script` `text` | 必須（友人は外せない） |
+  | 音楽 | `music` | 推奨 |
+  | テーマ・スキン | `skin` `themes` | 推奨 |
+  | ライセンス・説明書 | `license*.txt` `copyright*.txt` `readme*.txt` | 推奨 |
 
-- **カスタム:** [engine-files.default.json](engine-files.default.json) を `engine-files.json` という名前でコピーして、`folders`（フォルダ）と `files`（フォルダ直下のファイル。`*` が使える）を編集します。`engine-files.json` があればそちらを使います
-- 公開のたびに「配るフォルダ」「配らなかったフォルダ」「絶対に配らないもの」を表示するので、確かめてください
-- 中身が前回と同じなら zip は作り直しません。どのサーバーも使わなくなった古い zip は消します
+  - 必須: 友人は外せない。推奨: 友人が「推奨」を選ぶと落とす。任意（どちらでもない）: 友人が「カスタム」で選んだときだけ落とす
+  - 上にないもの（`maps`、`generated-scripts`、`history.txt` など）は配りません。配るときは部品に足します
+  - **絶対に配らないもの**（設定でも変わらない）: `.bat` `.cmd` `.ps1` `.vbs` などのスクリプト、本体以外の exe（Nettool / makeobj / ほかの版）、`.sve`（セーブデータやパスワード）、`settings.xml`、ログ、`save` `screenshot` `addons` フォルダ、pakset のフォルダ
+- **カスタム:** [engine-files.default.json](engine-files.default.json) を `engine-files.json` という名前でコピーして、部品（`components`）ごとの `folders` と `files`（`*` が使える）、`required` / `recommended` を編集します。`engine-files.json` があればそちらを使います
+- 公開のたびに、部品ごとのファイル数とサイズ、配らなかったフォルダ、絶対に配らないものを表示するので、確かめてください
+- 本体はファイル一覧方式で、`engine\<版>\` に置きます。友人は本体が更新されたときも変わったファイルだけを落とします
+- 中身が前回と同じなら置き直しません。どのサーバーも使わなくなった古い版は消します
 - 本体は Windows 版だけです。Mac や Linux の友人は、手元の simutrans をランチャーの「設定」で指定します
 
 **本体を配るには HTTPS が必要です。** 本体は実行ファイルなので、HTTP のままだと通信の途中でサーバーリストと本体をすり替えられ、友人の PC で好きなプログラムを動かされるおそれがあります。

@@ -44,4 +44,6 @@ public sealed class InstalledRecord
     public DateTimeOffset InstalledAt { get; set; }
     /// <summary>ファイル一覧方式のときだけ、各ファイルの照合用の記録（キーは pakset フォルダからの相対パス）。</summary>
     public Dictionary<string, FileStamp>? Files { get; set; }
+    /// <summary>本体の部品の選び方（"recommended" か、選んだ部品の id を並べたもの）。変わったら同期し直す。</summary>
+    public string? Selection { get; set; }
 }
