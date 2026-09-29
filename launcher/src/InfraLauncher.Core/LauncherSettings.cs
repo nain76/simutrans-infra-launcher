@@ -81,11 +81,19 @@ public sealed class InstallOptions
     public bool IsCustom => Components is not null;
 }
 
-/// <summary>共有されたサーバーリスト。表示名と配信アドレス（URL かファイルのパス）。</summary>
+/// <summary>
+/// 共有されたサーバーリスト。表示名と配信アドレス（URL かファイルのパス）。
+/// PublicKey は、ユーザーが管理者から聞いた確認コードと一致した署名の鍵。以後はこの鍵の署名がないと読み込まない。
+/// </summary>
 public sealed class ServerListSource
 {
     public string Name { get; set; } = "";
     public string Url { get; set; } = "";
+    public string? PublicKey { get; set; }
+
+    /// <summary>登録した鍵の確認コード。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string? Code => PublicKey is null ? null : ManifestSignature.CodeFor(PublicKey);
 }
 
 /// <summary>手動で設定したサーバー（プロファイル）。</summary>

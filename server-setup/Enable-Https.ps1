@@ -3,8 +3,8 @@
     配信サイトを HTTPS にする（Let's Encrypt の無料証明書を win-acme で取得して IIS に設定する）。
 
 .DESCRIPTION
-    ランチャーは HTTPS で取得したサーバーリストからしか simutrans 本体を入れない。
-    本体を友人に配るには、このスクリプトで HTTPS にしておく。
+    ファイルの書き換えはサーバーリストの署名（Signing.ps1）で防いでいる。HTTPS にすると通信が暗号化され、
+    署名に加えてもう一段守れる（おすすめ）。
 
     1. Windows ファイアウォールで TCP 80（証明書の確認用）と HTTPS のポート（既定 8443）を開ける
     2. win-acme（証明書を取るツール）を GitHub の公式の配布元から HTTPS で入れる。GitHub が SHA256 を公開していれば照合する
@@ -133,6 +133,6 @@ Write-Host '============================================================' -Foreg
 Write-Host ' HTTPS にしました。残りの作業:' -ForegroundColor Cyan
 Write-Host "  1. VPS 事業者のパケットフィルターなどで TCP 80 と TCP $HttpsPort を許可する（80 番は証明書の更新にも使うので開けたままにする）"
 Write-Host "  2. 友人に新しいアドレスを伝える: $shareUrl"
-Write-Host '     友人はランチャーで「編集」から配信アドレスをこれに変える（HTTPS のときだけ simutrans 本体も自動で入ります）'
+Write-Host '     友人はランチャーで「編集」から配信アドレスをこれに変える（確認コードは変わらないので見比べ直しは不要）'
 Write-Host '  証明書は win-acme が自動で更新します（タスクスケジューラに登録済み）'
 Write-Host '============================================================' -ForegroundColor Cyan

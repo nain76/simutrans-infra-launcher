@@ -4,34 +4,101 @@ using InfraLauncher.Core.Models;
 
 namespace InfraLauncher.Core;
 
-public sealed class ManifestException(string message, Exception? inner = null) : Exception(message, inner);
+public class ManifestException(string message, Exception? inner = null) : Exception(message, inner);
 
-/// <summary>マニフェストを取得して検証する。http(s):// と file:// に対応。</summary>
+/// <summary>マニフェスト（サーバーリスト）を取得して検証する。http(s):// と file:// に対応。</summary>
 public sealed partial class ManifestClient(HttpClient http)
 {
     public const int SupportedSchemaVersion = 1;
 
-    public async Task<Manifest> LoadAsync(Uri uri, CancellationToken ct = default)
+    /// <summary>公開し直している最中に取得して署名が合わなかったとき、取り直すまで待つ時間。</summary>
+    internal static TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(2);
+
+    /// <summary>
+    /// サーバーリストと、隣にある署名（manifest.sig.json）を取得して検証する。
+    /// <paramref name="pinnedKey"/>（ユーザーが確認コードを登録した鍵）を渡すと、その鍵の正しい署名がなければ例外にする。
+    /// 渡さなければ署名は任意（あれば中身と合うかだけ確かめ、確認コードを <see cref="Manifest.Signature"/> に入れる）。
+    /// 本体の自動インストールは、登録した鍵で確かめられたリストだけに許す。
+    /// </summary>
+    public async Task<Manifest> LoadAsync(Uri uri, string? pinnedKey = null, CancellationToken ct = default)
     {
-        string text;
+        var (bytes, signature) = await FetchAsync(uri, ct);
+        SignatureInfo? info;
         try
         {
-            text = uri.IsFile
-                ? await File.ReadAllTextAsync(uri.LocalPath, ct)
-                : await http.GetStringAsync(uri, ct);
+            info = Check(bytes, signature, pinnedKey);
+        }
+        catch (ManifestSignatureException e) when (e.Problem == SignatureProblem.Invalid && !uri.IsFile)
+        {
+            // 管理者がちょうど公開し直している最中だと、新しいリストと古い署名を取ってしまうことがある。少し待って1回だけ取り直す
+            await Task.Delay(RetryDelay, ct);
+            (bytes, signature) = await FetchAsync(uri, ct);
+            info = Check(bytes, signature, pinnedKey);
+        }
+        var manifest = Parse(Decode(bytes), uri, trusted: pinnedKey is not null);
+        manifest.Signature = info;
+        manifest.Trusted = pinnedKey is not null;
+        return manifest;
+    }
+
+    private async Task<(byte[] Manifest, string? Signature)> FetchAsync(Uri uri, CancellationToken ct)
+    {
+        var sigUri = ManifestSignature.SignatureUriFor(uri);
+        try
+        {
+            if (uri.IsFile)
+            {
+                var bytes = await File.ReadAllBytesAsync(uri.LocalPath, ct);
+                var sig = File.Exists(sigUri.LocalPath) ? await File.ReadAllTextAsync(sigUri.LocalPath, ct) : null;
+                return (bytes, sig);
+            }
+            var manifest = await http.GetByteArrayAsync(uri, ct);
+            using var response = await http.GetAsync(sigUri, ct);
+            if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                return (manifest, null);
+            }
+            response.EnsureSuccessStatusCode();
+            return (manifest, await response.Content.ReadAsStringAsync(ct));
         }
         catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException or TaskCanceledException && !ct.IsCancellationRequested)
         {
             throw new ManifestException($"サーバーリストを取得できませんでした。アドレスが正しいか確認してください: {uri} ({e.Message})", e);
         }
-        return Parse(text, uri);
     }
+
+    private static SignatureInfo? Check(byte[] manifest, string? signature, string? pinnedKey)
+    {
+        var info = signature is null ? null : ManifestSignature.Verify(manifest, signature);
+        if (pinnedKey is null)
+        {
+            return info;
+        }
+        if (info is null)
+        {
+            throw new ManifestSignatureException(SignatureProblem.Missing,
+                "確認コードを登録したサーバーリストなのに、署名が見つかりません。配信しているファイルが書き換えられたおそれがあるため、読み込みを中止しました。サーバー管理者に連絡してください");
+        }
+        if (!Convert.FromBase64String(info.PublicKey).AsSpan().SequenceEqual(Convert.FromBase64String(pinnedKey)))
+        {
+            throw new ManifestSignatureException(SignatureProblem.KeyChanged,
+                $"サーバーリストの確認コードが変わりました（登録済み: {ManifestSignature.CodeFor(pinnedKey)}、今回: {info.Code}）。" +
+                "管理者が鍵を作り直したのなら、新しい確認コードを管理者に確かめてから「編集」で登録し直してください。" +
+                "心当たりがなければ、配信しているファイルが書き換えられたおそれがあります", info.Code);
+        }
+        return info;
+    }
+
+    /// <summary>UTF-8 として読む（先頭に BOM があれば除く）。</summary>
+    private static string Decode(byte[] bytes) =>
+        bytes is [0xEF, 0xBB, 0xBF, ..] ? System.Text.Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3) : System.Text.Encoding.UTF8.GetString(bytes);
 
     /// <summary>
     /// 解析して検証する。<paramref name="baseUri"/> を渡すと、リスト内の相対アドレス（"pak128.japan/index.json" など）を
     /// サーバーリストの場所から見た絶対アドレスに置き換える。
+    /// <paramref name="trusted"/> は署名を確かめたリストか（本体の自動インストールを許すか）。
     /// </summary>
-    public static Manifest Parse(string json, Uri? baseUri = null)
+    public static Manifest Parse(string json, Uri? baseUri = null, bool trusted = false)
     {
         Manifest? manifest;
         try
@@ -46,11 +113,11 @@ public sealed partial class ManifestClient(HttpClient http)
         {
             throw new ManifestException("サーバーリストが空です");
         }
-        Validate(manifest, baseUri);
+        Validate(manifest, baseUri, trusted);
         return manifest;
     }
 
-    private static void Validate(Manifest m, Uri? baseUri)
+    private static void Validate(Manifest m, Uri? baseUri, bool trusted)
     {
         if (m.SchemaVersion != SupportedSchemaVersion)
         {
@@ -88,28 +155,26 @@ public sealed partial class ManifestClient(HttpClient http)
             if (s.Engine is { } e)
             {
                 Require(SafeName().IsMatch(e.Revision) && e.Revision.Trim('.').Length > 0, $"サーバー '{where}' の engine.revision が不正です: {e.Revision}");
-                var secure = true;
                 foreach (var (key, b) in e.Builds ?? new())
                 {
                     var what = $"サーバー '{where}' の engine.builds.{key}";
                     var engineZip = b.Url is not null || b.Sha256 is not null;
                     var engineIndex = b.IndexUrl is not null || b.IndexSha256 is not null;
                     Require(engineZip != engineIndex, $"{what} には、url と sha256（zip 方式）か、index_url と index_sha256（ファイル一覧方式）のどちらか一方を書いてください");
-                    string url;
                     if (engineIndex)
                     {
-                        url = b.IndexUrl = ResolveUrl(b.IndexUrl, baseUri, $"{what}.index_url");
+                        b.IndexUrl = ResolveUrl(b.IndexUrl, baseUri, $"{what}.index_url");
                         RequireSha(b.IndexSha256, $"{what}.index_sha256");
                     }
                     else
                     {
-                        url = b.Url = ResolveUrl(b.Url, baseUri, $"{what}.url");
+                        b.Url = ResolveUrl(b.Url, baseUri, $"{what}.url");
                         RequireSha(b.Sha256, $"{what}.sha256");
                     }
                     Require(IsSafeRelativePath(b.Exe), $"{what}.exe が不正です");
-                    secure &= new Uri(url).Scheme is "https" || new Uri(url).IsFile && baseUri is null or { IsFile: true };
                 }
-                s.EngineDownloadAllowed = secure && (baseUri is null || baseUri.Scheme == "https" || baseUri.IsFile);
+                // 本体のファイルは SHA256 でサーバーリストに結び付いているので、リストの署名を確かめていれば取得経路は問わない
+                s.EngineDownloadAllowed = trusted;
             }
         }
     }

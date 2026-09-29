@@ -104,8 +104,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         else if (blockedEngine)
         {
             throw new SyncException(
-                $"サーバー '{server.Name}' のサーバーリストが HTTPS ではないため、安全のため simutrans 本体は自動で入れません。" +
-                "「編集」で配信アドレスを https:// で始まるものに変えるか、「設定」で手元の simutrans 本体を指定してください");
+                $"サーバー '{server.Name}' のサーバーリストの確認コードをまだ登録していないため、安全のため simutrans 本体は自動で入れません。" +
+                "「編集」でサーバー管理者から聞いた確認コードと見比べて登録するか、「設定」で手元の simutrans 本体を指定してください");
         }
         else
         {

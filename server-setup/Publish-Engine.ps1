@@ -15,8 +15,8 @@
        （ファイル一覧方式なので、友人は本体を更新したときも変わったファイルだけを落とす）
     4. どのサーバーも使わなくなった古い版のフォルダ（と以前の zip）を消す
 
-    ランチャーは HTTPS で取得したサーバーリストからしか本体を入れない（通信途中ですり替えられないようにするため）。
-    Enable-Https.ps1 で HTTPS にしておくこと。
+    ランチャーは、ユーザーが確認コードを登録した鍵で署名されたサーバーリストからしか本体を入れない
+    （すり替えられないようにするため）。署名はサーバーリストを書き換えるたびに自動で付ける（Signing.ps1）。
 
     引数なしの Publish-Pakset.ps1（Publish-Pakset.bat）から自動で呼ばれる。
 #>
@@ -210,7 +210,7 @@ foreach ($id in $ServerId) {
     $server[0] | Add-Member -NotePropertyName engine -NotePropertyValue $engine -Force
 }
 $data | Add-Member -NotePropertyName updated_at -NotePropertyValue (Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz') -Force
-Write-JsonFile $manifestPath $data
+Write-ManifestFile $manifestPath $data
 
 # --- 4. どのサーバーも使わなくなった古い版を消す ---
 $data = Read-JsonFile $manifestPath

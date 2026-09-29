@@ -27,7 +27,7 @@ public sealed class LauncherService(InstallLayout layout, HttpClient http)
         {
             try
             {
-                return new ManifestSource(list, await Manifests.LoadAsync(ToUri(list.Url), ct), null);
+                return new ManifestSource(list, await Manifests.LoadAsync(ToUri(list.Url), list.PublicKey, ct), null);
             }
             catch (Exception e) when (e is ManifestException or UriFormatException or ArgumentException)
             {

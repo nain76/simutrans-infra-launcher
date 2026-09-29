@@ -175,12 +175,12 @@ public sealed class SyncServiceTests : IDisposable
     }
 
     [Fact]
-    public void RefusesEngineFromInsecureList()
+    public void RefusesEngineFromUntrustedList()
     {
         var server = Server(Zip(("simutrans.exe", "x")), Zip(("a.pak", "a")));
         server.EngineDownloadAllowed = false;
         var e = Assert.Throws<SyncException>(() => _sync.Plan(server, new LauncherSettings()));
-        Assert.Contains("HTTPS", e.Message);
+        Assert.Contains("確認コード", e.Message);
 
         // 手元の simutrans があればそれを使い、本体はダウンロードしない
         var local = Path.Combine(_dir, "mine", "simutrans.exe");

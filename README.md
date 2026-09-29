@@ -46,7 +46,7 @@ dotnet run --project src/InfraLauncher.App
 # コマンドライン版
 dotnet run --project src/InfraLauncher.Cli -- list   https://example.ddns.net/manifest.json
 dotnet run --project src/InfraLauncher.Cli -- sync   https://example.ddns.net/manifest.json friends-a
-dotnet run --project src/InfraLauncher.Cli -- launch https://example.ddns.net/manifest.json friends-a --print-only
+dotnet run --project src/InfraLauncher.Cli -- launch https://example.ddns.net/manifest.json friends-a --print-only --code A1B2-C3D4-E5F6-0718-293A
 ```
 
 友人に配る実行ファイル（.NET のインストール不要）を作るには:
@@ -63,6 +63,7 @@ dotnet publish src/InfraLauncher.App -c Release -r win-x64 --self-contained \
 
 画面上の「追加」「編集」「削除」でサーバー一覧を管理します。
 
+- **確認コード**: 共有されたリストを追加すると、サーバーリストの確認コード（`A1B2-C3D4-E5F6-0718-293A` のような文字列）が表示されます。サーバー管理者から聞いたものと同じなら「同じ（登録する）」を押します。以後ランチャーは、サーバーリストがその管理者のものか（書き換えられていないか）を毎回確かめ、合わなければ読み込みを止めます。**simutrans 本体は、確認コードを登録したリストからだけ入れます**（登録しなくても pakset は同期できます。あとから「編集」で登録できます）
 - **同期 / 起動**: 「同期」で本体と pakset をサーバーと同じ状態にし（何も実行しません）、「起動」で simutrans を起動して接続します。ランチャーが配布元から入れた本体を初めて起動するときは、配布元・場所・SHA256 を表示して確認します
 - **追加**: 次のどちらかを選びます
   - **サーバー管理者から共有されたリストを追加**: 管理者から教えてもらった配信アドレス（`https://…/manifest.json` など）か、受け取ったファイルを指定します。リストのサーバーがまとめて表示され、pakset や本体は自動で同期されます
@@ -78,11 +79,11 @@ dotnet publish src/InfraLauncher.App -c Release -r win-x64 --self-contained \
 
 ## 動き
 
-1. 共有されたサーバーリスト（マニフェスト）を読んで一覧を作る
+1. 共有されたサーバーリスト（マニフェスト）と隣の署名（`manifest.sig.json`）を読んで一覧を作る。確認コードを登録したリストは、その鍵の正しい署名がなければ読み込まない
 2. 共有リストのサーバーを選んで「同期」を押すと、足りないものだけをダウンロードする（起動はしない）。ダウンロードしたものは SHA256 を確かめてから置く
    - zip 方式: 本体と pakset の zip の SHA256 を記録（`installed.json`）と比べ、違えば zip を丸ごと入れ替える
    - ファイル一覧方式: pakset のファイルを1つずつ一覧と照合し、変わったファイルだけを落とす。一覧にないファイルは片付ける
-   - 本体: サーバーリストに本体があり、サーバーリストを HTTPS で取得した場合だけ、サーバーと同じ本体を入れる。手元のほかのフォルダに同じ中身の pakset ファイルがあればコピーして使う
+   - 本体: サーバーリストに本体があり、ユーザーが確認コードを登録した鍵でサーバーリストの署名を確かめられた場合だけ、サーバーと同じ本体を入れる。手元のほかのフォルダに同じ中身の pakset ファイルがあればコピーして使う
 3. 「起動」を押すと `simutrans -objects <pak>/ -noaddons -load net:<host>:<port>` で起動して接続する（手動プロファイルは 2 を飛ばす）
    - ランチャーが配布元から入れた本体を初めて起動するときは、配布元・場所・SHA256 を表示して確認する。承認した本体は SHA256 で覚え、本体が変わるとまた確認する
    - インストール後に本体の exe が書き換えられていたら、起動せずに同期で入れ直す

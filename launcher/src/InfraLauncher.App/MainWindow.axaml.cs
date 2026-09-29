@@ -196,6 +196,7 @@ public partial class MainWindow : Window
             }
             list.Name = edited.Name;
             list.Url = edited.Url;
+            list.PublicKey = edited.PublicKey;
             _settings.Save(_service.Layout);
             await RefreshAsync();
         }

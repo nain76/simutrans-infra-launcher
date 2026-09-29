@@ -9,4 +9,8 @@
     <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="InfraLauncher.Core.Tests" />
+  </ItemGroup>
+
 </Project>

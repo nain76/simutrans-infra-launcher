@@ -69,3 +69,23 @@ zip の中身を入れ替えたら、ファイル名が同じでも SHA256 を�
 - `pakset`（ファイル一覧方式）: `Publish-Pakset.ps1` が書き換える
 - `engine` と `pakset`（zip 方式）: バージョンを上げたときに手で書き換える
 - `status` / `players` / `message`: 今は手で書き換える。次の段階で、サーバー側の PowerShell スクリプトが `nettool clients` の結果から定期的に書き換える予定
+- 手で書き換えたあとは、`server-setup/Manage-SigningKey.bat` の「3. サーバーリストに署名し直す」を実行する（下の「署名」）
+
+## 署名（manifest.sig.json）
+
+サーバーリストの隣（`manifest.json` なら `manifest.sig.json`。`.json` で終わらないアドレスなら末尾に `.sig.json` を足した場所）に署名を置く。
+server-setup のスクリプトが、サーバーリストを書き換えるたびに自動で作る。
+
+```json
+{
+  "format": "infra-launcher-signature-1",
+  "public_key": "<公開鍵。P-256 の SubjectPublicKeyInfo を base64 にしたもの>",
+  "signature": "<manifest.json のバイト列そのものに対する ECDSA P-256 / SHA-256 の署名。r と s を並べた 64 バイトを base64 にしたもの>",
+  "signed_at": "2026-09-29T20:00:00+09:00"
+}
+```
+
+- 確認コードは、公開鍵（base64 を戻したバイト列）の SHA256 の先頭 10 バイトを 16 進数の大文字にして4文字ずつ `-` で区切ったもの
+- ランチャーは、ユーザーが確認コードを登録した公開鍵を覚え、以後その鍵の正しい署名がなければ読み込まない。署名は manifest.json のバイト列に対するものなので、署名したあとは1バイトでも変えてはいけない
+- pakset と本体のファイル一覧・zip は manifest.json の SHA256 で結び付いているので、manifest.json の署名だけですべてを確かめられる
+- 本体（engine）の自動インストールは、確認コードを登録したリストだけに許す

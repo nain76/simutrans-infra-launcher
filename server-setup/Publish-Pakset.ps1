@@ -246,7 +246,7 @@ if ($Manifest) {
         $pakset | Add-Member -NotePropertyName index_sha256 -NotePropertyValue $indexSha -Force
     }
     $data | Add-Member -NotePropertyName updated_at -NotePropertyValue (Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz') -Force
-    Write-JsonFile $manifestPath $data
+    Write-ManifestFile $manifestPath $data
 }
 
 # --- 結果 ---

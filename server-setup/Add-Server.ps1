@@ -122,7 +122,7 @@ if ($data) {
 else {
     $data = [ordered]@{ schema_version = 1; servers = @($entry) }
 }
-Write-JsonFile $manifestPath $data
+Write-ManifestFile $manifestPath $data
 Write-Ok "サーバーリストに「$ServerName」（$PublicHost`:$GamePort）を追加しました"
 
 # --- 公開 ---

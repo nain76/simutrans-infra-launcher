@@ -6,13 +6,14 @@ using InfraLauncher.Core.Models;
 //   sync   <manifest> <server>   同期だけ行う
 //   launch <manifest> <server>   同期して起動（--print-only で起動せずにコマンドを表示。
 //                                配布元から入れた本体を初めて起動するときは --trust で承認する）
-// 共通オプション: --data-dir <dir>（ランチャーのデータフォルダ）, --simutrans <exe>（手元の本体）
+// 共通オプション: --data-dir <dir>（ランチャーのデータフォルダ）, --simutrans <exe>（手元の本体）,
+//                 --code <確認コード>（サーバー管理者から聞いた確認コード。一致すれば本体も入れられる）
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
 
 var positional = new List<string>();
 string? dataDir = null, simutransExe = null;
-string? installDir = null, components = null;
+string? installDir = null, components = null, code = null;
 var printOnly = false;
 var trust = false;
 for (var i = 0; i < args.Length; i++)
@@ -23,6 +24,7 @@ for (var i = 0; i < args.Length; i++)
         case "--simutrans" when i + 1 < args.Length: simutransExe = args[++i]; break;
         case "--install-dir" when i + 1 < args.Length: installDir = args[++i]; break;
         case "--components" when i + 1 < args.Length: components = args[++i]; break;
+        case "--code" when i + 1 < args.Length: code = args[++i]; break;
         case "--print-only": printOnly = true; break;
         case "--trust": trust = true; break;
         case "-h" or "--help": return Usage();
@@ -53,7 +55,22 @@ InstallOptions? options = installDir is null && components is null ? null : new 
 
 try
 {
-    var manifest = await service.Manifests.LoadAsync(LauncherService.ToUri(positional[1]));
+    // 確認コードは、画面で登録したものか --code で指定したもの
+    var uri = LauncherService.ToUri(positional[1]);
+    var pinned = settings.ServerLists.FirstOrDefault(l => LauncherService.ToUri(l.Url) == uri)?.PublicKey;
+    var manifest = await service.Manifests.LoadAsync(uri, pinned);
+    if (pinned is null && code is not null)
+    {
+        if (manifest.Signature is not { } sig || !ManifestSignature.SameCode(sig.Code, code))
+        {
+            Console.Error.WriteLine($"エラー: 確認コードが一致しません（指定: {code}、サーバーリスト: {manifest.Signature?.Code ?? "署名なし"}）");
+            return 4;
+        }
+        manifest = await service.Manifests.LoadAsync(uri, sig.PublicKey);
+    }
+    Console.WriteLine(manifest.Trusted ? $"確認コード: {manifest.Signature!.Code}（一致）"
+        : manifest.Signature is { } s0 ? $"確認コード: {s0.Code}（未確認。管理者から聞いたものと同じなら --code で指定すると本体も入れられます）"
+        : "このサーバーリストには署名がありません（本体は自動で入れません）");
     switch (positional[0])
     {
         case "list":
@@ -156,6 +173,7 @@ static int Usage()
           --install-dir <dir> 本体と pakset のダウンロード先
           --components <c>    本体の部品。recommended（既定）か、部品の id をカンマで並べる（例: music,maps）
           --simutrans <exe>   サーバーリストにこの PC 用の本体がないときに使う simutrans の実行ファイル
+          --code <コード>     サーバー管理者から聞いた確認コード（例: A1B2-C3D4-E5F6-0718-293A）
         """);
     return 2;
 }

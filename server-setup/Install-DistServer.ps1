@@ -9,7 +9,8 @@
     4. 読み出し（GET / HEAD）以外の要求を断る設定を入れる
     5. サーバーリスト（manifest.json）がなければ、1台目のサーバーを登録して pakset を公開する（Add-Server.ps1）
        あれば、登録済みの pakset を公開し直す（Publish-Pakset.ps1）
-    6. サーバーリストを取得できること、書き込み要求が断られることを確かめ、友人に伝えるアドレスを表示する
+    6. サーバーリストに署名する（署名の鍵がなければ作る。Signing.ps1 を参照）
+    7. サーバーリストを取得できること、書き込み要求が断られることを確かめ、友人に伝えるアドレスと確認コードを表示する
 
     足りない情報は実行中に質問するので、引数なしで実行してもよい。
     管理者として実行すること（Setup-Server.bat をダブルクリックすると管理者として起動する）。
@@ -38,7 +39,7 @@ param(
     [string] $PaksetSource,
     # HTTPS のポート
     [int] $HttpsPort = 8443,
-    # HTTPS にしない（simutrans 本体は配れなくなる）
+    # HTTPS にしない（署名があるので本体も配れるが、通信の中身は暗号化されない）
     [switch] $SkipHttps,
     # 証明書の期限切れなどの連絡先（任意）
     [string] $Email
@@ -176,15 +177,22 @@ else {
     }
 }
 
+# サーバーリストに署名する（鍵がなければここで作る）。友人のランチャーはこの署名で書き換えに気づく
+if (Test-Path -LiteralPath $manifestPath) {
+    Update-ManifestSignature $manifestPath
+}
+
 # --- 5. 確認 ---
 Write-Step '配信できるか確かめています'
-$localUrl = "http://localhost:$Port/manifest.json"
-try {
-    $response = Invoke-WebRequest -Uri $localUrl -UseBasicParsing -TimeoutSec 10
-    Write-Ok "$localUrl を取得できました（$($response.RawContentLength) バイト）"
-}
-catch {
-    Write-Warning "$localUrl を取得できませんでした: $($_.Exception.Message)"
+foreach ($name in @('manifest.json', 'manifest.sig.json')) {
+    $localUrl = "http://localhost:$Port/$name"
+    try {
+        $response = Invoke-WebRequest -Uri $localUrl -UseBasicParsing -TimeoutSec 10
+        Write-Ok "$localUrl を取得できました（$($response.RawContentLength) バイト）"
+    }
+    catch {
+        Write-Warning "$localUrl を取得できませんでした: $($_.Exception.Message)"
+    }
 }
 # 書き込み要求（PUT）が断られることを確かめる
 try {
@@ -204,7 +212,7 @@ if (Test-Path -LiteralPath (Join-Path $DistDir 'write-test.txt')) {
 # --- 6. HTTPS ---
 $https = @(Get-WebBinding -Name $SiteName -Protocol https | Where-Object { ($_.bindingInformation -split ':')[1] -eq "$HttpsPort" }).Count -gt 0
 if (-not $https -and -not $SkipHttps) {
-    Write-Step 'HTTPS にします（友人に simutrans 本体を配るのに必要です）'
+    Write-Step 'HTTPS にします（おすすめ。通信を暗号化し、署名に加えてもう一段守ります）'
     $answer = Read-Value "無料の証明書を取って HTTPS（ポート $HttpsPort）にしますか？ 80 番を開けておく必要があります（Y/n）" 'Y'
     if ($answer -match '^[Yy]') {
         $httpsArgs = @{ HostName = $PublicHost; HttpsPort = $HttpsPort; SiteName = $SiteName; DistDir = $DistDir }
@@ -231,11 +239,15 @@ Write-Host "  1. 外から $ports に届くようにする（Windows のファ�
 Write-Host '     - VPS の場合: 事業者の管理画面のパケットフィルター / セキュリティグループで許可する（その仕組みがなければ不要）'
 Write-Host '     - 自宅の場合: ルーターのポート転送でこのサーバーへ転送する'
 Write-Host "  2. 自分の PC のブラウザで $shareUrl が開けるか確かめる"
-Write-Host "  3. 友人にこのアドレスを伝える: $shareUrl"
-Write-Host '     友人はランチャーの「追加」→「サーバー管理者から共有されたリストを追加」に入れる'
+Write-Host "  3. 友人にこのアドレスと確認コードを伝える（Discord の DM など）"
+Write-Host "     アドレス:   $shareUrl"
+$signingKey = Get-SigningKey
+if ($signingKey) { Write-Host "     確認コード: $($signingKey.Code)" -ForegroundColor Yellow }
+Write-Host '     友人はランチャーの「追加」→「サーバー管理者から共有されたリストを追加」にアドレスを入れ、'
+Write-Host '     画面に出る確認コードが同じか見比べる（確認コードは秘密ではない。見せても問題ない）'
+Write-Host '  4. 署名の鍵のバックアップを作っていなければ、Manage-SigningKey.bat で作って VPS の外に保管する'
 if (-not $https) {
-    Write-Host '  ※ HTTPS ではないため、友人の PC には simutrans 本体が自動で入りません（各自で入れて「設定」で指定）'
-    Write-Host '     HTTPS にするには Enable-Https.bat をダブルクリック'
+    Write-Host '  ※ HTTPS ではありません。署名で書き換えは防げますが、HTTPS にするとより安全です（Enable-Https.bat をダブルクリック）'
 }
 Write-Host '  アドオンを足したあとは: pak をコピー → simutrans サーバーを再起動 → Publish-Pakset.bat をダブルクリック'
 Write-Host '  simutrans サーバーを増やすときは: Add-Server.bat をダブルクリック'

@@ -6,6 +6,25 @@ public sealed class Manifest
     public int SchemaVersion { get; set; }
     public DateTimeOffset? UpdatedAt { get; set; }
     public List<ServerEntry> Servers { get; set; } = new();
+
+    /// <summary>署名があれば、その鍵と確認コード。<see cref="ManifestClient"/> が設定する。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public SignatureInfo? Signature { get; set; }
+
+    /// <summary>ユーザーが確認コードを登録した鍵で署名されていたか。<see cref="ManifestClient"/> が設定する。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool Trusted { get; set; }
+}
+
+/// <summary>サーバーリストの署名ファイル（manifest.sig.json）。</summary>
+public sealed class SignatureFile
+{
+    public string? Format { get; set; }
+    /// <summary>公開鍵（SubjectPublicKeyInfo を base64 にしたもの）。</summary>
+    public string? PublicKey { get; set; }
+    /// <summary>manifest.json のバイト列に対する ECDSA P-256 / SHA-256 の署名（r と s を並べた 64 バイトを base64 にしたもの）。</summary>
+    public string? Signature { get; set; }
+    public string? SignedAt { get; set; }
 }
 
 public sealed class ServerEntry
@@ -21,8 +40,8 @@ public sealed class ServerEntry
 
     /// <summary>
     /// このサーバーの本体（実行ファイル）を自動で入れてよいか。
-    /// 通信途中で本体をすり替えられないよう、HTTPS で取得したサーバーリストで、本体のアドレスも HTTPS のときだけ許す
-    /// （手元のファイルのサーバーリストは許す）。<see cref="ManifestClient"/> が設定する。
+    /// 本体をすり替えられないよう、ユーザーが確認コードを登録した鍵でサーバーリストが署名されているときだけ許す。
+    /// <see cref="ManifestClient"/> が設定する。
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool EngineDownloadAllowed { get; set; }

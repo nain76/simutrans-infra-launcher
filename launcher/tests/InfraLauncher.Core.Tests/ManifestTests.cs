@@ -166,15 +166,12 @@ public class EngineTrustTests
         """;
 
     [Theory]
-    [InlineData("https://example.com/manifest.json", "engine/a.zip", true)]
-    [InlineData("https://example.com/manifest.json", "https://cdn.example.com/a.zip", true)]
-    [InlineData("https://example.com/manifest.json", "http://cdn.example.com/a.zip", false)]
-    [InlineData("http://example.com:8080/manifest.json", "engine/a.zip", false)]
-    [InlineData("http://example.com:8080/manifest.json", "https://cdn.example.com/a.zip", false)]
-    [InlineData("file:///C:/lists/manifest.json", "engine/a.zip", true)]
-    public void AllowsEngineOnlyOverHttps(string listUrl, string engineUrl, bool allowed)
+    [InlineData("https://example.com/manifest.json", "engine/a.zip")]
+    [InlineData("http://example.com:8080/manifest.json", "http://cdn.example.com/a.zip")]
+    [InlineData("file:///C:/lists/manifest.json", "engine/a.zip")]
+    public void AllowsEngineOnlyForTrustedLists(string listUrl, string engineUrl)
     {
-        var m = ManifestClient.Parse(Manifest(engineUrl), new Uri(listUrl));
-        Assert.Equal(allowed, m.Servers[0].EngineDownloadAllowed);
+        Assert.False(ManifestClient.Parse(Manifest(engineUrl), new Uri(listUrl)).Servers[0].EngineDownloadAllowed);
+        Assert.True(ManifestClient.Parse(Manifest(engineUrl), new Uri(listUrl), trusted: true).Servers[0].EngineDownloadAllowed);
     }
 }

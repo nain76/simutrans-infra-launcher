@@ -153,3 +153,6 @@ function Resolve-EngineExe([string] $paksetSource, [int[]] $ports) {
 function Get-EngineSource([string] $paksetSource) {
     return Find-SimutransExe (Split-Path -Parent $paksetSource)
 }
+
+# サーバーリストへの署名
+. (Join-Path $PSScriptRoot 'Signing.ps1')

@@ -45,7 +45,7 @@ public sealed class ServerRow : INotifyPropertyChanged
             PlayersText = server.Players is { } n ? $"{n}人" : "",
             Message = server.Message ?? "",
             PaksetText = server.Pakset.DisplayName,
-            SourceText = $"リスト: {list.Name}",
+            SourceText = list.PublicKey is null ? $"リスト: {list.Name}（確認コード未登録）" : $"リスト: {list.Name}（確認コード登録済み）",
         };
         row.SetPlan(plan, planError);
         return row;
