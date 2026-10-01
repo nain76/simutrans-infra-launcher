@@ -90,7 +90,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
             var exeRel = Path.GetRelativePath(engineDir, exe).Replace('\\', '/');
             var exeChanged = record?.Files?.FirstOrDefault(kv => string.Equals(kv.Key, exeRel, StringComparison.OrdinalIgnoreCase)).Value is { } stamp
                 && !stamp.Matches(new FileInfo(exe));
-            var engineLabel = $"simutrans {server.Engine.Revision}";
+            var engineLabel = $"simutrans 本体 {Path.GetFileName(build.Exe)}";
             if (build.UsesFileIndex)
             {
                 var selection = options?.Components is { } c ? "custom:" + string.Join(',', c.Order(StringComparer.Ordinal)) : "recommended";

@@ -152,11 +152,14 @@ $lines = foreach ($f in $files) {
 $lines += @($components | ForEach-Object { "component|{0}|{1}|{2}|{3}" -f $_.Id, $_.Name, $_.Required, $_.Recommended })
 $sha = [System.Security.Cryptography.SHA256]::Create()
 $fingerprint = ([System.BitConverter]::ToString($sha.ComputeHash($Utf8NoBom.GetBytes(($lines -join "`n")))) -replace '-', '').ToLowerInvariant()
-$version = (Get-Item -LiteralPath $exe).VersionInfo.ProductVersion
-if (-not $version) { $version = (Get-Item -LiteralPath $exe).VersionInfo.FileVersion }
-if (-not $version) {
-    # 版の情報がない exe（OTRP の sim-WinGDI64-OTRPv57_0_1.exe など）は名前を使う
-    $version = [System.IO.Path]::GetFileNameWithoutExtension($exe)
+# 版の名前は exe の名前にする（OTRP の sim-WinGDI64-OTRPv62_0_3.exe などは、exe に書かれた版が元の simutrans の版
+# 「122.0.1 Nightly」になっていて、どの本体か分からないため）。
+# 名前が simutrans.exe だけで区別できない場合は、exe に書かれた版を足す
+$version = [System.IO.Path]::GetFileNameWithoutExtension($exe)
+if ($version -eq 'simutrans') {
+    $info = (Get-Item -LiteralPath $exe).VersionInfo
+    $exeVersion = if ($info.ProductVersion) { $info.ProductVersion } else { $info.FileVersion }
+    if ($exeVersion) { $version = "simutrans-$exeVersion" }
 }
 $version = ($version -replace '[^A-Za-z0-9_.-]+', '-').Trim('-', '.')
 $revision = if ($version) { "$version-$($fingerprint.Substring(0, 8))" } else { "r-$($fingerprint.Substring(0, 8))" }

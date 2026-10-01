@@ -42,7 +42,10 @@ public sealed class ServerRow : INotifyPropertyChanged
 
     public static ServerRow Listed(ServerListSource list, ServerEntry server, SyncPlan? plan, string? planError)
     {
-        var engine = server.Engine is { } e ? $"本体: {e.Revision}" : "本体: 手元のものを使う";
+        // 本体は exe の名前で出す（版の名前より分かりやすいため）
+        var engine = server.Engine?.Builds?.GetValueOrDefault(PlatformInfo.CurrentKey) is { } build
+            ? $"本体: {Path.GetFileName(build.Exe)}"
+            : "本体: 手元のものを使う";
         var row = new ServerRow(ServerRowKind.Listed, FavoriteKeys.ForListed(list, server.Id))
         {
             List = list,
