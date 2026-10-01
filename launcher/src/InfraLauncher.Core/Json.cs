@@ -8,12 +8,12 @@ using InfraLauncher.Core.Models;
 namespace InfraLauncher.Core;
 
 /// <summary>
-/// JSON の読み書き。exe を小さくするために未使用コードを削っても動くよう、
-/// リフレクションではなくソース生成（<see cref="JsonContext"/>）を使う。
+/// JSONの読み書き。exeを小さくするために未使用コードを削っても動くよう、
+///リフレクションではなくソース生成（<see cref="JsonContext"/>）を使う。
 /// </summary>
 internal static class Json
 {
-    /// <summary>マニフェストや保存ファイルは snake_case。日本語はエスケープせずに書く。</summary>
+    /// <summary>マニフェストや保存ファイルはsnake_case。日本語はエスケープせずに書く。</summary>
     public static readonly JsonContext Context = new(new JsonSerializerOptions
     {
         PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,

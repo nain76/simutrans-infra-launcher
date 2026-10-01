@@ -1,23 +1,23 @@
 ﻿<#
 .SYNOPSIS
-    pakset を Web 公開用フォルダにコピーし、ランチャーの差分同期に使うファイル一覧（index.json）を作る。
+    paksetをWeb公開用フォルダにコピーし、ランチャーの差分同期に使うファイル一覧（index.json）を作る。
 
 .DESCRIPTION
-    1. -Source の pakset フォルダの中身を -Destination（Web サーバーで公開しているフォルダ）にコピーする。
-       変わったファイルだけをコピーし、-Source から消えたファイルは -Destination からも消す。
-    2. -Destination にファイル一覧 index.json（パス・サイズ・SHA256）を書く。
-    3. -Destination に IIS 用の web.config を書く（.pak や .tab を配信できるようにするため）。
-    4. -Manifest と -ServerId を指定すると、サーバーリストの該当サーバーの pakset を
-       index_url / index_sha256 / version に書き換える。同じ pakset を使うサーバーが複数あれば、-ServerId に全部を並べる。
+    1. -Sourceのpaksetフォルダの中身を-Destination（Webサーバーで公開しているフォルダ）にコピーする。
+       変わったファイルだけをコピーし、-Sourceから消えたファイルは-Destinationからも消す。
+    2. -Destinationにファイル一覧index.json（パス・サイズ・SHA256）を書く。
+    3. -DestinationにIIS用のweb.configを書く（.pakや.tabを配信できるようにするため）。
+    4. -Manifestと-ServerIdを指定すると、サーバーリストの該当サーバーのpaksetを
+       index_url / index_sha256 / versionに書き換える。同じpaksetを使うサーバーが複数あれば、-ServerIdに全部を並べる。
 
-    アドオンを足すときは、-Source の pakset フォルダに pak をコピーしてからこのスクリプトを実行する。
+    アドオンを足すときは、-Sourceのpaksetフォルダにpakをコピーしてからこのスクリプトを実行する。
     ランチャーは次に接続するとき、足したファイルだけを落とす。
 
-    -Source と -Destination を省略すると、publish-settings.json に登録されたすべての pakset を公開する
-    （Setup-Server.bat / Add-Server.bat が登録する。Publish-Pakset.bat をダブルクリックすると、この形で実行される）。
-    このとき、pakset フォルダの1つ上にある simutrans 本体も Publish-Engine.ps1 で公開する。
+    -Sourceと-Destinationを省略すると、publish-settings.jsonに登録されたすべてのpaksetを公開する
+    （Setup-Server.bat / Add-Server.batが登録する。Publish-Pakset.batをダブルクリックすると、この形で実行される）。
+    このとき、paksetフォルダの1つ上にあるsimutrans本体もPublish-Engine.ps1で公開する。
 
-    Windows PowerShell 5.1 と PowerShell 7 のどちらでも動く。
+    Windows PowerShell 5.1とPowerShell 7のどちらでも動く。
 
 .EXAMPLE
     .\Publish-Pakset.ps1 -Source C:\simutrans\pak128.japan `
@@ -26,25 +26,25 @@
 #>
 [CmdletBinding()]
 param(
-    # サーバーが使っている pakset フォルダ（省略すると publish-settings.json の値）
+    # サーバーが使っているpaksetフォルダ（省略するとpublish-settings.jsonの値）
     [string] $Source,
-    # Web サーバーで公開するフォルダ（pakset ごとに分ける。省略すると publish-settings.json の値）
+    # Webサーバーで公開するフォルダ（paksetごとに分ける。省略するとpublish-settings.jsonの値）
     [string] $Destination,
     # 書き換えるサーバーリスト（manifest.json）。省略するとファイル一覧だけ作る
     [string] $Manifest,
-    # サーバーリストの中で書き換えるサーバーの id（同じ pakset を使うサーバーが複数あれば、カンマ区切りで並べる）
+    # サーバーリストの中で書き換えるサーバーのid（同じpaksetを使うサーバーが複数あれば、カンマ区切りで並べる）
     [string[]] $ServerId,
-    # サーバーリストに書く pakset のバージョン。省略すると日時
+    # サーバーリストに書くpaksetのバージョン。省略すると日時
     [string] $Version,
-    # サーバーリストに書く index.json のアドレス。
-    # 省略すると、サーバーリストから見た相対パスにする（-Destination がサーバーリストと同じフォルダかその下にある場合）
+    # サーバーリストに書くindex.jsonのアドレス。
+    # 省略すると、サーバーリストから見た相対パスにする（-Destinationがサーバーリストと同じフォルダかその下にある場合）
     [string] $IndexUrl
 )
 
 Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 
-# ランチャーが受け付けない種類のファイル（InfraLauncher.Core の ManifestClient.BlockedExtensions と同じ）
+# ランチャーが受け付けない種類のファイル（InfraLauncher.CoreのManifestClient.BlockedExtensionsと同じ）
 $BlockedExtensions = @(
     '.exe', '.dll', '.com', '.scr', '.msi', '.msp', '.bat', '.cmd', '.ps1', '.psm1', '.vbs', '.vbe',
     '.js', '.jse', '.wsf', '.wsh', '.hta', '.lnk', '.url', '.reg', '.cpl', '.jar', '.sh', '.app', '.so', '.dylib'
@@ -68,20 +68,20 @@ function Get-Sha256([string] $path) {
 }
 
 
-# --- 準備 ---
+# ---準備---
 if (-not $Source -and -not $Destination) {
-    # 登録されたすべての pakset を公開する
+    # 登録されたすべてのpaksetを公開する
     $settings = Get-PublishSettings
     if (@($settings.paksets).Count -eq 0) {
-        throw "公開する pakset が登録されていません。Setup-Server.bat か Add-Server.bat で登録するか、-Source と -Destination を指定してください"
+        throw "公開するpaksetが登録されていません。Setup-Server.batかAdd-Server.batで登録するか、-Sourceと-Destinationを指定してください"
     }
     foreach ($p in $settings.paksets) {
-        Write-Step "$($p.pakset_source) を公開します（サーバー: $($p.server_ids -join ', ')）"
+        Write-Step "$($p.pakset_source)を公開します（サーバー: $($p.server_ids -join ', ')）"
         & $PSCommandPath -Source $p.pakset_source -Destination $p.destination -Manifest $settings.manifest -ServerId $p.server_ids -Version $Version
     }
 
-    # simutrans 本体も公開する（同じ本体を使うサーバーをまとめる）。
-    # 動いているサーバーの exe が分かればそれを使う（本体を入れ替えたときに追従する）。
+    # simutrans本体も公開する（同じ本体を使うサーバーをまとめる）。
+    # 動いているサーバーのexeが分かればそれを使う（本体を入れ替えたときに追従する）。
     # 決まっていなければ探し、見つからなければ選んでもらう（空欄と答えたら 'none' を残し、次からは聞かない）
     $servers = @((Read-JsonFile $settings.manifest).servers)
     $changed = $false
@@ -94,12 +94,12 @@ if (-not $Source -and -not $Destination) {
         $ports = @($servers | Where-Object { $p.server_ids -contains $_.id } | ForEach-Object { [int](($_.address -split ':')[-1]) })
         $running = Find-RunningServerExe (Split-Path -Parent $p.pakset_source) $ports
         if ($running -and $p.engine_source -ne $running) {
-            Write-Ok "動いている simutrans サーバーの本体に合わせます: $(Split-Path -Leaf $running)"
+            Write-Ok "動いているsimutransサーバーの本体に合わせます: $(Split-Path -Leaf $running)"
             $p.engine_source = $running
             $changed = $true
         }
         if (-not $p.engine_source -or ($p.engine_source -ne 'none' -and -not (Test-Path -LiteralPath $p.engine_source -PathType Leaf))) {
-            Write-Step "$($p.pakset_source) を使うサーバーの simutrans 本体を探しています"
+            Write-Step "$($p.pakset_source)を使うサーバーのsimutrans本体を探しています"
             $exe = Resolve-EngineExe $p.pakset_source $ports
             $p.engine_source = if ($exe) { $exe } else { 'none' }
             $changed = $true
@@ -109,28 +109,28 @@ if (-not $Source -and -not $Destination) {
     $engineDest = Join-Path (Split-Path -Parent $settings.manifest) 'engine'
     foreach ($group in @($settings.paksets | Where-Object { $_.engine_source -and $_.engine_source -ne 'none' } | Group-Object { $_.engine_source })) {
         $ids = @($group.Group | ForEach-Object { $_.server_ids })
-        Write-Step "simutrans 本体 $($group.Name) を公開します（サーバー: $($ids -join ', ')）"
+        Write-Step "simutrans本体 $($group.Name)を公開します（サーバー: $($ids -join ', ')）"
         & (Join-Path $PSScriptRoot 'Publish-Engine.ps1') -Source $group.Name -Destination $engineDest -Manifest $settings.manifest -ServerId $ids
     }
     return
 }
 if (-not $Source -or -not $Destination) {
-    throw "-Source と -Destination は両方指定してください"
+    throw "-Sourceと-Destinationは両方指定してください"
 }
 $src = Get-FullPath $Source
 $dst = Get-FullPath $Destination
 if (-not (Test-Path -LiteralPath $src -PathType Container)) {
-    throw "pakset フォルダが見つかりません: $src"
+    throw "paksetフォルダが見つかりません: $src"
 }
 if ((Test-Inside $dst $src) -or (Test-Inside $src $dst)) {
-    throw "-Source と -Destination は、互いの中にない別のフォルダを指定してください"
+    throw "-Sourceと-Destinationは、互いの中にない別のフォルダを指定してください"
 }
 if ($Manifest -and -not $ServerId) {
-    throw "-Manifest を指定するときは -ServerId も指定してください"
+    throw "-Manifestを指定するときは-ServerIdも指定してください"
 }
 New-Item -ItemType Directory -Force -Path $dst | Out-Null
 
-# --- 1. 公開するファイルを集める ---
+# --- 1. 公開するファイルを集める---
 $files = @()
 foreach ($f in Get-ChildItem -LiteralPath $src -Recurse -File -Force) {
     $rel = Get-RelativePath $src $f.FullName
@@ -139,16 +139,16 @@ foreach ($f in Get-ChildItem -LiteralPath $src -Recurse -File -Force) {
         continue
     }
     if ($Reserved -contains $rel.ToLowerInvariant()) {
-        throw "pakset フォルダの直下に $rel があります。この名前はファイル一覧用に使うため、名前を変えてください"
+        throw "paksetフォルダの直下に $rel があります。この名前はファイル一覧用に使うため、名前を変えてください"
     }
     $files += [pscustomobject]@{ Rel = $rel; Source = $f }
 }
 $files = @($files | Sort-Object -Property Rel -CaseSensitive)
 if ($files.Count -eq 0) {
-    throw "pakset フォルダにファイルがありません: $src"
+    throw "paksetフォルダにファイルがありません: $src"
 }
 
-# --- 2. 変わったファイルだけコピーする ---
+# --- 2. 変わったファイルだけコピーする---
 $copied = 0
 foreach ($f in $files) {
     $target = Join-Path $dst ($f.Rel.Replace('/', [System.IO.Path]::DirectorySeparatorChar))
@@ -162,7 +162,7 @@ foreach ($f in $files) {
     $copied++
 }
 
-# --- 3. ファイル一覧を書く（ファイルをそろえてから書く） ---
+# --- 3. ファイル一覧を書く（ファイルをそろえてから書く）---
 $entries = @()
 $total = [long]0
 foreach ($f in $files) {
@@ -175,7 +175,7 @@ $indexJson = ConvertTo-Json -InputObject ([ordered]@{ schema_version = 1; files 
 Write-TextFile $indexPath $indexJson
 $indexSha = Get-Sha256 $indexPath
 
-# --- 4. -Source から消えたファイルを片付ける（一覧を書いたあとに消す） ---
+# --- 4. -Sourceから消えたファイルを片付ける（一覧を書いたあとに消す）---
 $keep = @{}
 foreach ($f in $files) { $keep[$f.Rel.ToLowerInvariant()] = $true }
 $removed = 0
@@ -191,14 +191,14 @@ Get-ChildItem -LiteralPath $dst -Recurse -Directory -Force |
     Where-Object { -not (Get-ChildItem -LiteralPath $_.FullName -Force) } |
     Remove-Item -Force
 
-# --- 5. IIS 用の web.config（既存のものが自作なら触らない） ---
+# --- 5. IIS用のweb.config（既存のものが自作なら触らない）---
 $webConfig = Join-Path $dst 'web.config'
 if (-not (Test-Path -LiteralPath $webConfig) -or (Get-Content -LiteralPath $webConfig -Raw).Contains($WebConfigMarker)) {
     Write-DistWebConfig $webConfig @($files | ForEach-Object { [System.IO.Path]::GetExtension($_.Rel).ToLowerInvariant() }) `
-        "$WebConfigMarker. pakset のファイルを IIS から配信できるようにする。"
+        "$WebConfigMarker. paksetのファイルをIISから配信できるようにする。"
 }
 
-# --- 6. サーバーリストを書き換える ---
+# --- 6. サーバーリストを書き換える---
 if ($Manifest) {
     $manifestPath = Get-FullPath $Manifest
     $data = Read-JsonFile $manifestPath
@@ -206,7 +206,7 @@ if ($Manifest) {
     foreach ($id in $ServerId) {
         $found = @($data.servers | Where-Object { $_.id -eq $id })
         if ($found.Count -ne 1) {
-            throw "サーバーリストに id が '$id' のサーバーが見つかりません"
+            throw "サーバーリストにidが '$id' のサーバーが見つかりません"
         }
         $targets += $found[0]
     }
@@ -214,7 +214,7 @@ if ($Manifest) {
     if (-not $IndexUrl) {
         $manifestDir = Split-Path -Parent $manifestPath
         if (-not (Test-Inside $indexPath $manifestDir)) {
-            throw "-Destination がサーバーリストと同じフォルダの下にないため、相対パスにできません。-IndexUrl で index.json のアドレスを指定してください"
+            throw "-Destinationがサーバーリストと同じフォルダの下にないため、相対パスにできません。-IndexUrlでindex.jsonのアドレスを指定してください"
         }
         $IndexUrl = Get-RelativePath $manifestDir $indexPath
     }
@@ -235,7 +235,7 @@ if ($Manifest) {
     Write-ManifestFile $manifestPath $data
 }
 
-# --- 結果 ---
+# ---結果---
 Write-Host ("公開しました: {0} ファイル（{1:N0} バイト）、コピー {2} 件、削除 {3} 件" -f $files.Count, $total, $copied, $removed)
 Write-Host "ファイル一覧: $indexPath"
 Write-Host "index_sha256: $indexSha"

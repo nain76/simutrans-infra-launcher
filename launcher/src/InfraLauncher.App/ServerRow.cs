@@ -17,12 +17,12 @@ public enum ServerRowKind
 }
 
 /// <summary>
-/// サーバー一覧の1行。ひと目で分かるよう、サーバーの稼働状況と同期の状態は色付きの札（バッジ）で出し、
-/// 細かい情報は下の行に小さく出す。
+///サーバー一覧の1行。ひと目で分かるよう、サーバーの稼働状況と同期の状態は色付きの札（バッジ）で出し、
+///細かい情報は下の行に小さく出す。
 /// </summary>
 public sealed class ServerRow : INotifyPropertyChanged
 {
-    // 札の色。明るい画面でも暗い画面でも白い文字が読める濃さにする
+    //札の色。明るい画面でも暗い画面でも白い文字が読める濃さにする
     private static readonly IBrush Green = new SolidColorBrush(Color.Parse("#1f7a3a"));
     private static readonly IBrush Orange = new SolidColorBrush(Color.Parse("#b35c00"));
     private static readonly IBrush Red = new SolidColorBrush(Color.Parse("#b3261e"));
@@ -42,7 +42,7 @@ public sealed class ServerRow : INotifyPropertyChanged
 
     public static ServerRow Listed(ServerListSource list, ServerEntry server, SyncPlan? plan, string? planError)
     {
-        // 本体は exe の名前で出す（版の名前より分かりやすいため）
+        //本体はexeの名前で出す（版の名前より分かりやすいため）
         var engine = server.Engine?.Builds?.GetValueOrDefault(PlatformInfo.CurrentKey) is { } build
             ? $"本体: {Path.GetFileName(build.Exe)}"
             : "本体: 手元のものを使う";
@@ -113,8 +113,8 @@ public sealed class ServerRow : INotifyPropertyChanged
     public bool HasStatus => _statusText.Length > 0;
 
     /// <summary>
-    /// ポートにつながったかを反映する。管理者が「メンテナンス中」にしているときはそれを優先する。
-    /// つながらないときは「停止中」（サーバーが起動していないか、ポートが外から届かない）。
+    ///ポートにつながったかを反映する。管理者が「メンテナンス中」にしているときはそれを優先する。
+    ///つながらないときは「停止中」（サーバーが起動していないか、ポートが外から届かない）。
     /// </summary>
     public void SetReachable(bool reachable)
     {
@@ -184,12 +184,12 @@ public sealed class ServerRow : INotifyPropertyChanged
         }
         else if (plan.UpToDate)
         {
-            (SyncLabel, SyncBrush, SyncDetail) = ("✔ 起動できます", Green, "本体と pakset はサーバーと同じです");
+            (SyncLabel, SyncBrush, SyncDetail) = ("✔ 起動できます", Green, "本体とpaksetはサーバーと同じです");
         }
         else
         {
-            var needed = string.Join("、", plan.Items.Where(i => i.Needed).Select(i => i.Kind == SyncItemKind.Engine ? "simutrans 本体" : "pakset"));
-            (SyncLabel, SyncBrush, SyncDetail) = ("要同期", Orange, $"{needed} を更新します。「同期」を押してください");
+            var needed = string.Join("、", plan.Items.Where(i => i.Needed).Select(i => i.Kind == SyncItemKind.Engine ? "simutrans本体" : "pakset"));
+            (SyncLabel, SyncBrush, SyncDetail) = ("要同期", Orange, $"{needed}を更新します。「同期」を押してください");
         }
         OnPropertyChanged(nameof(IsReady));
         OnPropertyChanged(nameof(CanSync));
@@ -201,15 +201,15 @@ public sealed class ServerRow : INotifyPropertyChanged
         var updates = results.Where(r => !r.UpToDate).ToList();
         if (updates.Count == 0)
         {
-            (SyncLabel, SyncBrush, SyncDetail) = ("✔ 最新です", Green, "本体と pakset はサーバーと同じです。「起動」で遊べます");
+            (SyncLabel, SyncBrush, SyncDetail) = ("✔ 最新です", Green, "本体とpaksetはサーバーと同じです。「起動」で遊べます");
             return;
         }
         var parts = updates.Select(r =>
         {
-            var what = r.Item.Kind == SyncItemKind.Engine ? "simutrans 本体" : "pakset";
+            var what = r.Item.Kind == SyncItemKind.Engine ? "simutrans本体" : "pakset";
             var size = r.Bytes > 0 ? $"・{FormatSize(r.Bytes)}" : "";
-            var files = r.Files > 0 ? $"{r.Files} ファイル{size}" : "ファイルの入れ替えなし";
-            return r.Removals > 0 ? $"{what}（{files}、片付け {r.Removals} ファイル）" : $"{what}（{files}）";
+            var files = r.Files > 0 ? $"{r.Files}ファイル{size}" : "ファイルの入れ替えなし";
+            return r.Removals > 0 ? $"{what}（{files}、片付け{r.Removals}ファイル）" : $"{what}（{files}）";
         });
         (SyncLabel, SyncBrush, SyncDetail) = ("更新あり", Orange, $"{string.Join("、", parts)}。「同期」を押すと反映します");
     }

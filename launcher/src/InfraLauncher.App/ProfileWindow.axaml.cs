@@ -28,7 +28,7 @@ public partial class ProfileWindow : Window
 
     private async void OnBrowseExe(object? sender, RoutedEventArgs e)
     {
-        if (await Dialogs.PickFileAsync(this, "simutrans の実行ファイルを選択", Dialogs.SimutransExe) is { } path)
+        if (await Dialogs.PickFileAsync(this, "simutransの実行ファイルを選択", Dialogs.SimutransExe) is { } path)
         {
             ExeBox.Text = path;
         }
@@ -38,14 +38,14 @@ public partial class ProfileWindow : Window
     {
         var exe = ExeBox.Text?.Trim();
         var start = string.IsNullOrEmpty(exe) ? null : SimutransPaths.DataDirFor(exe);
-        if (await Dialogs.PickFolderAsync(this, "pakset のフォルダを選択", start) is not { } path)
+        if (await Dialogs.PickFolderAsync(this, "paksetのフォルダを選択", start) is not { } path)
         {
             return;
         }
         path = Path.TrimEndingDirectorySeparator(path);
         if (start is not null && !string.Equals(Path.GetDirectoryName(path), Path.TrimEndingDirectorySeparator(start), StringComparison.OrdinalIgnoreCase))
         {
-            ShowError("pakset のフォルダは simutrans 本体と同じフォルダの中にあるものを選んでください");
+            ShowError("paksetのフォルダはsimutrans本体と同じフォルダの中にあるものを選んでください");
             return;
         }
         ErrorText.IsVisible = false;
@@ -62,8 +62,8 @@ public partial class ProfileWindow : Window
         string? error =
             name.Length == 0 ? "表示名を入れてください" :
             !ServerAddress.TryParse(address, out _) ? "接続先のアドレスの形式が正しくありません（例: example.ddns.net:13353）" :
-            exe.Length == 0 ? "simutrans 本体を指定してください" :
-            pak.Length == 0 ? "pakset のフォルダを指定してください" :
+            exe.Length == 0 ? "simutrans本体を指定してください" :
+            pak.Length == 0 ? "paksetのフォルダを指定してください" :
             null;
         if (error is not null)
         {

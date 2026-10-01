@@ -1,16 +1,16 @@
-﻿# サーバーリスト（manifest.json）への署名。Common.ps1 から読み込まれる。
+﻿# サーバーリスト（manifest.json）への署名。Common.ps1から読み込まれる。
 #
 # しくみ（エンジニアでなくても分かるように）:
-#   - 「秘密の鍵」はこの VPS の中だけに置く。これで manifest.json に「管理者が公開したもの」という印（署名）を付ける
-#   - 印は manifest.sig.json として manifest.json の隣に置く。友人のランチャーは毎回これを確かめる
-#   - 友人には最初に一度だけ「確認コード」（秘密の鍵と対になる公開鍵から作る短い文字列）を伝える。
+#   -「秘密の鍵」はこのVPSの中だけに置く。これでmanifest.jsonに「管理者が公開したもの」という印（署名）を付ける
+#   -印はmanifest.sig.jsonとしてmanifest.jsonの隣に置く。友人のランチャーは毎回これを確かめる
+#   -友人には最初に一度だけ「確認コード」（秘密の鍵と対になる公開鍵から作る短い文字列）を伝える。
 #     確認コードは秘密ではない。友人は聞いたコードをランチャーに入力するだけでよい
-#   - 配信フォルダを誰かに書き換えられても、秘密の鍵がなければ正しい印は作れないので、ランチャーが気づいて止める
-#   - pakset と本体のファイル一覧は manifest.json に SHA256 が書いてあるので、manifest.json の印だけで全部を守れる
+#   -配信フォルダを誰かに書き換えられても、秘密の鍵がなければ正しい印は作れないので、ランチャーが気づいて止める
+#   - paksetと本体のファイル一覧はmanifest.jsonにSHA256が書いてあるので、manifest.jsonの印だけで全部を守れる
 #
-# 秘密の鍵のファイルは %LOCALAPPDATA%\InfraLauncherServer\signing-key.dat に置き、Windows の DPAPI で
-# 「この Windows ユーザーでしか開けない」ように暗号化する（配信フォルダには置かない）。
-# 形式は ECDSA P-256 / SHA-256。Windows PowerShell 5.1（.NET Framework 4.7 以降）と PowerShell 7 の両方で動く。
+# 秘密の鍵のファイルは%LOCALAPPDATA%\InfraLauncherServer\signing-key.datに置き、WindowsのDPAPIで
+# 「このWindowsユーザーでしか開けない」ように暗号化する（配信フォルダには置かない）。
+# 形式はECDSA P-256 / SHA-256。Windows PowerShell 5.1（.NET Framework 4.7以降）とPowerShell 7の両方で動く。
 
 $SigningKeyPath = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'InfraLauncherServer\signing-key.dat'
 $SigningKeyFormat = 'infra-launcher-signing-key-1'
@@ -18,7 +18,7 @@ $SignatureFormat = 'infra-launcher-signature-1'
 $BackupFormat = 'infra-launcher-signing-key-backup-1'
 $DpapiEntropy = [System.Text.Encoding]::UTF8.GetBytes('InfraLauncher.ManifestSigning')
 
-# P-256 の公開鍵を SubjectPublicKeyInfo（DER）にするときの先頭部分。後ろに 0x04・X・Y を続ける
+# P-256の公開鍵をSubjectPublicKeyInfo（DER）にするときの先頭部分。後ろに0x04・X・Yを続ける
 $P256SpkiPrefix = [byte[]](0x30, 0x59, 0x30, 0x13, 0x06, 0x07, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x02, 0x01,
     0x06, 0x08, 0x2a, 0x86, 0x48, 0xce, 0x3d, 0x03, 0x01, 0x07, 0x03, 0x42, 0x00, 0x04)
 
@@ -51,13 +51,13 @@ function Test-IsWindowsHost {
     return -not (Get-Variable -Name IsWindows -ErrorAction SilentlyContinue) -or $IsWindows
 }
 
-# DPAPI で「この Windows ユーザーでしか開けない」ようにする。
-# Windows 以外（開発時の動作確認）では INFRA_SIGNING_INSECURE_TEST=1 のときだけ暗号化せずに保存する
+# DPAPIで「このWindowsユーザーでしか開けない」ようにする。
+# Windows以外（開発時の動作確認）ではINFRA_SIGNING_INSECURE_TEST=1のときだけ暗号化せずに保存する
 function Protect-KeyBytes([byte[]] $bytes) {
     if (Test-IsWindowsHost) {
         return 'dpapi:' + [Convert]::ToBase64String([System.Security.Cryptography.ProtectedData]::Protect($bytes, $DpapiEntropy, 'CurrentUser'))
     }
-    if ($env:INFRA_SIGNING_INSECURE_TEST -ne '1') { throw '署名の鍵は Windows でしか保存できません' }
+    if ($env:INFRA_SIGNING_INSECURE_TEST -ne '1') { throw '署名の鍵はWindowsでしか保存できません' }
     return 'plain:' + [Convert]::ToBase64String($bytes)
 }
 
@@ -72,10 +72,10 @@ function Unprotect-KeyBytes([string] $text) {
 
 function Get-P256Curve { return [System.Security.Cryptography.ECCurve+NamedCurves]::nistP256 }
 
-# 鍵を新しく作り、秘密の値（D・X・Y を並べた 96 バイト）を返す
+# 鍵を新しく作り、秘密の値（D・X・Yを並べた96バイト）を返す
 function New-KeyBytes {
     if ($PSVersionTable.PSEdition -eq 'Desktop') {
-        # .NET Framework では、取り出しを許した鍵として作る必要がある
+        # .NET Frameworkでは、取り出しを許した鍵として作る必要がある
         $params = New-Object System.Security.Cryptography.CngKeyCreationParameters
         $params.ExportPolicy = [System.Security.Cryptography.CngExportPolicies]::AllowPlaintextExport
         $cng = [System.Security.Cryptography.CngKey]::Create([System.Security.Cryptography.CngAlgorithm]::ECDsaP256, $null, $params)
@@ -103,12 +103,12 @@ function New-EcdsaFromKeyBytes([byte[]] $raw) {
     return [System.Security.Cryptography.ECDsa]::Create($p)
 }
 
-# 公開鍵（SubjectPublicKeyInfo の base64）。ランチャーの ManifestSignature と同じ形
+# 公開鍵（SubjectPublicKeyInfoのbase64）。ランチャーのManifestSignatureと同じ形
 function Get-PublicKeyText([byte[]] $raw) {
     return [Convert]::ToBase64String((Join-Bytes $P256SpkiPrefix (Get-ByteRange $raw 32 64)))
 }
 
-# 確認コード: 公開鍵の SHA256 の先頭 10 バイトを 16 進数で4文字ずつ区切ったもの（ランチャーと同じ計算）
+# 確認コード: 公開鍵のSHA256の先頭10バイトを16進数で4文字ずつ区切ったもの（ランチャーと同じ計算）
 function Get-SigningCode([string] $publicKey) {
     $sha = [System.Security.Cryptography.SHA256]::Create()
     $hash = $sha.ComputeHash([Convert]::FromBase64String($publicKey))
@@ -138,10 +138,10 @@ function Save-SigningKey([byte[]] $raw) {
 
 function Get-SigningKeyBytes {
     $key = Get-SigningKey
-    if (-not $key) { throw '署名の鍵がありません。Manage-SigningKey.bat で作ってください' }
+    if (-not $key) { throw '署名の鍵がありません。Manage-SigningKey.batで作ってください' }
     try { $raw = Unprotect-KeyBytes $key.Protected }
     catch {
-        throw "署名の鍵を開けませんでした。鍵を作った Windows ユーザー（$($key.User)）で実行してください。VPS を作り直した場合は Manage-SigningKey.bat の「バックアップから戻す」を使ってください（$($_.Exception.Message)）"
+        throw "署名の鍵を開けませんでした。鍵を作ったWindowsユーザー（$($key.User)）で実行してください。VPSを作り直した場合はManage-SigningKey.batの「バックアップから戻す」を使ってください（$($_.Exception.Message)）"
     }
     if ((Get-PublicKeyText $raw) -ne $key.PublicKey) { throw "署名の鍵のファイルが壊れています: $SigningKeyPath" }
     return , $raw
@@ -159,7 +159,7 @@ function Get-PublishedSigningCode([string] $manifestPath) {
     try { return Get-SigningCode (Read-JsonFile $sigPath).public_key } catch { return $null }
 }
 
-# manifest.json に署名して manifest.sig.json を書く（manifest.json はバイト列そのものに署名するので、このあと書き換えないこと）
+# manifest.jsonに署名してmanifest.sig.jsonを書く（manifest.jsonはバイト列そのものに署名するので、このあと書き換えないこと）
 function Invoke-ManifestSign([string] $manifestPath) {
     $raw = Get-SigningKeyBytes
     $ec = New-EcdsaFromKeyBytes $raw
@@ -181,7 +181,7 @@ function Show-SigningCode([string] $code) {
     Write-Host '   ┌──────────────────────────────────────┐' -ForegroundColor Yellow
     Write-Host "      確認コード:  $code" -ForegroundColor Yellow
     Write-Host '   └──────────────────────────────────────┘' -ForegroundColor Yellow
-    Write-Host '   ・この確認コードを、Discord の DM などで友人に一度だけ伝えてください'
+    Write-Host '   ・この確認コードを、DiscordのDMなどで友人に一度だけ伝えてください'
     Write-Host '     友人はランチャーでサーバーリストを追加するとき、このコードを入力します（ランチャーにはコードは表示されません）'
     Write-Host '   ・確認コードは秘密ではありません。人に見られても問題ありません（パスワードではありません）'
     Write-Host '   ・サーバーリストのアドレスと一緒に伝えてかまいません。ただし配信サーバー（8080 / 8443）に置いて伝えるのはやめてください'
@@ -190,10 +190,10 @@ function Show-SigningCode([string] $code) {
 function Write-SigningExplanation {
     Write-Host '   これは何？'
     Write-Host '    ・サーバーリスト（manifest.json）に「管理者が公開したもの」という印（署名）を付けるための鍵です'
-    Write-Host '    ・印は、この VPS にある秘密の鍵でしか作れません'
+    Write-Host '    ・印は、このVPSにある秘密の鍵でしか作れません'
     Write-Host '    ・友人のランチャーは毎回この印を確かめます。誰かが配信フォルダのファイルを書き換えても、'
-    Write-Host '      印が合わなくなるので気づいて止まります（知らない exe を実行してしまうことを防ぎます）'
-    Write-Host '    ・Publish-Pakset.bat などで公開するたびに、自動で印を付け直します。普段は何もしなくてかまいません'
+    Write-Host '      印が合わなくなるので気づいて止まります（知らないexeを実行してしまうことを防ぎます）'
+    Write-Host '    ・Publish-Pakset.batなどで公開するたびに、自動で印を付け直します。普段は何もしなくてかまいません'
 }
 
 function Read-Password([string] $prompt) {
@@ -215,7 +215,7 @@ function Get-Hmac([byte[]] $key, [byte[]] $data) {
     return , $mac
 }
 
-# パスワード付きのバックアップを書く（PBKDF2-SHA256 で鍵を作り、AES-256-CBC で暗号化して HMAC-SHA256 を付ける）
+# パスワード付きのバックアップを書く（PBKDF2-SHA256で鍵を作り、AES-256-CBCで暗号化してHMAC-SHA256を付ける）
 function Export-SigningKeyBackup([string] $path, [string] $password) {
     $raw = Get-SigningKeyBytes
     $salt = New-RandomBytes 16
@@ -232,7 +232,7 @@ function Export-SigningKeyBackup([string] $path, [string] $password) {
     $mac = Get-Hmac $keys.Mac (Join-Bytes $iv $data)
     Write-JsonFile $path ([ordered]@{
         format     = $BackupFormat
-        note       = 'InfraLauncher のサーバーリスト署名の鍵のバックアップ。戻すときは Manage-SigningKey.bat の「バックアップから戻す」を使う。パスワードがないと開けない'
+        note       = 'InfraLauncherのサーバーリスト署名の鍵のバックアップ。戻すときはManage-SigningKey.batの「バックアップから戻す」を使う。パスワードがないと開けない'
         code       = Get-SigningCode (Get-PublicKeyText $raw)
         public_key = Get-PublicKeyText $raw
         kdf        = 'pbkdf2-sha256'
@@ -266,8 +266,8 @@ function Import-SigningKeyBackup([string] $path, [string] $password) {
 # バックアップを作るかを聞いて作る
 function Invoke-BackupPrompt {
     Write-Host ''
-    Write-Host '   VPS を作り直したときも同じ確認コードを使い続けられるよう、パスワード付きのバックアップを作れます。'
-    Write-Host '   作らない場合、VPS を作り直したら鍵を作り直すことになり、友人全員に新しい確認コードを入力し直してもらうことになります。'
+    Write-Host '   VPSを作り直したときも同じ確認コードを使い続けられるよう、パスワード付きのバックアップを作れます。'
+    Write-Host '   作らない場合、VPSを作り直したら鍵を作り直すことになり、友人全員に新しい確認コードを入力し直してもらうことになります。'
     $answer = Read-Value 'バックアップを作りますか？（Y/n）' 'Y'
     if ($answer -notmatch '^[Yy]') { return }
     while ($true) {
@@ -280,7 +280,7 @@ function Invoke-BackupPrompt {
     $path = Resolve-BackupPath (Read-Value 'バックアップの保存先（フォルダかファイルのフルパス）' (Join-Path $PSScriptRoot 'signing-key-backup.json'))
     Export-SigningKeyBackup $path $p1
     Write-Ok "バックアップを作りました: $path"
-    Write-Host '   このファイルは自分の PC や USB メモリなど、VPS の外にコピーして保管してください（VPS からは消してかまいません）'
+    Write-Host '   このファイルは自分のPCやUSBメモリなど、VPSの外にコピーして保管してください（VPSからは消してかまいません）'
     Write-Host '   配信フォルダには絶対に置かないでください'
 }
 
@@ -291,13 +291,13 @@ function Initialize-SigningKey([string] $manifestPath) {
     Write-SigningExplanation
     $published = if ($manifestPath) { Get-PublishedSigningCode $manifestPath } else { $null }
     if ($published) {
-        Write-Warning "この Windows ユーザー（$([Environment]::UserName)）には鍵がありませんが、いまのサーバーリストは確認コード $published の鍵で署名されています"
-        Write-Host '   別の Windows ユーザーで作った鍵なら、そのユーザーでログインして実行してください。'
-        Write-Host '   VPS を作り直したのなら、バックアップから戻すと同じ確認コードを使い続けられます。'
+        Write-Warning "このWindowsユーザー（$([Environment]::UserName)）には鍵がありませんが、いまのサーバーリストは確認コード $published の鍵で署名されています"
+        Write-Host '   別のWindowsユーザーで作った鍵なら、そのユーザーでログインして実行してください。'
+        Write-Host '   VPSを作り直したのなら、バックアップから戻すと同じ確認コードを使い続けられます。'
     }
     Write-Host ''
     Write-Host '     1. 新しく鍵を作る'
-    Write-Host '     2. バックアップから戻す（以前作った signing-key-backup.json がある場合）'
+    Write-Host '     2. バックアップから戻す（以前作ったsigning-key-backup.jsonがある場合）'
     $choice = Read-Value '番号' '1'
     if ($choice -eq '2') {
         Restore-SigningKeyInteractive
@@ -307,7 +307,7 @@ function Initialize-SigningKey([string] $manifestPath) {
     $key = Get-SigningKey
     Write-Ok '鍵を作りました'
     Write-Host "   秘密の鍵のファイル: $SigningKeyPath"
-    Write-Host "   この Windows ユーザー（$([Environment]::UserName)）でしか開けないよう暗号化してあります。ほかの PC にコピーしても使えません"
+    Write-Host "   このWindowsユーザー（$([Environment]::UserName)）でしか開けないよう暗号化してあります。ほかのPCにコピーしても使えません"
     Show-SigningCode $key.Code
     if ($published) {
         Write-Warning "確認コードが $published から変わりました。友人には新しい確認コードを伝えてください（ランチャーの「編集」で入力し直してもらいます）"
@@ -315,7 +315,7 @@ function Initialize-SigningKey([string] $manifestPath) {
     Invoke-BackupPrompt
 }
 
-# バックアップの置き場所。フォルダを指定した場合や、拡張子のない名前を指定した場合は、その中の signing-key-backup.json にする
+# バックアップの置き場所。フォルダを指定した場合や、拡張子のない名前を指定した場合は、その中のsigning-key-backup.jsonにする
 # （ただし、拡張子のない名前でも同じ名前のファイルがすでにあれば、そのファイルを使う。以前の版はそのまま保存していたため）
 function Resolve-BackupPath([string] $path, [switch] $Existing) {
     $full = Get-FullPath $path.Trim().Trim('"')
@@ -345,14 +345,14 @@ function Restore-SigningKeyInteractive {
     Show-SigningCode (Get-SigningKey).Code
 }
 
-# manifest.json を書き換えたあとに呼ぶ。鍵がなければ用意してから署名する
+# manifest.jsonを書き換えたあとに呼ぶ。鍵がなければ用意してから署名する
 function Update-ManifestSignature([string] $manifestPath) {
     Initialize-SigningKey $manifestPath
     Invoke-ManifestSign $manifestPath
     Write-Ok "サーバーリストに署名しました（確認コード $((Get-SigningKey).Code)）"
 }
 
-# manifest.json を書いて署名する
+# manifest.jsonを書いて署名する
 function Write-ManifestFile([string] $path, $data) {
     Write-JsonFile $path $data
     Update-ManifestSignature $path

@@ -65,7 +65,7 @@ internal static class Dialogs
         return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
     }
 
-    public static readonly FilePickerFileType SimutransExe = new("simutrans の実行ファイル")
+    public static readonly FilePickerFileType SimutransExe = new("simutransの実行ファイル")
     {
         Patterns = OperatingSystem.IsWindows() ? ["*.exe"] : ["*"],
     };

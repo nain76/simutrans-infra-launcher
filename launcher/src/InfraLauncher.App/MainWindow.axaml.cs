@@ -65,8 +65,8 @@ public partial class MainWindow : Window
 
             var failed = sources.Count(s => s.Error is not null);
             StatusText.Text = failed > 0
-                ? $"読み込めなかったサーバーリストが {failed} 件あります。選んで「編集」でアドレスを確認してください"
-                : rows.Count > 0 ? $"{rows.Count} 件のサーバー（{DateTime.Now:HH:mm} 更新）" : "";
+                ? $"読み込めなかったサーバーリストが{failed}件あります。選んで「編集」でアドレスを確認してください"
+                : rows.Count > 0 ? $"{rows.Count}件のサーバー（{DateTime.Now:HH:mm}更新）" : "";
         }
         finally
         {
@@ -128,7 +128,7 @@ public partial class MainWindow : Window
     private void UpdateButtons()
     {
         var row = Selected;
-        // 同期中は「同期」ボタンを「中止」にする
+        //同期中は「同期」ボタンを「中止」にする
         SyncButton.Content = _syncCts is null ? "同期" : "中止";
         SyncButton.IsEnabled = _syncCts is not null || !_busy && row is { CanSync: true };
         CheckButton.IsEnabled = !_busy && _rows.Any(r => r.Kind == ServerRowKind.Listed);
@@ -194,7 +194,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 共有リストのサーバーは中身を管理者が管理しているので、リストの表示名と配信アドレスを編集する
+        //共有リストのサーバーは中身を管理者が管理しているので、リストの表示名と配信アドレスを編集する
         var list = row.List!;
         var note = row.Kind == ServerRowKind.Listed
             ? $"「{row.Name}」はサーバーリスト「{list.Name}」から配信されています。サーバーの内容はサーバー管理者が管理しているため、ここではリストの表示名と配信アドレスを変更できます。"
@@ -202,13 +202,13 @@ public partial class MainWindow : Window
         var lw = new ServerListWindow(_service.Manifests, list, note);
         if (await lw.ShowDialog<bool>(this) && lw.Result is { } edited)
         {
-            // 配信アドレスが変わったら、お気に入りの印も引き継ぐ
+            //配信アドレスが変わったら、お気に入りの印も引き継ぐ
             var oldPrefix = FavoriteKeys.ForListed(list, "");
             var newPrefix = FavoriteKeys.ForListed(edited, "");
             _settings.FavoriteKeys = _settings.FavoriteKeys
                 .Select(k => k.StartsWith(oldPrefix, StringComparison.Ordinal) ? newPrefix + k[oldPrefix.Length..] : k)
                 .ToList();
-            // インストール設定も引き継ぐ
+            //インストール設定も引き継ぐ
             foreach (var key in _settings.ServerInstall.Keys.Where(k => k.StartsWith(oldPrefix, StringComparison.Ordinal)).ToList())
             {
                 var value = _settings.ServerInstall[key];
@@ -242,11 +242,11 @@ public partial class MainWindow : Window
             return;
         }
 
-        // 共有リストのサーバーは1件だけ消すことはできないので、リストごと削除する
+        //共有リストのサーバーは1件だけ消すことはできないので、リストごと削除する
         var list = row.List!;
         var count = _rows.Count(r => r.Kind == ServerRowKind.Listed && r.List == list);
         var message = row.Kind == ServerRowKind.Listed
-            ? $"「{row.Name}」はサーバーリスト「{list.Name}」から配信されています。\nリストごと削除すると、このリストの {count} 件のサーバーが一覧から消えます。削除しますか？"
+            ? $"「{row.Name}」はサーバーリスト「{list.Name}」から配信されています。\nリストごと削除すると、このリストの{count}件のサーバーが一覧から消えます。削除しますか？"
             : $"サーバーリスト「{list.Name}」を削除しますか？";
         if (await Dialogs.ConfirmAsync(this, "削除", message, "リストを削除"))
         {
@@ -264,7 +264,7 @@ public partial class MainWindow : Window
 
     private void OnDoubleTapped(object? sender, RoutedEventArgs e)
     {
-        // ダブルクリックは、起動できるなら起動、まだなら同期（同期だけでは何も実行しない）
+        //ダブルクリックは、起動できるなら起動、まだなら同期（同期だけでは何も実行しない）
         if (Selected is { IsReady: true })
         {
             OnLaunch(sender, e);
@@ -275,7 +275,7 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>本体と pakset をサーバーと同じ状態にする。起動はしない。</summary>
+    /// <summary>本体とpaksetをサーバーと同じ状態にする。起動はしない。</summary>
     private async void OnSync(object? sender, RoutedEventArgs e)
     {
         if (_syncCts is { } running)
@@ -288,16 +288,16 @@ public partial class MainWindow : Window
         {
             return;
         }
-        SetBusy(true, $"{row.Name} を同期しています…");
+        SetBusy(true, $"{row.Name}を同期しています…");
         using var cts = new CancellationTokenSource();
-        // 進み具合が長いあいだ届かなければ、考えられる原因と対処を出す
+        //進み具合が長いあいだ届かなければ、考えられる原因と対処を出す
         var watchdog = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         watchdog.Tick += (_, _) =>
         {
             if (DateTime.Now - _lastProgress > TimeSpan.FromSeconds(60))
             {
-                StatusText.Text = $"{_lastStage}\n1分以上進んでいません。ダウンロード先が OneDrive などの同期フォルダの中だと止まることがあります。" +
-                    "「中止」を押し、「インストール設定」でダウンロード先を OneDrive の外に変えてから、もう一度「同期」を押してください。" +
+                StatusText.Text = $"{_lastStage}\n1分以上進んでいません。ダウンロード先がOneDriveなどの同期フォルダの中だと止まることがあります。" +
+                    "「中止」を押し、「インストール設定」でダウンロード先をOneDriveの外に変えてから、もう一度「同期」を押してください。" +
                     $"詳しい記録: {_service.Layout.SyncLogPath}";
             }
         };
@@ -305,7 +305,7 @@ public partial class MainWindow : Window
         {
             var progress = new Progress<SyncProgress>(p =>
             {
-                // 進み具合は後から届くことがあるので、同期が終わったあとに届いたものは捨てる（結果の表示を上書きしないように）
+                //進み具合は後から届くことがあるので、同期が終わったあとに届いたものは捨てる（結果の表示を上書きしないように）
                 if (!ReferenceEquals(_syncCts, cts))
                 {
                     return;
@@ -319,7 +319,7 @@ public partial class MainWindow : Window
                     Progress.Value = p.BytesDone * 100.0 / p.BytesTotal.Value;
                 }
             });
-            // 本体を配っているサーバーを初めて同期するときは、先にインストール設定を決めてもらう
+            //本体を配っているサーバーを初めて同期するときは、先にインストール設定を決めてもらう
             if (server.EngineDownloadAllowed && !_settings.ServerInstall.ContainsKey(row.FavoriteKey))
             {
                 if (!await EditInstallOptionsAsync(row))
@@ -327,7 +327,7 @@ public partial class MainWindow : Window
                     StatusText.Text = "同期を取りやめました";
                     return;
                 }
-                SetBusy(true, $"{row.Name} を同期しています…");
+                SetBusy(true, $"{row.Name}を同期しています…");
             }
             var options = OptionsFor(row);
             _syncCts = cts;
@@ -340,7 +340,7 @@ public partial class MainWindow : Window
             row.SetPlan(_service.Sync.Plan(server, _settings, options), null);
             StatusText.Text = summary.Downloads == 0 && summary.Removed == 0
                 ? $"{row.Name}: すでに最新です。「起動」で接続できます"
-                : $"{row.Name}: 同期しました（ダウンロード {summary.Downloads} 件）。「起動」で接続できます";
+                : $"{row.Name}: 同期しました（ダウンロード{summary.Downloads}件）。「起動」で接続できます";
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
@@ -361,7 +361,7 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>simutrans を起動して接続する。配布元から入れた本体は、初回（と中身が変わったとき）に確認する。</summary>
+    /// <summary>simutransを起動して接続する。配布元から入れた本体は、初回（と中身が変わったとき）に確認する。</summary>
     private async void OnLaunch(object? sender, RoutedEventArgs e)
     {
         if (_busy || Selected is not { IsReady: true } row)
@@ -404,8 +404,8 @@ public partial class MainWindow : Window
         _settings.ServerInstall.GetValueOrDefault(FavoriteKeys.ForListed(list, server.Id));
 
     /// <summary>
-    /// アップデートチェック。サーバーリストを取り直し、選んだサーバー（選んでいなければすべて）について、
-    /// 同期で何を落とすことになるかを調べて表示する。ダウンロードや書き換えはしない。
+    ///アップデートチェック。サーバーリストを取り直し、選んだサーバー（選んでいなければすべて）について、
+    ///同期で何を落とすことになるかを調べて表示する。ダウンロードや書き換えはしない。
     /// </summary>
     private async void OnCheck(object? sender, RoutedEventArgs e)
     {
@@ -428,7 +428,7 @@ public partial class MainWindow : Window
             var lines = new List<string>();
             foreach (var row in targets)
             {
-                var progress = new Progress<SyncProgress>(p => StatusText.Text = $"{row.Name}: {p.Item.Label} を確かめています");
+                var progress = new Progress<SyncProgress>(p => StatusText.Text = $"{row.Name}: {p.Item.Label}を確かめています");
                 var results = await _service.Sync.CheckAsync(row.Plan!, progress);
                 row.SetCheckResult(results);
                 lines.Add($"{row.Name}: {row.SyncDetail}");
@@ -474,14 +474,14 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>インストール設定の画面を出して保存する。保存したら true。</summary>
+    /// <summary>インストール設定の画面を出して保存する。保存したらtrue。</summary>
     private async Task<bool> EditInstallOptionsAsync(ServerRow row)
     {
         var server = row.Server!;
         var index = await _service.Sync.LoadEngineIndexAsync(server);
         if (index is null)
         {
-            // zip 方式の本体など、部品を選べないサーバーはダウンロード先だけ選べるようにする
+            // zip方式の本体など、部品を選べないサーバーはダウンロード先だけ選べるようにする
             index = new InfraLauncher.Core.Models.PaksetIndex { SchemaVersion = 1 };
         }
         var pakset = await _service.Sync.LoadPaksetIndexAsync(server);
@@ -491,23 +491,23 @@ public partial class MainWindow : Window
         {
             return false;
         }
-        // ダウンロード先が変わったら、前のフォルダはもう使わない（記録を捨てる）。ランチャーが入れたファイルを消すかは聞く
+        //ダウンロード先が変わったら、前のフォルダはもう使わない（記録を捨てる）。ランチャーが入れたファイルを消すかは聞く
         var previous = _service.Sync.PreviousInstallDir(server, _settings, OptionsFor(row), dialog.Result);
         _settings.ServerInstall[row.FavoriteKey] = dialog.Result;
         _settings.Save(_service.Layout);
         if (previous is not null)
         {
-            // ランチャーが入れたもの以外のファイル（セーブデータなど）があれば、バックアップを取るよう案内する
+            //ランチャーが入れたもの以外のファイル（セーブデータなど）があれば、バックアップを取るよう案内する
             var userFiles = _service.Sync.UserFilesIn(previous);
             var saves = userFiles.Count(f => f.EndsWith(".sve", StringComparison.OrdinalIgnoreCase));
             var backup = userFiles.Count == 0
                 ? "セーブデータ（.sve）を置いていた場合は、消す前に別の場所へコピーしてください。"
-                : $"このフォルダには、ランチャーが入れたもの以外のファイルが {userFiles.Count} 個あります" +
-                  (saves > 0 ? $"（セーブデータ .sve が {saves} 個）" : "") +
+                : $"このフォルダには、ランチャーが入れたもの以外のファイルが{userFiles.Count}個あります" +
+                  (saves > 0 ? $"（セーブデータ.sveが{saves}個）" : "") +
                   "。これらは消しませんが、念のため別の場所へコピーしてバックアップしてください。";
             var delete = Directory.Exists(previous) && await Dialogs.ConfirmAsync(this, "前のダウンロード先",
                 $"ダウンロード先を変えました。前のフォルダはもう使いません。\n{previous}\n\n" +
-                "このフォルダにある、ランチャーが入れたファイル（simutrans 本体と pakset）を消しますか？\n\n" + backup, "消す");
+                "このフォルダにある、ランチャーが入れたファイル（simutrans本体とpakset）を消しますか？\n\n" + backup, "消す");
             if (_service.Sync.ForgetInstall(previous, delete) && delete)
             {
                 StatusText.Text = $"前のフォルダに、ランチャーが入れたもの以外のファイルが残っています。要らなければ消してください: {previous}";

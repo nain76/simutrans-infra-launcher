@@ -3,9 +3,9 @@ using System.Net.Sockets;
 namespace InfraLauncher.Core;
 
 /// <summary>
-/// simutrans サーバーが動いているかを、そのポートにつながるかで確かめる。
-/// サーバーリストの status は管理者が書いた値なので、実際に動いているかはこちらで確かめる。
-/// つないですぐ切るだけで、ゲームのデータは送らない。
+/// simutransサーバーが動いているかを、そのポートにつながるかで確かめる。
+///サーバーリストのstatusは管理者が書いた値なので、実際に動いているかはこちらで確かめる。
+///つないですぐ切るだけで、ゲームのデータは送らない。
 /// </summary>
 public static class ServerProbe
 {

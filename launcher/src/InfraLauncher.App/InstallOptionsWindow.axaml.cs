@@ -54,8 +54,8 @@ public sealed class ComponentChoice(IndexComponent component, long size, Action 
 }
 
 /// <summary>
-/// サーバーごとのインストール設定。ダウンロード先と、本体の部品を「推奨」で落とすか「カスタム」で選ぶかを決める。
-/// pakset はサーバーと同じでないと接続できないので、選択肢は出さずにすべて落とす。
+///サーバーごとのインストール設定。ダウンロード先と、本体の部品を「推奨」で落とすか「カスタム」で選ぶかを決める。
+/// paksetはサーバーと同じでないと接続できないので、選択肢は出さずにすべて落とす。
 /// </summary>
 public partial class InstallOptionsWindow : Window
 {
@@ -67,7 +67,7 @@ public partial class InstallOptionsWindow : Window
 
     public InstallOptionsWindow() => InitializeComponent();
 
-    /// <param name="paksetBytes">pakset 全体のサイズ（ファイル一覧方式のとき。zip 方式なら null）。</param>
+    /// <param name="paksetBytes">pakset全体のサイズ（ファイル一覧方式のとき。zip方式ならnull）。</param>
     public InstallOptionsWindow(string serverName, string defaultRoot, InstallOptions? current, PaksetIndex engineIndex, string paksetName, long? paksetBytes) : this()
     {
         _engineIndex = engineIndex;
@@ -78,7 +78,7 @@ public partial class InstallOptionsWindow : Window
         AdviceText.Text = SyncFolders.Advice;
         RootBox.Text = current?.InstallRoot ?? "";
         _paksetName = paksetName;
-        PaksetNote.Text = "pakset はサーバーと完全に同じでないと接続できないため、すべてダウンロードします。手元にすでにあるファイルは落としません。";
+        PaksetNote.Text = "paksetはサーバーと完全に同じでないと接続できないため、すべてダウンロードします。手元にすでにあるファイルは落としません。";
 
         var sizes = ComponentSelection.SizeByComponent(engineIndex);
         foreach (var c in engineIndex.Components ?? new())
@@ -126,8 +126,8 @@ public partial class InstallOptionsWindow : Window
         }
         var selected = CustomRadio.IsChecked == true ? _choices.Where(c => c.IsChecked).Select(c => c.Component.Id).ToList() : null;
         var total = ComponentSelection.SelectFiles(_engineIndex, selected).Sum(f => f.Size);
-        TotalText.Text = _paksetBytes is { } pakset ? ComponentChoice.Format(total + pakset) : $"{ComponentChoice.Format(total)} ＋ pakset";
-        PaksetSizeText.Text = _paksetBytes is { } p ? $"{ComponentChoice.Format(p)}（{_paksetName}）" : $"サイズ不明（{_paksetName}・zip でまとめて配布）";
+        TotalText.Text = _paksetBytes is { } pakset ? ComponentChoice.Format(total + pakset) : $"{ComponentChoice.Format(total)} ＋pakset";
+        PaksetSizeText.Text = _paksetBytes is { } p ? $"{ComponentChoice.Format(p)}（{_paksetName}）" : $"サイズ不明（{_paksetName}・zipでまとめて配布）";
         EngineSizeText.Text = $"{ComponentChoice.Format(total)}（上で選んだ部品）";
     }
 

@@ -1,34 +1,34 @@
 ﻿<#
 .SYNOPSIS
-    simutrans サーバーの本体（Windows 版）を、部品ごとのファイル一覧つきで公開し、サーバーリストに書く。
+    simutransサーバーの本体（Windows版）を、部品ごとのファイル一覧つきで公開し、サーバーリストに書く。
 
 .DESCRIPTION
     友人のランチャーは、サーバーと同じ本体を自動で入れて起動する（本体が違うとチェックサムがずれることがあるため）。
-    1. -Source（simutrans 本体の exe）があるフォルダから、配るものだけを集める（許可リスト方式）
-       - 推奨設定は engine-files.default.json。engine-files.json があればそちらを使う（カスタム）
-       - 本体の exe は必ず入れる
-       - 絶対に配らないもの（設定でも変わらない）: スクリプトやバッチファイル、本体以外の exe（nettool / makeobj / ほかの版）、
-         セーブデータ（.sve）、settings.xml、ログ、save / screenshot / addons フォルダ、pakset のフォルダ
+    1. -Source（simutrans本体のexe）があるフォルダから、配るものだけを集める（許可リスト方式）
+       - 推奨設定はengine-files.default.json。engine-files.jsonがあればそちらを使う（カスタム）
+       - 本体のexeは必ず入れる
+       - 絶対に配らないもの（設定でも変わらない）: スクリプトやバッチファイル、本体以外のexe（nettool / makeobj /ほかの版）、
+         セーブデータ（.sve）、settings.xml、ログ、save / screenshot / addonsフォルダ、paksetのフォルダ
        部品（音楽、テーマなど）ごとに「必須・推奨・任意」を決め、友人はランチャーで「推奨」か「カスタム」を選べる
     2. 中身から識別名（revision）を決める
-    3. -Destination\<revision>\ にファイルとファイル一覧（index.json）を置き、サーバーリストの該当サーバーの engine を書き換える
+    3. -Destination\<revision>\にファイルとファイル一覧（index.json）を置き、サーバーリストの該当サーバーのengineを書き換える
        （ファイル一覧方式なので、友人は本体を更新したときも変わったファイルだけを落とす）
-    4. どのサーバーも使わなくなった古い版のフォルダ（と以前の zip）を消す
+    4. どのサーバーも使わなくなった古い版のフォルダ（と以前のzip）を消す
 
     ランチャーは、ユーザーが確認コードを登録した鍵で署名されたサーバーリストからしか本体を入れない
     （すり替えられないようにするため）。署名はサーバーリストを書き換えるたびに自動で付ける（Signing.ps1）。
 
-    引数なしの Publish-Pakset.ps1（Publish-Pakset.bat）から自動で呼ばれる。
+    引数なしのPublish-Pakset.ps1（Publish-Pakset.bat）から自動で呼ばれる。
 #>
 [CmdletBinding()]
 param(
-    # simutrans 本体の exe のフルパス（フォルダを渡すと中の exe を探す）
+    # simutrans本体のexeのフルパス（フォルダを渡すと中のexeを探す）
     [Parameter(Mandatory = $true)] [string] $Source,
     # 本体を置くフォルダ（サーバーリストと同じフォルダの下。この中に版ごとのフォルダを作る）
     [Parameter(Mandatory = $true)] [string] $Destination,
     # 書き換えるサーバーリスト（manifest.json）
     [Parameter(Mandatory = $true)] [string] $Manifest,
-    # この本体を使うサーバーの id
+    # この本体を使うサーバーのid
     [Parameter(Mandatory = $true)] [string[]] $ServerId
 )
 
@@ -36,12 +36,12 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Common.ps1')
 
-# 絶対に配らないもの（engine-files.json に書いても変わらない）
+# 絶対に配らないもの（engine-files.jsonに書いても変わらない）
 $NeverFolders = @('save', 'screenshot', 'addons')
 $NeverFiles = @('*.bat', '*.cmd', '*.ps1', '*.psm1', '*.vbs', '*.vbe', '*.js', '*.jse', '*.wsf', '*.hta', '*.lnk', '*.url', '*.reg',
     '*.exe', '*.com', '*.scr', '*.msi', '*.sve', '*.log', 'settings.xml', '*pwdhash*', 'index.json', 'web.config')
 
-# 配るもの（推奨設定。engine-files.json があればそちらを使う）
+# 配るもの（推奨設定。engine-files.jsonがあればそちらを使う）
 $rulesPath = Join-Path $PSScriptRoot 'engine-files.json'
 $rulesName = 'engine-files.json（カスタム）'
 if (-not (Test-Path -LiteralPath $rulesPath)) {
@@ -66,14 +66,14 @@ if ($rules.PSObject.Properties['components']) {
     }
 }
 else {
-    # 以前の形式（folders と files だけ）は、必須の部品1つとして扱う
+    # 以前の形式（foldersとfilesだけ）は、必須の部品1つとして扱う
     $components += [pscustomobject]@{ Id = 'core'; Name = '本体'; Required = $true; Recommended = $false
         Folders = @($rules.folders | ForEach-Object { $_.ToLowerInvariant() }); Files = @($rules.files) }
 }
 $coreComponent = @($components | Where-Object { $_.Required })[0]
 if (-not $coreComponent) { throw "$rulesPath に必須（required）の部品がありません" }
 foreach ($c in $components) {
-    if ($c.Id -notmatch '^[A-Za-z0-9_.+-]+$') { throw "部品の id に使えない文字があります: $($c.Id)" }
+    if ($c.Id -notmatch '^[A-Za-z0-9_.+-]+$') { throw "部品のidに使えない文字があります: $($c.Id)" }
 }
 
 function Test-Like([string] $name, [string[]] $patterns) {
@@ -92,15 +92,15 @@ else {
     $src = $given
     $exe = Find-SimutransExe $src
     if (-not $exe) {
-        throw "simutrans 本体の exe を決められません: $src（exe のフルパスを指定してください）"
+        throw "simutrans本体のexeを決められません: $src（exeのフルパスを指定してください）"
     }
 }
 $manifestDir = Split-Path -Parent $manifestPath
 if (-not $dst.StartsWith($manifestDir + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
-    throw "-Destination はサーバーリストと同じフォルダの下にしてください: $dst"
+    throw "-Destinationはサーバーリストと同じフォルダの下にしてください: $dst"
 }
 
-# --- 1. 配るファイルを部品ごとに集める ---
+# --- 1. 配るファイルを部品ごとに集める---
 $exeName = Split-Path -Leaf $exe
 $files = @([pscustomobject]@{ Rel = $exeName; File = (Get-Item -LiteralPath $exe); Component = $coreComponent.Id })
 $skippedFolders = @()
@@ -112,7 +112,7 @@ foreach ($item in Get-ChildItem -LiteralPath $src -Force) {
         $owner = @($components | Where-Object { $_.Folders -contains $item.Name.ToLowerInvariant() })[0]
         if (-not $owner) { $skippedFolders += $item.Name; continue }
         foreach ($f in Get-ChildItem -LiteralPath $item.FullName -Recurse -File -Force) {
-            # フォルダの中でも、スクリプトや exe などは配らない
+            # フォルダの中でも、スクリプトやexeなどは配らない
             if (Test-Like $f.Name $NeverFiles) { $neverItems += $f.FullName.Substring($src.Length + 1); continue }
             $files += [pscustomobject]@{ Rel = $f.FullName.Substring($src.Length + 1).Replace('\', '/'); File = $f; Component = $owner.Id }
         }
@@ -130,19 +130,19 @@ Write-Host "   配るものの設定: $rulesName"
 foreach ($c in $components) {
     $mine = @($files | Where-Object { $_.Component -eq $c.Id })
     $kind = if ($c.Required) { '必須' } elseif ($c.Recommended) { '推奨' } else { '任意' }
-    # Measure-Object -Property { ... } は Windows PowerShell 5.1 では使えないので、自分で足す
+    # Measure-Object -Property { ... } はWindows PowerShell 5.1では使えないので、自分で足す
     $size = [long]0
     foreach ($f in $mine) { $size += $f.File.Length }
     Write-Host ("   部品「{0}」（{1}）: {2} ファイル、{3:N0} バイト" -f $c.Name, $kind, $mine.Count, [long]$size)
 }
-if ($skippedFolders.Count -gt 0) { Write-Host ("   配らなかったフォルダ: {0}（配るには engine-files.json の部品の folders に足す）" -f ($skippedFolders -join ', ')) }
+if ($skippedFolders.Count -gt 0) { Write-Host ("   配らなかったフォルダ: {0}（配るにはengine-files.jsonの部品のfoldersに足す）" -f ($skippedFolders -join ', ')) }
 if ($neverItems.Count -gt 0) {
     $shown = @($neverItems | Select-Object -First 12)
-    $more = if ($neverItems.Count -gt $shown.Count) { " ほか $($neverItems.Count - $shown.Count) 件" } else { '' }
+    $more = if ($neverItems.Count -gt $shown.Count) { " ほか $($neverItems.Count - $shown.Count)件" } else { '' }
     Write-Host ("   絶対に配らないもの: {0}{1}" -f ($shown -join ', '), $more)
 }
 
-# --- 2. 識別名（中身と部品の分け方が同じなら同じ名前になる） ---
+# --- 2. 識別名（中身と部品の分け方が同じなら同じ名前になる）---
 $hashes = @{}
 $lines = foreach ($f in $files) {
     $h = (Get-FileHash -LiteralPath $f.File.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -152,9 +152,9 @@ $lines = foreach ($f in $files) {
 $lines += @($components | ForEach-Object { "component|{0}|{1}|{2}|{3}" -f $_.Id, $_.Name, $_.Required, $_.Recommended })
 $sha = [System.Security.Cryptography.SHA256]::Create()
 $fingerprint = ([System.BitConverter]::ToString($sha.ComputeHash($Utf8NoBom.GetBytes(($lines -join "`n")))) -replace '-', '').ToLowerInvariant()
-# 版の名前は exe の名前にする（OTRP の sim-WinGDI64-OTRPv62_0_3.exe などは、exe に書かれた版が元の simutrans の版
+# 版の名前はexeの名前にする（OTRPのsim-WinGDI64-OTRPv62_0_3.exeなどは、exeに書かれた版が元のsimutransの版
 # 「122.0.1 Nightly」になっていて、どの本体か分からないため）。
-# 名前が simutrans.exe だけで区別できない場合は、exe に書かれた版を足す
+# 名前がsimutrans.exeだけで区別できない場合は、exeに書かれた版を足す
 $version = [System.IO.Path]::GetFileNameWithoutExtension($exe)
 if ($version -eq 'simutrans') {
     $info = (Get-Item -LiteralPath $exe).VersionInfo
@@ -164,7 +164,7 @@ if ($version -eq 'simutrans') {
 $version = ($version -replace '[^A-Za-z0-9_.-]+', '-').Trim('-', '.')
 $revision = if ($version) { "$version-$($fingerprint.Substring(0, 8))" } else { "r-$($fingerprint.Substring(0, 8))" }
 
-# --- 3. ファイルとファイル一覧を置く ---
+# --- 3. ファイルとファイル一覧を置く---
 $revDir = Join-Path $dst $revision
 $created = -not (Test-Path -LiteralPath (Join-Path $revDir 'index.json'))
 if ($created) {
@@ -184,9 +184,9 @@ if ($created) {
     New-Item -ItemType Directory -Force -Path $dst | Out-Null
     Move-Item -LiteralPath $staging -Destination $revDir
 }
-# IIS で配信できるようにする（前回と同じ版でも、設定を直したときのために毎回書く）
+# IISで配信できるようにする（前回と同じ版でも、設定を直したときのために毎回書く）
 Write-DistWebConfig (Join-Path $revDir 'web.config') @($files | ForEach-Object { $_.File.Extension.ToLowerInvariant() }) `
-    'Generated by Publish-Engine.ps1. simutrans 本体のファイルを IIS から配信できるようにする。'
+    'Generated by Publish-Engine.ps1. simutrans本体のファイルをIISから配信できるようにする。'
 $indexPath = Join-Path $revDir 'index.json'
 $indexSha = (Get-FileHash -LiteralPath $indexPath -Algorithm SHA256).Hash.ToLowerInvariant()
 $indexUrl = $indexPath.Substring($manifestDir.Length + 1).Replace('\', '/')
@@ -194,7 +194,7 @@ $indexUrl = $indexPath.Substring($manifestDir.Length + 1).Replace('\', '/')
 $data = Read-JsonFile $manifestPath
 foreach ($id in $ServerId) {
     $server = @($data.servers | Where-Object { $_.id -eq $id })
-    if ($server.Count -ne 1) { throw "サーバーリストに id が '$id' のサーバーが見つかりません" }
+    if ($server.Count -ne 1) { throw "サーバーリストにidが '$id' のサーバーが見つかりません" }
     $engine = [ordered]@{
         revision = $revision
         builds   = [ordered]@{ 'windows-x64' = [ordered]@{ index_url = $indexUrl; index_sha256 = $indexSha; exe = $exeName } }
@@ -204,7 +204,7 @@ foreach ($id in $ServerId) {
 $data | Add-Member -NotePropertyName updated_at -NotePropertyValue (Get-Date -Format 'yyyy-MM-ddTHH:mm:sszzz') -Force
 Write-ManifestFile $manifestPath $data
 
-# --- 4. どのサーバーも使わなくなった古い版を消す ---
+# --- 4. どのサーバーも使わなくなった古い版を消す---
 $data = Read-JsonFile $manifestPath
 $inUse = @($data.servers | Where-Object { $_.PSObject.Properties['engine'] -and $_.engine } | ForEach-Object {
     $b = $_.engine.builds.PSObject.Properties['windows-x64']
@@ -223,4 +223,4 @@ $total = [long]0
 foreach ($f in $files) { $total += $f.File.Length }
 $state = if ($created) { '公開しました' } else { '前回と同じなので置き直していません' }
 Write-Host ("本体を公開しました: {0}（{1} ファイル、{2:N0} バイト、{3}）" -f $revision, $files.Count, [long]$total, $state)
-Write-Host "サーバーリストの engine を更新しました（$($ServerId -join ', ')、revision $revision）"
+Write-Host "サーバーリストのengineを更新しました（$($ServerId -join ', ')、revision $revision）"

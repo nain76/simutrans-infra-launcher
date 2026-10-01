@@ -1,15 +1,15 @@
 namespace InfraLauncher.Core;
 
 /// <summary>
-/// 同期の記録（&lt;データフォルダ&gt;/logs/sync.log）。止まったり失敗したりしたときに、どこで何が起きたかを調べるために残す。
-/// 2 MB を超えたら sync.old.log に移して書き直す。記録に失敗しても同期は続ける。
+///同期の記録（&lt;データフォルダ&gt;/logs/sync.log）。止まったり失敗したりしたときに、どこで何が起きたかを調べるために残す。
+/// 2 MBを超えたらsync.old.logに移して書き直す。記録に失敗しても同期は続ける。
 /// </summary>
 public static class SyncLog
 {
     private static readonly object Gate = new();
     private const long MaxBytes = 2 * 1024 * 1024;
 
-    /// <summary>記録するファイル。null なら記録しない。</summary>
+    /// <summary>記録するファイル。nullなら記録しない。</summary>
     public static string? FilePath { get; set; }
 
     public static void Write(string message)

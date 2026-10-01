@@ -2,10 +2,10 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:local="using:InfraLauncher.App"
         x:Class="InfraLauncher.App.MainWindow"
-        Title="Simutrans ランチャー"
+        Title="Simutransランチャー"
         Width="900" Height="580" MinWidth="620" MinHeight="380">
   <DockPanel Margin="16">
-    <!-- 上: タイトルと操作 -->
+    <!--上: タイトルと操作-->
     <Grid DockPanel.Dock="Top" ColumnDefinitions="Auto,*,Auto" Margin="0,0,0,12">
       <StackPanel Orientation="Horizontal" Spacing="8">
         <TextBlock Text="サーバー一覧" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" Margin="0,0,12,0" />
@@ -20,7 +20,7 @@
       </StackPanel>
     </Grid>
 
-    <!-- 下: 接続ボタンと進み具合 -->
+    <!--下: 接続ボタンと進み具合-->
     <StackPanel DockPanel.Dock="Bottom" Spacing="8" Margin="0,12,0,0">
       <ProgressBar x:Name="Progress" IsVisible="False" Minimum="0" Maximum="100" Height="6" />
       <Grid ColumnDefinitions="*,Auto">
@@ -31,9 +31,9 @@
           <Button x:Name="InstallOptionsButton" Content="インストール設定…" IsEnabled="False" Padding="12,8" Click="OnInstallOptions"
                   ToolTip.Tip="ダウンロード先と、本体のファイル構成（推奨／カスタム）を決める" />
           <Button x:Name="SyncButton" Content="同期" IsEnabled="False" Padding="20,8" Click="OnSync"
-                  ToolTip.Tip="本体と pakset をサーバーと同じ状態にする（起動はしない）" />
+                  ToolTip.Tip="本体とpaksetをサーバーと同じ状態にする（起動はしない）" />
           <Button x:Name="LaunchButton" Content="起動" IsEnabled="False" Classes="accent" Padding="24,8" Click="OnLaunch"
-                  ToolTip.Tip="simutrans を起動してサーバーに接続する" />
+                  ToolTip.Tip="simutransを起動してサーバーに接続する" />
         </StackPanel>
       </Grid>
     </StackPanel>
@@ -41,7 +41,7 @@
     <Grid>
       <ListBox x:Name="ServerList" SelectionChanged="OnSelectionChanged" DoubleTapped="OnDoubleTapped">
         <ListBox.Styles>
-          <!-- 選んだ行は、Windows のアクセントカラー（緑など）で塗りつぶさず、薄い背景と左の線で示す。札の色が読めるように -->
+          <!--選んだ行は、Windowsのアクセントカラー（緑など）で塗りつぶさず、薄い背景と左の線で示す。札の色が読めるように-->
           <Style Selector="ListBoxItem">
             <Setter Property="Margin" Value="0,0,0,6" />
             <Setter Property="Padding" Value="10,8" />
@@ -80,7 +80,7 @@
                       Margin="0,0,8,0" VerticalAlignment="Top"
                       ToolTip.Tip="お気に入りの印を付ける／外す" Click="OnToggleFavorite" />
 
-              <!-- 1行目: 名前・稼働状況・人数 -->
+              <!-- 1行目: 名前・稼働状況・人数-->
               <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
                 <TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
                 <Border Classes="badge" Background="{Binding StatusBrush}" IsVisible="{Binding HasStatus}">
@@ -90,13 +90,13 @@
               </StackPanel>
               <TextBlock Grid.Column="2" Text="{Binding AddressText}" Opacity="0.7" VerticalAlignment="Center" />
 
-              <!-- 2行目: お知らせ -->
+              <!-- 2行目: お知らせ-->
               <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" IsVisible="{Binding HasMessage}"
                          TextWrapping="Wrap" Margin="0,6,0,0">
                 <Run Text="お知らせ: " FontWeight="SemiBold" /><Run Text="{Binding Message}" />
               </TextBlock>
 
-              <!-- 3行目: 同期の状態 -->
+              <!-- 3行目: 同期の状態-->
               <Grid Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" Margin="0,8,0,0"
                     IsVisible="{Binding HasSyncLabel}">
                 <Border Classes="badge" Background="{Binding SyncBrush}">
@@ -105,7 +105,7 @@
                 <TextBlock Grid.Column="1" Text="{Binding SyncDetail}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="10,0,0,0" />
               </Grid>
 
-              <!-- 4行目: 細かい情報 -->
+              <!-- 4行目: 細かい情報-->
               <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding DetailText}" FontSize="12"
                          Opacity="0.65" TextWrapping="Wrap" Margin="0,6,0,0" />
             </Grid>

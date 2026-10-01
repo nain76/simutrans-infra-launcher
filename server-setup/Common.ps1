@@ -1,5 +1,5 @@
-﻿# server-setup のスクリプトで共通に使う関数。各スクリプトから . "$PSScriptRoot\Common.ps1" で読み込む。
-# Windows PowerShell 5.1 は BOM がないと日本語を正しく読めないので、BOM 付き UTF-8 で保存すること。
+﻿# server-setupのスクリプトで共通に使う関数。各スクリプトから. "$PSScriptRoot\Common.ps1" で読み込む。
+# Windows PowerShell 5.1はBOMがないと日本語を正しく読めないので、BOM付きUTF-8で保存すること。
 
 $Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
 $PublishSettingsPath = Join-Path $PSScriptRoot 'publish-settings.json'
@@ -36,14 +36,14 @@ function Get-FullPath([string] $path) {
 }
 
 <#
-  Publish-Pakset.bat が使う設定（publish-settings.json）。
+  Publish-Pakset.batが使う設定（publish-settings.json）。
   {
     "manifest": "C:\\simutrans-dist\\manifest.json",
     "paksets": [ { "pakset_source": "...", "destination": "...", "server_ids": ["friends-a"], "engine_source": "..." } ]
   }
-  同じ pakset フォルダを使うサーバーは、1つの項目の server_ids にまとめる。
-  engine_source は simutrans 本体の exe のフルパス（ふつうは pakset フォルダの1つ上にある）。なければ本体は公開しない。
-  以前の版ではフォルダを入れていたので、フォルダが入っていたら中の exe を探す。
+  同じpaksetフォルダを使うサーバーは、1つの項目のserver_idsにまとめる。
+  engine_sourceはsimutrans本体のexeのフルパス（ふつうはpaksetフォルダの1つ上にある）。なければ本体は公開しない。
+  以前の版ではフォルダを入れていたので、フォルダが入っていたら中のexeを探す。
 #>
 function Get-PublishSettings {
     $result = [ordered]@{ manifest = $null; paksets = @() }
@@ -69,8 +69,8 @@ function Save-PublishSettings($settings) {
     Write-JsonFile $PublishSettingsPath ([ordered]@{ manifest = $settings.manifest; paksets = @($settings.paksets) })
 }
 
-# pakset を登録する。同じ pakset フォルダが登録済みなら、そこにサーバーの id を足す。
-# 本体のフォルダ（pakset フォルダの1つ上）に simutrans.exe があれば、本体も公開の対象にする
+# paksetを登録する。同じpaksetフォルダが登録済みなら、そこにサーバーのidを足す。
+# 本体のフォルダ（paksetフォルダの1つ上）にsimutrans.exeがあれば、本体も公開の対象にする
 function Add-PublishEntry($settings, [string] $source, [string] $destination, [string] $serverId) {
     foreach ($p in $settings.paksets) {
         if ($p.pakset_source -eq $source -and $p.destination -eq $destination) {
@@ -84,17 +84,17 @@ function Add-PublishEntry($settings, [string] $source, [string] $destination, [s
     }
 }
 
-# simutrans と一緒に置かれることが多い、本体ではない exe
+# simutransと一緒に置かれることが多い、本体ではないexe
 $NotEngineExe = '^(makeobj|nettool|unins|uninstall|setup|update|vc_?redist)'
 
-# フォルダ直下の exe のうち、本体の候補（makeobj などを除く）。新しい順
+# フォルダ直下のexeのうち、本体の候補（makeobjなどを除く）。新しい順
 function Get-ExeCandidates([string] $dir) {
     if (-not $dir -or -not (Test-Path -LiteralPath $dir -PathType Container)) { return @() }
     return @(Get-ChildItem -LiteralPath $dir -Filter '*.exe' -File | Where-Object { $_.Name -notmatch $NotEngineExe } |
         Sort-Object LastWriteTime -Descending)
 }
 
-# 指定したポートで simutrans サーバー（-server <port>）として動いているプロセスの exe を探す
+# 指定したポートでsimutransサーバー（-server <port>）として動いているプロセスのexeを探す
 function Find-RunningServerExe([string] $dir, [int[]] $ports) {
     if (-not $dir -or -not $ports -or -not (Get-Command Get-CimInstance -ErrorAction SilentlyContinue)) { return $null }
     try {
@@ -109,8 +109,8 @@ function Find-RunningServerExe([string] $dir, [int[]] $ports) {
     return $null
 }
 
-# simutrans 本体の実行ファイルを名前から探す。
-# simutrans.exe → simutrans*.exe / sim-*.exe（OTRP の sim-WinGDI64-OTRPv57.exe など）が1つだけ → 候補が1つだけ。決められなければ $null
+# simutrans本体の実行ファイルを名前から探す。
+# simutrans.exe→simutrans*.exe / sim-*.exe（OTRPのsim-WinGDI64-OTRPv57.exeなど）が1つだけ → 候補が1つだけ。決められなければ $null
 function Find-SimutransExe([string] $dir) {
     $exes = @(Get-ExeCandidates $dir)
     $main = @($exes | Where-Object { $_.Name -ieq 'simutrans.exe' })
@@ -121,22 +121,22 @@ function Find-SimutransExe([string] $dir) {
     return $null
 }
 
-# 本体の exe を決める。動いているサーバーの exe → 名前 → 番号で選んでもらう（空欄なら本体は配らない）
+# 本体のexeを決める。動いているサーバーのexe→ 名前 → 番号で選んでもらう（空欄なら本体は配らない）
 function Resolve-EngineExe([string] $paksetSource, [int[]] $ports) {
     $dir = Split-Path -Parent $paksetSource
     $running = Find-RunningServerExe $dir $ports
     if ($running) {
-        Write-Ok "動いている simutrans サーバーの本体を使います: $(Split-Path -Leaf $running)"
+        Write-Ok "動いているsimutransサーバーの本体を使います: $(Split-Path -Leaf $running)"
         return $running
     }
     $exe = Find-SimutransExe $dir
     if ($exe) { return $exe }
     $candidates = @(Get-ExeCandidates $dir)
     if ($candidates.Count -eq 0) {
-        Write-Warning "$dir に simutrans 本体の exe が見つかりません。本体は配りません"
+        Write-Warning "$dir にsimutrans本体のexeが見つかりません。本体は配りません"
         return $null
     }
-    Write-Host "   $dir に exe が複数あります。simutrans サーバーの起動に使っている本体を選んでください（新しい順）"
+    Write-Host "   $dir にexeが複数あります。simutransサーバーの起動に使っている本体を選んでください（新しい順）"
     for ($i = 0; $i -lt $candidates.Count; $i++) {
         Write-Host ("     {0}. {1}（{2:yyyy/MM/dd}）" -f ($i + 1), $candidates[$i].Name, $candidates[$i].LastWriteTime)
     }
@@ -145,11 +145,11 @@ function Resolve-EngineExe([string] $paksetSource, [int[]] $ports) {
         if (-not $answer) { return $null }
         $n = 0
         if ([int]::TryParse($answer, [ref]$n) -and $n -ge 1 -and $n -le $candidates.Count) { return $candidates[$n - 1].FullName }
-        Write-Warning "1〜$($candidates.Count) の番号で答えてください"
+        Write-Warning "1〜$($candidates.Count)の番号で答えてください"
     }
 }
 
-# pakset フォルダの1つ上に simutrans 本体が見つかれば、その exe のフルパスを返す（質問はしない）
+# paksetフォルダの1つ上にsimutrans本体が見つかれば、そのexeのフルパスを返す（質問はしない）
 function Get-EngineSource([string] $paksetSource) {
     return Find-SimutransExe (Split-Path -Parent $paksetSource)
 }
@@ -157,9 +157,9 @@ function Get-EngineSource([string] $paksetSource) {
 # サーバーリストへの署名
 . (Join-Path $PSScriptRoot 'Signing.ps1')
 
-# IIS で配信するフォルダの web.config を書く。
-# - 使っている拡張子を登録する（IIS は知らない拡張子のファイルを配らないため。.pak・.tab・.bdf など）
-# - ファイル名の「+」を通す（m+10r.bdf など。IIS は標準では「+」を含むアドレスを断る）。
+# IISで配信するフォルダのweb.configを書く。
+# -使っている拡張子を登録する（IISは知らない拡張子のファイルを配らないため。.pak・.tab・.bdfなど）
+# -ファイル名の「+」を通す（m+10r.bdfなど。IISは標準では「+」を含むアドレスを断る）。
 #   ファイルをそのまま配るだけのサイトなので、通しても危険はない
 function Write-DistWebConfig([string] $path, [string[]] $extensions, [string] $comment) {
     $maps = (@($extensions | Where-Object { $_ -and $_ -ne '.json' } | Sort-Object -Unique) | ForEach-Object {

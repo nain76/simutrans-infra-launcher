@@ -10,7 +10,7 @@
     <TextBox x:Name="NameBox" Watermark="例: 友達グループのサーバー" />
 
     <TextBlock Text="配信アドレス" FontWeight="SemiBold" Margin="0,10,0,0" />
-    <TextBlock Text="サーバー管理者から教えてもらったアドレス（https:// で始まるもの）を貼り付けてください。"
+    <TextBlock Text="サーバー管理者から教えてもらったアドレス（https://で始まるもの）を貼り付けてください。"
                TextWrapping="Wrap" Opacity="0.75" />
     <Grid ColumnDefinitions="*,Auto">
       <TextBox x:Name="UrlBox" Watermark="https://example.ddns.net:8443/manifest.json" />
@@ -19,7 +19,7 @@
 
     <TextBlock x:Name="ResultText" TextWrapping="Wrap" IsVisible="False" Margin="0,6,0,0" />
 
-    <!-- 確認コードの入力。画面にはコードを出さず、管理者から聞いたコードを自分で入れてもらう（見ずに「同じ」を押してしまわないように） -->
+    <!--確認コードの入力。画面にはコードを出さず、管理者から聞いたコードを自分で入れてもらう（見ずに「同じ」を押してしまわないように）-->
     <Border x:Name="CodePanel" IsVisible="False" Margin="0,10,0,0" Padding="12" CornerRadius="6"
             BorderThickness="1" BorderBrush="#808080">
       <StackPanel Spacing="8">

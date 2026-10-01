@@ -4,7 +4,7 @@ namespace InfraLauncher.Core;
 
 public static class PlatformInfo
 {
-    /// <summary>マニフェストの engine.builds のキー（windows-x64 など）。</summary>
+    /// <summary>マニフェストのengine.buildsのキー（windows-x64など）。</summary>
     public static string CurrentKey => $"{Os}-{Arch}";
 
     private static string Os =>

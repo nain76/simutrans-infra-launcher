@@ -8,15 +8,15 @@ public class SyncException(string message, Exception? inner = null) : Exception(
 
 public enum SyncItemKind { Engine, Pakset }
 
-/// <summary>zip を丸ごと入れ替えるか、ファイル一覧で差分だけを落とすか。</summary>
+/// <summary>zipを丸ごと入れ替えるか、ファイル一覧で差分だけを落とすか。</summary>
 public enum SyncMethod { Zip, FileIndex }
 
 /// <summary>
-/// 1つのダウンロード対象（本体または pakset）と、その展開先。
-/// ファイル一覧方式では Url と Sha256 は一覧ファイル（index.json）のもの。
+/// 1つのダウンロード対象（本体またはpakset）と、その展開先。
+///ファイル一覧方式ではUrlとSha256は一覧ファイル（index.json）のもの。
 /// </summary>
-/// Components は本体の部品の選び方（null なら推奨）。Selection はそれを文字列にしたもの（記録と比べる）。
-/// DeleteUnknown は一覧にないファイルを片付けるか（pakset は片付ける。本体はランチャーが入れたものだけ片付ける）。
+/// Componentsは本体の部品の選び方（nullなら推奨）。Selectionはそれを文字列にしたもの（記録と比べる）。
+/// DeleteUnknownは一覧にないファイルを片付けるか（paksetは片付ける。本体はランチャーが入れたものだけ片付ける）。
 public sealed record SyncItem(SyncItemKind Kind, string Label, string Url, string Sha256, string TargetDir, bool Needed,
     SyncMethod Method = SyncMethod.Zip, string? ExePath = null,
     IReadOnlyCollection<string>? Components = null, string? Selection = null, bool DeleteUnknown = true);
@@ -29,8 +29,8 @@ public sealed record SyncPlan(ServerEntry Server, string ExePath, string PaksetF
 
 public sealed record SyncProgress(SyncItem Item, string Stage, long BytesDone, long? BytesTotal);
 
-/// <summary>同期の結果。Downloads はダウンロードしたファイル（zip）の数、Removed は片付けたファイルの数。</summary>
-/// <summary>アップデートチェックの結果。UpToDate でなければ、落とすファイルの数と大きさ（zip 方式なら大きさは 0）と片付けるファイルの数。</summary>
+/// <summary>同期の結果。Downloadsはダウンロードしたファイル（zip）の数、Removedは片付けたファイルの数。</summary>
+/// <summary>アップデートチェックの結果。UpToDateでなければ、落とすファイルの数と大きさ（zip方式なら大きさは0）と片付けるファイルの数。</summary>
 public sealed record CheckResult(SyncItem Item, bool UpToDate, int Files, long Bytes, int Removals);
 
 public sealed record SyncSummary(int Downloads, long Bytes, int Removed)
@@ -39,9 +39,9 @@ public sealed record SyncSummary(int Downloads, long Bytes, int Removed)
 }
 
 /// <summary>
-/// サーバーリストと installed.json を比べ、必要なものだけをダウンロード・展開する。
-/// zip 方式: ダウンロード → sha256 確認 → 展開先の横の一時フォルダに展開 → 置き換え。
-/// ファイル一覧方式: <see cref="FileIndexSync"/> を参照。
+///サーバーリストとinstalled.jsonを比べ、必要なものだけをダウンロード・展開する。
+/// zip方式: ダウンロード →sha256確認 → 展開先の横の一時フォルダに展開 → 置き換え。
+///ファイル一覧方式: <see cref="FileIndexSync"/>を参照。
 /// </summary>
 public sealed class SyncService(InstallLayout layout, HttpClient http)
 {
@@ -53,7 +53,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
             : settings.InstallRoot is { Length: > 0 } g ? g
             : layout.DefaultInstallRoot);
 
-    /// <summary>本体のファイル一覧（部品の一覧とサイズを画面に出すため）。本体を落とせないサーバーなら null。</summary>
+    /// <summary>本体のファイル一覧（部品の一覧とサイズを画面に出すため）。本体を落とせないサーバーならnull。</summary>
     public async Task<PaksetIndex?> LoadEngineIndexAsync(ServerEntry server, CancellationToken ct = default)
     {
         var build = server.Engine?.Builds?.GetValueOrDefault(PlatformInfo.CurrentKey);
@@ -64,7 +64,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         return await _fileIndex.LoadIndexAsync(build.IndexUrl!, build.IndexSha256!, $"simutrans {server.Engine!.Revision}", build.Exe, ct);
     }
 
-    /// <summary>ダウンロード先を変えたとき、前のダウンロード先にあるこのサーバーの本体のフォルダ（変わっていなければ null）。</summary>
+    /// <summary>ダウンロード先を変えたとき、前のダウンロード先にあるこのサーバーの本体のフォルダ（変わっていなければnull）。</summary>
     public string? PreviousInstallDir(ServerEntry server, LauncherSettings settings, InstallOptions? before, InstallOptions? after)
     {
         var oldRoot = InstallRoot(settings, before);
@@ -74,8 +74,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    /// フォルダの中にある、ランチャーが入れたもの以外のファイル（セーブデータやスクリーンショット、書き換えた設定ファイルなど）。
-    /// 片付ける前に、バックアップを取るよう案内するために使う。
+    ///フォルダの中にある、ランチャーが入れたもの以外のファイル（セーブデータやスクリーンショット、書き換えた設定ファイルなど）。
+    ///片付ける前に、バックアップを取るよう案内するために使う。
     /// </summary>
     public IReadOnlyList<string> UserFilesIn(string dir)
     {
@@ -88,7 +88,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         foreach (var (key, record) in InstalledState.Load(layout).Items.Where(kv => kv.Key.Equals(full, StringComparison.OrdinalIgnoreCase)
                      || kv.Key.StartsWith(full + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
         {
-            // config/simuconf.tab は照合の記録に入れていないが、ランチャーが入れたものとして扱う
+            // config/simuconf.tabは照合の記録に入れていないが、ランチャーが入れたものとして扱う
             foreach (var rel in (record.Files?.Keys ?? Enumerable.Empty<string>()).Concat(FileIndexSync.PreservedFiles))
             {
                 installed.Add(Path.GetFullPath(Path.Combine(key, rel.Replace('/', Path.DirectorySeparatorChar))));
@@ -105,9 +105,9 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    /// 使わなくなったフォルダ（前のダウンロード先）の記録と、ダウンロード途中の一時ファイルを捨てる。以後は使い回しにも使わない。
-    /// <paramref name="deleteFiles"/> なら、ランチャーが入れたファイル（記録にあるもの）も消し、空になったフォルダを消す。
-    /// 自分で置いたファイル（セーブデータなど）は記録にないので消さない。フォルダが残ったら true。
+    ///使わなくなったフォルダ（前のダウンロード先）の記録と、ダウンロード途中の一時ファイルを捨てる。以後は使い回しにも使わない。
+    /// <paramref name="deleteFiles"/>なら、ランチャーが入れたファイル（記録にあるもの）も消し、空になったフォルダを消す。
+    ///自分で置いたファイル（セーブデータなど）は記録にないので消さない。フォルダが残ったらtrue。
     /// </summary>
     public bool ForgetInstall(string dir, bool deleteFiles)
     {
@@ -144,7 +144,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    /// 残骸を片付ける。消されたフォルダの記録と、長いあいだ使われていない一時ファイル（ダウンロード途中のもの、取得済みのファイル一覧）を捨てる。
+    ///残骸を片付ける。消されたフォルダの記録と、長いあいだ使われていない一時ファイル（ダウンロード途中のもの、取得済みのファイル一覧）を捨てる。
     /// </summary>
     private void CleanUp()
     {
@@ -177,7 +177,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         catch (UnauthorizedAccessException) { }
     }
 
-    /// <summary>pakset のファイル一覧（全体のサイズを画面に出すため）。zip 方式の pakset なら null。</summary>
+    /// <summary>paksetのファイル一覧（全体のサイズを画面に出すため）。zip方式のpaksetならnull。</summary>
     public async Task<PaksetIndex?> LoadPaksetIndexAsync(ServerEntry server, CancellationToken ct = default)
     {
         var p = server.Pakset;
@@ -200,13 +200,13 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         {
             var engineDir = Path.Combine(InstallRoot(settings, options), server.Engine!.Revision);
             exe = Path.GetFullPath(Path.Combine(engineDir, build.Exe));
-            EnsureInside(engineDir, exe, "engine の exe");
+            EnsureInside(engineDir, exe, "engineのexe");
             var record = state.Get(engineDir);
-            // インストール後に実行ファイルが書き換えられていたら、入れ直す
+            //インストール後に実行ファイルが書き換えられていたら、入れ直す
             var exeRel = Path.GetRelativePath(engineDir, exe).Replace('\\', '/');
             var exeChanged = record?.Files?.FirstOrDefault(kv => string.Equals(kv.Key, exeRel, StringComparison.OrdinalIgnoreCase)).Value is { } stamp
                 && !stamp.Matches(new FileInfo(exe));
-            var engineLabel = $"simutrans 本体 {Path.GetFileName(build.Exe)}";
+            var engineLabel = $"simutrans本体{Path.GetFileName(build.Exe)}";
             if (build.UsesFileIndex)
             {
                 var selection = options?.Components is { } c ? "custom:" + string.Join(',', c.Order(StringComparer.Ordinal)) : "recommended";
@@ -227,14 +227,14 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         else if (blockedEngine)
         {
             throw new SyncException(
-                $"サーバー '{server.Name}' のサーバーリストの確認コードをまだ登録していないため、安全のため simutrans 本体は自動で入れません。" +
-                "「編集」でサーバー管理者から聞いた確認コードを入力するか、「設定」で手元の simutrans 本体を指定してください");
+                $"サーバー '{server.Name}' のサーバーリストの確認コードをまだ登録していないため、安全のためsimutrans本体は自動で入れません。" +
+                "「編集」でサーバー管理者から聞いた確認コードを入力するか、「設定」で手元のsimutrans本体を指定してください");
         }
         else
         {
             throw new SyncException(
-                $"サーバー '{server.Name}' のサーバーリストには、この PC（{PlatformInfo.CurrentKey}）用の simutrans 本体が含まれていません。" +
-                "「設定」で手元の simutrans 本体を指定してください");
+                $"サーバー '{server.Name}' のサーバーリストには、このPC（{PlatformInfo.CurrentKey}）用のsimutrans本体が含まれていません。" +
+                "「設定」で手元のsimutrans本体を指定してください");
         }
 
         var p = server.Pakset;
@@ -250,8 +250,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    /// アップデートチェック。サーバーと同じにするのに何を落とす必要があるかを確かめるだけで、何も書き換えない。
-    /// ファイル一覧方式なら手元のファイルを1つずつ照合する（記録と違うファイルはハッシュを計算し直す）。
+    ///アップデートチェック。サーバーと同じにするのに何を落とす必要があるかを確かめるだけで、何も書き換えない。
+    ///ファイル一覧方式なら手元のファイルを1つずつ照合する（記録と違うファイルはハッシュを計算し直す）。
     /// </summary>
     public async Task<IReadOnlyList<CheckResult>> CheckAsync(SyncPlan plan, IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
     {
@@ -274,14 +274,14 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     public async Task<SyncSummary> SyncAsync(SyncPlan plan, IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
     {
         var summary = new SyncSummary(0, 0, 0);
-        // 消されたフォルダ（以前のダウンロード先など）の記録や、古い一時ファイルを片付ける
+        //消されたフォルダ（以前のダウンロード先など）の記録や、古い一時ファイルを片付ける
         CleanUp();
-        // 本体を先に入れる。本体を入れ直すと中の pakset も消えるので、そのあと pakset を判定し直す
+        //本体を先に入れる。本体を入れ直すと中のpaksetも消えるので、そのあとpaksetを判定し直す
         foreach (var item in plan.Items.OrderBy(i => i.Kind))
         {
             if (item.Method == SyncMethod.FileIndex)
             {
-                // 照合は軽いので毎回行い、手元で消えたり書き換わったりしたファイルも直す
+                //照合は軽いので毎回行い、手元で消えたり書き換わったりしたファイルも直す
                 summary = summary.Add(await _fileIndex.SyncAsync(item, progress, ct));
                 continue;
             }
@@ -335,7 +335,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         var target = Path.GetFullPath(item.TargetDir);
         var parent = Path.GetDirectoryName(target)!;
         Directory.CreateDirectory(parent);
-        // 別ドライブへの移動にならないよう、一時フォルダは展開先の横に作る
+        //別ドライブへの移動にならないよう、一時フォルダは展開先の横に作る
         var staging = Path.Combine(parent, $".{Path.GetFileName(target)}.partial");
         TryDeleteDir(staging);
         Directory.CreateDirectory(staging);
@@ -346,8 +346,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
                 foreach (var entry in zip.Entries)
                 {
                     var dest = Path.GetFullPath(Path.Combine(staging, entry.FullName));
-                    // zip slip 対策: 一時フォルダの外に書き出すエントリは拒否する
-                    EnsureInside(staging, dest, $"{item.Label} の zip のエントリ '{entry.FullName}'");
+                    // zip slip対策: 一時フォルダの外に書き出すエントリは拒否する
+                    EnsureInside(staging, dest, $"{item.Label}のzipのエントリ '{entry.FullName}'");
                     if (entry.FullName.EndsWith('/') || entry.FullName.EndsWith('\\'))
                     {
                         Directory.CreateDirectory(dest);
@@ -368,7 +368,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
             var record = new InstalledRecord { Sha256 = item.Sha256.ToLowerInvariant(), Url = item.Url, InstalledAt = DateTimeOffset.Now };
             if (item.ExePath is not null && File.Exists(item.ExePath))
             {
-                // 実行ファイルのサイズと更新日時を覚えておき、あとで書き換えられていないか確かめる
+                //実行ファイルのサイズと更新日時を覚えておき、あとで書き換えられていないか確かめる
                 var info = new FileInfo(item.ExePath);
                 record.Files = new() { [Path.GetRelativePath(target, item.ExePath).Replace('\\', '/')] = FileStamp.From(info, "") };
             }
@@ -382,8 +382,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    /// 展開先を置き換える。ランチャーが入れたフォルダなら消し、そうでないもの（ユーザーが自分で入れた pakset など）は
-    /// 名前を変えて残しておく。
+    ///展開先を置き換える。ランチャーが入れたフォルダなら消し、そうでないもの（ユーザーが自分で入れたpaksetなど）は
+    ///名前を変えて残しておく。
     /// </summary>
     private static void ReplaceDirectory(string target, string content, InstalledState state)
     {
@@ -403,7 +403,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         Directory.Move(content, target);
     }
 
-    /// <summary>zip の最上位がフォルダ1つだけなら、そのフォルダを返す（公式配布の zip は pak128.japan/ などで包まれているため）。</summary>
+    /// <summary>zipの最上位がフォルダ1つだけなら、そのフォルダを返す（公式配布のzipはpak128.japan/などで包まれているため）。</summary>
     private static string? SingleTopLevelDir(string dir)
     {
         var entries = Directory.GetFileSystemEntries(dir);
@@ -416,7 +416,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         {
             return;
         }
-        // zip によっては実行権限が残らないので、本体フォルダ直下の拡張子なしファイルなどに付けておく
+        // zipによっては実行権限が残らないので、本体フォルダ直下の拡張子なしファイルなどに付けておく
         foreach (var f in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
         {
             var name = Path.GetFileName(f);
@@ -436,7 +436,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(path));
         if (full != r && !full.StartsWith(r + Path.DirectorySeparatorChar, StringComparison.Ordinal))
         {
-            throw new SyncException($"{what} が展開先の外を指しています");
+            throw new SyncException($"{what}が展開先の外を指しています");
         }
     }
 

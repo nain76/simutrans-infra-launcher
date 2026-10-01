@@ -6,7 +6,7 @@ namespace InfraLauncher.Core;
 
 public class ManifestException(string message, Exception? inner = null) : Exception(message, inner);
 
-/// <summary>マニフェスト（サーバーリスト）を取得して検証する。http(s):// と file:// に対応。</summary>
+/// <summary>マニフェスト（サーバーリスト）を取得して検証する。http(s)://とfile://に対応。</summary>
 public sealed partial class ManifestClient(HttpClient http)
 {
     public const int SupportedSchemaVersion = 1;
@@ -15,10 +15,10 @@ public sealed partial class ManifestClient(HttpClient http)
     internal static TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(2);
 
     /// <summary>
-    /// サーバーリストと、隣にある署名（manifest.sig.json）を取得して検証する。
+    ///サーバーリストと、隣にある署名（manifest.sig.json）を取得して検証する。
     /// <paramref name="pinnedKey"/>（ユーザーが確認コードを登録した鍵）を渡すと、その鍵の正しい署名がなければ例外にする。
-    /// 渡さなければ署名は任意（あれば中身と合うかだけ確かめ、確認コードを <see cref="Manifest.Signature"/> に入れる）。
-    /// 本体の自動インストールは、登録した鍵で確かめられたリストだけに許す。
+    ///渡さなければ署名は任意（あれば中身と合うかだけ確かめ、確認コードを<see cref="Manifest.Signature"/>に入れる）。
+    ///本体の自動インストールは、登録した鍵で確かめられたリストだけに許す。
     /// </summary>
     public async Task<Manifest> LoadAsync(Uri uri, string? pinnedKey = null, CancellationToken ct = default)
     {
@@ -30,7 +30,7 @@ public sealed partial class ManifestClient(HttpClient http)
         }
         catch (ManifestSignatureException e) when (e.Problem == SignatureProblem.Invalid && !uri.IsFile)
         {
-            // 管理者がちょうど公開し直している最中だと、新しいリストと古い署名を取ってしまうことがある。少し待って1回だけ取り直す
+            //管理者がちょうど公開し直している最中だと、新しいリストと古い署名を取ってしまうことがある。少し待って1回だけ取り直す
             await Task.Delay(RetryDelay, ct);
             (bytes, signature) = await FetchAsync(uri, ct);
             info = Check(bytes, signature, pinnedKey);
@@ -82,7 +82,7 @@ public sealed partial class ManifestClient(HttpClient http)
         if (!Convert.FromBase64String(info.PublicKey).AsSpan().SequenceEqual(Convert.FromBase64String(pinnedKey)))
         {
             throw new ManifestSignatureException(SignatureProblem.KeyChanged,
-                // 新しい確認コードは画面に出さない（出すと、ユーザーがそれを写して入力できてしまう）
+                //新しい確認コードは画面に出さない（出すと、ユーザーがそれを写して入力できてしまう）
                 "サーバーリストの確認コードが変わりました。" +
                 "管理者が鍵を作り直したのなら、新しい確認コードを管理者に聞いて「編集」で入力し直してください。" +
                 "心当たりがなければ、配信しているファイルが書き換えられたおそれがあります", info.Code);
@@ -90,14 +90,14 @@ public sealed partial class ManifestClient(HttpClient http)
         return info;
     }
 
-    /// <summary>UTF-8 として読む（先頭に BOM があれば除く）。</summary>
+    /// <summary>UTF-8として読む（先頭にBOMがあれば除く）。</summary>
     private static string Decode(byte[] bytes) =>
         bytes is [0xEF, 0xBB, 0xBF, ..] ? System.Text.Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3) : System.Text.Encoding.UTF8.GetString(bytes);
 
     /// <summary>
-    /// 解析して検証する。<paramref name="baseUri"/> を渡すと、リスト内の相対アドレス（"pak128.japan/index.json" など）を
-    /// サーバーリストの場所から見た絶対アドレスに置き換える。
-    /// <paramref name="trusted"/> は署名を確かめたリストか（本体の自動インストールを許すか）。
+    ///解析して検証する。<paramref name="baseUri"/>を渡すと、リスト内の相対アドレス（"pak128.japan/index.json" など）を
+    ///サーバーリストの場所から見た絶対アドレスに置き換える。
+    /// <paramref name="trusted"/>は署名を確かめたリストか（本体の自動インストールを許すか）。
     /// </summary>
     public static Manifest Parse(string json, Uri? baseUri = null, bool trusted = false)
     {
@@ -122,46 +122,46 @@ public sealed partial class ManifestClient(HttpClient http)
     {
         if (m.SchemaVersion != SupportedSchemaVersion)
         {
-            throw new ManifestException($"対応していない schema_version です: {m.SchemaVersion}（対応: {SupportedSchemaVersion}）。ランチャーを更新してください");
+            throw new ManifestException($"対応していないschema_versionです: {m.SchemaVersion}（対応: {SupportedSchemaVersion}）。ランチャーを更新してください");
         }
         var ids = new HashSet<string>();
         foreach (var s in m.Servers)
         {
             var where = string.IsNullOrEmpty(s.Name) ? s.Id : s.Name;
-            Require(SafeName().IsMatch(s.Id), $"サーバー '{where}' の id が不正です");
-            Require(ids.Add(s.Id), $"サーバーの id が重複しています: {s.Id}");
-            Require(!string.IsNullOrWhiteSpace(s.Name), $"サーバー '{s.Id}' の name がありません");
-            Require(ServerAddress.TryParse(s.Address, out _), $"サーバー '{where}' の address が不正です: {s.Address}");
+            Require(SafeName().IsMatch(s.Id), $"サーバー '{where}' のidが不正です");
+            Require(ids.Add(s.Id), $"サーバーのidが重複しています: {s.Id}");
+            Require(!string.IsNullOrWhiteSpace(s.Name), $"サーバー '{s.Id}' のnameがありません");
+            Require(ServerAddress.TryParse(s.Address, out _), $"サーバー '{where}' のaddressが不正です: {s.Address}");
 
             var p = s.Pakset;
-            Require(p is not null, $"サーバー '{where}' に pakset がありません");
-            // folder と revision はそのままパスになるので、.. や区切り文字を含む値を拒否する
-            Require(SafeName().IsMatch(p!.Folder) && p.Folder.Trim('.').Length > 0, $"サーバー '{where}' の pakset.folder が不正です: {p.Folder}");
+            Require(p is not null, $"サーバー '{where}' にpaksetがありません");
+            // folderとrevisionはそのままパスになるので、.. や区切り文字を含む値を拒否する
+            Require(SafeName().IsMatch(p!.Folder) && p.Folder.Trim('.').Length > 0, $"サーバー '{where}' のpakset.folderが不正です: {p.Folder}");
             var hasZip = p.Url is not null || p.Sha256 is not null;
             var hasIndex = p.IndexUrl is not null || p.IndexSha256 is not null;
             Require(hasZip != hasIndex,
-                $"サーバー '{where}' の pakset には、url と sha256（zip 方式）か、index_url と index_sha256（ファイル一覧方式）のどちらか一方を書いてください");
+                $"サーバー '{where}' のpaksetには、urlとsha256（zip方式）か、index_urlとindex_sha256（ファイル一覧方式）のどちらか一方を書いてください");
             if (hasIndex)
             {
-                p.IndexUrl = ResolveUrl(p.IndexUrl, baseUri, $"サーバー '{where}' の pakset.index_url");
-                RequireSha(p.IndexSha256, $"サーバー '{where}' の pakset.index_sha256");
+                p.IndexUrl = ResolveUrl(p.IndexUrl, baseUri, $"サーバー '{where}' のpakset.index_url");
+                RequireSha(p.IndexSha256, $"サーバー '{where}' のpakset.index_sha256");
             }
             else
             {
-                p.Url = ResolveUrl(p.Url, baseUri, $"サーバー '{where}' の pakset.url");
-                RequireSha(p.Sha256, $"サーバー '{where}' の pakset.sha256");
+                p.Url = ResolveUrl(p.Url, baseUri, $"サーバー '{where}' のpakset.url");
+                RequireSha(p.Sha256, $"サーバー '{where}' のpakset.sha256");
             }
 
             s.EngineDownloadAllowed = false;
             if (s.Engine is { } e)
             {
-                Require(SafeName().IsMatch(e.Revision) && e.Revision.Trim('.').Length > 0, $"サーバー '{where}' の engine.revision が不正です: {e.Revision}");
+                Require(SafeName().IsMatch(e.Revision) && e.Revision.Trim('.').Length > 0, $"サーバー '{where}' のengine.revisionが不正です: {e.Revision}");
                 foreach (var (key, b) in e.Builds ?? new())
                 {
-                    var what = $"サーバー '{where}' の engine.builds.{key}";
+                    var what = $"サーバー '{where}' のengine.builds.{key}";
                     var engineZip = b.Url is not null || b.Sha256 is not null;
                     var engineIndex = b.IndexUrl is not null || b.IndexSha256 is not null;
-                    Require(engineZip != engineIndex, $"{what} には、url と sha256（zip 方式）か、index_url と index_sha256（ファイル一覧方式）のどちらか一方を書いてください");
+                    Require(engineZip != engineIndex, $"{what}には、urlとsha256（zip方式）か、index_urlとindex_sha256（ファイル一覧方式）のどちらか一方を書いてください");
                     if (engineIndex)
                     {
                         b.IndexUrl = ResolveUrl(b.IndexUrl, baseUri, $"{what}.index_url");
@@ -172,21 +172,21 @@ public sealed partial class ManifestClient(HttpClient http)
                         b.Url = ResolveUrl(b.Url, baseUri, $"{what}.url");
                         RequireSha(b.Sha256, $"{what}.sha256");
                     }
-                    Require(IsSafeRelativePath(b.Exe), $"{what}.exe が不正です");
+                    Require(IsSafeRelativePath(b.Exe), $"{what}.exeが不正です");
                 }
-                // 本体のファイルは SHA256 でサーバーリストに結び付いているので、リストの署名を確かめていれば取得経路は問わない
+                //本体のファイルはSHA256でサーバーリストに結び付いているので、リストの署名を確かめていれば取得経路は問わない
                 s.EngineDownloadAllowed = trusted;
             }
         }
     }
 
     /// <summary>
-    /// アドレスを絶対アドレスにする。相対アドレスは baseUri から見た位置になる。
-    /// Web 上のリストが手元のファイル（file://）を指すことは許さない。
+    ///アドレスを絶対アドレスにする。相対アドレスはbaseUriから見た位置になる。
+    /// Web上のリストが手元のファイル（file://）を指すことは許さない。
     /// </summary>
     internal static string ResolveUrl(string? url, Uri? baseUri, string what)
     {
-        Require(!string.IsNullOrWhiteSpace(url), $"{what} がありません");
+        Require(!string.IsNullOrWhiteSpace(url), $"{what}がありません");
         Uri? resolved = null;
         if (Uri.TryCreate(url, UriKind.Absolute, out var abs) && abs.Scheme is "http" or "https" or "file")
         {
@@ -196,18 +196,18 @@ public sealed partial class ManifestClient(HttpClient http)
         {
             resolved = rel;
         }
-        Require(resolved is not null, $"{what} が不正です: {url}");
-        Require(!(resolved!.IsFile && baseUri is { IsFile: false }), $"{what} が手元のファイルを指しています: {url}");
+        Require(resolved is not null, $"{what}が不正です: {url}");
+        Require(!(resolved!.IsFile && baseUri is { IsFile: false }), $"{what}が手元のファイルを指しています: {url}");
         return resolved.AbsoluteUri;
     }
 
     /// <summary>
-    /// ファイル一覧（index.json）を解析して検証する。
-    /// <paramref name="engineExe"/> を渡すと本体のファイル一覧として扱い、その実行ファイルと、直下の .dll だけは許す。
+    ///ファイル一覧（index.json）を解析して検証する。
+    /// <paramref name="engineExe"/>を渡すと本体のファイル一覧として扱い、その実行ファイルと、直下の.dllだけは許す。
     /// </summary>
     public static PaksetIndex ParseIndex(string json, string? engineExe = null)
     {
-        var kind = engineExe is null ? "pakset" : "simutrans 本体";
+        var kind = engineExe is null ? "pakset" : "simutrans本体";
         PaksetIndex? index;
         try
         {
@@ -218,12 +218,12 @@ public sealed partial class ManifestClient(HttpClient http)
             throw new ManifestException($"{kind}のファイル一覧の形式が正しくありません: {e.Message}", e);
         }
         Require(index is not null, $"{kind}のファイル一覧が空です");
-        Require(index!.SchemaVersion == SupportedSchemaVersion, $"対応していないファイル一覧の schema_version です: {index.SchemaVersion}");
+        Require(index!.SchemaVersion == SupportedSchemaVersion, $"対応していないファイル一覧のschema_versionです: {index.SchemaVersion}");
 
         var componentIds = new HashSet<string>(StringComparer.Ordinal);
         foreach (var c in index.Components ?? new())
         {
-            Require(SafeName().IsMatch(c.Id) && componentIds.Add(c.Id), $"{kind}のファイル一覧の部品の id が不正か重複しています: {c.Id}");
+            Require(SafeName().IsMatch(c.Id) && componentIds.Add(c.Id), $"{kind}のファイル一覧の部品のidが不正か重複しています: {c.Id}");
         }
 
         var files = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -238,8 +238,8 @@ public sealed partial class ManifestClient(HttpClient http)
             Require(allowedExecutable || !BlockedExtensions.Contains(ext), $"{kind}のファイル一覧に実行ファイルなどが含まれています: {f.Path}");
             Require(files.Add(f.Path), $"{kind}のファイル一覧でパスが重複しています: {f.Path}");
             Require(f.Size >= 0, $"{kind}のファイル一覧のサイズが不正です: {f.Path}");
-            RequireSha(f.Sha256, $"{kind}のファイル一覧の {f.Path} の sha256");
-            Require(f.Component is null || componentIds.Contains(f.Component), $"{kind}のファイル一覧の {f.Path} の部品がありません: {f.Component}");
+            RequireSha(f.Sha256, $"{kind}のファイル一覧の{f.Path}のsha256");
+            Require(f.Component is null || componentIds.Contains(f.Component), $"{kind}のファイル一覧の{f.Path}の部品がありません: {f.Component}");
             var parts = f.Path.Split('/');
             for (var i = 1; i < parts.Length; i++)
             {
@@ -247,13 +247,13 @@ public sealed partial class ManifestClient(HttpClient http)
             }
         }
         Require(!files.Overlaps(dirs), $"{kind}のファイル一覧に、ファイルとフォルダで同じ名前のものがあります");
-        Require(engineExe is null || files.Contains(engineExe), $"{kind}のファイル一覧に実行ファイル {engineExe} がありません");
+        Require(engineExe is null || files.Contains(engineExe), $"{kind}のファイル一覧に実行ファイル{engineExe}がありません");
         return index;
     }
 
     /// <summary>
-    /// pakset に入っていてはいけない、OS がそのまま実行できる種類のファイル。
-    /// Squirrel スクリプト（.nut）は pakset の正式な中身なので止めない（simutrans の中で制限付きで動く）。
+    /// paksetに入っていてはいけない、OSがそのまま実行できる種類のファイル。
+    /// Squirrelスクリプト（.nut）はpaksetの正式な中身なので止めない（simutransの中で制限付きで動く）。
     /// </summary>
     public static readonly HashSet<string> BlockedExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -268,7 +268,7 @@ public sealed partial class ManifestClient(HttpClient http)
         "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
     };
 
-    /// <summary>"/" 区切りの相対パスで、どの OS でもフォルダの外を指さず、Windows で作れる名前か。</summary>
+    /// <summary>"/" 区切りの相対パスで、どのOSでもフォルダの外を指さず、Windowsで作れる名前か。</summary>
     internal static bool IsSafeRelativePath(string? path)
     {
         if (string.IsNullOrEmpty(path) || path.Length > 400 || path.StartsWith('/'))
@@ -288,7 +288,7 @@ public sealed partial class ManifestClient(HttpClient http)
     }
 
     private static void RequireSha(string? sha256, string what) =>
-        Require(Sha256Hex().IsMatch(sha256 ?? ""), $"{what} が不正です（16進数64文字）");
+        Require(Sha256Hex().IsMatch(sha256 ?? ""), $"{what}が不正です（16進数64文字）");
 
     private static void Require(bool ok, string message)
     {

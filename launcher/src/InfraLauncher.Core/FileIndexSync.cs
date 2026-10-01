@@ -4,9 +4,9 @@ using InfraLauncher.Core.Models;
 namespace InfraLauncher.Core;
 
 /// <summary>
-/// ファイル一覧方式の同期。手元のフォルダを一覧と照合し、変わったファイルだけを落とす。
+///ファイル一覧方式の同期。手元のフォルダを一覧と照合し、変わったファイルだけを落とす。
 /// 1. 照合: サイズと更新日時が前回の記録と同じならハッシュ計算を省く。違えば計算し直す
-/// 2. ダウンロード: 足りないファイルを展開先の横の一時フォルダに落とし、1つずつ SHA256 を確かめる
+/// 2. ダウンロード: 足りないファイルを展開先の横の一時フォルダに落とし、1つずつSHA256を確かめる
 ///    （一時フォルダは中断しても残るので、次回は落とし終えたファイルを使い回す）
 /// 3. 反映: 全部そろってから置き換え、一覧にないファイルを片付ける
 ///    ランチャーが入れたフォルダなら消し、ユーザーが自分で入れたフォルダなら退避する
@@ -20,9 +20,9 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
     internal static TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(2);
 
     /// <summary>
-    /// 本体と pakset のうち、サーバーと同じにするために落とし直す必要がある設定ファイル以外のもの。
-    /// config/simuconf.tab はユーザーが自分で書き換えたり、ランチャーがプレイヤー名を書き込んだりするので、
-    /// 手元になければ入れるが、あれば書き換えない（サーバー側で変わっても上書きしない）。
+    ///本体とpaksetのうち、サーバーと同じにするために落とし直す必要がある設定ファイル以外のもの。
+    /// config/simuconf.tabはユーザーが自分で書き換えたり、ランチャーがプレイヤー名を書き込んだりするので、
+    ///手元になければ入れるが、あれば書き換えない（サーバー側で変わっても上書きしない）。
     /// </summary>
     internal static readonly HashSet<string> PreservedFiles = new(StringComparer.OrdinalIgnoreCase) { "config/simuconf.tab" };
 
@@ -34,8 +34,8 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    /// 同期が必要かを確かめるだけで、何も書き換えない（「アップデートチェック」用）。
-    /// 落とすファイルの数と大きさ、片付けるファイルの数を返す。
+    ///同期が必要かを確かめるだけで、何も書き換えない（「アップデートチェック」用）。
+    ///落とすファイルの数と大きさ、片付けるファイルの数を返す。
     /// </summary>
     public async Task<CheckResult> CheckAsync(SyncItem item, IProgress<SyncProgress>? progress, CancellationToken ct)
     {
@@ -58,7 +58,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         var stamps = record?.Files ?? new Dictionary<string, FileStamp>();
 
         // 1. 照合
-        SyncLog.Write($"[{item.Label}] 同期を始めます: {target}（一覧 {item.Url}、{wanted.Count} ファイル）");
+        SyncLog.Write($"[{item.Label}]同期を始めます: {target}（一覧{item.Url}、{wanted.Count}ファイル）");
         progress?.Report(new SyncProgress(item, "確認中", 0, null));
         var newStamps = new Dictionary<string, FileStamp>(StringComparer.OrdinalIgnoreCase);
         var missing = new List<PaksetFile>();
@@ -68,7 +68,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             var info = new FileInfo(local);
             if (PreservedFiles.Contains(f.Path) && info.Exists)
             {
-                // 手元で書き換えてよい設定ファイル。あればそのまま使い、照合の記録にも入れない
+                //手元で書き換えてよい設定ファイル。あればそのまま使い、照合の記録にも入れない
                 continue;
             }
             if (info.Exists && info.Length == f.Size)
@@ -88,7 +88,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             missing.Add(f);
         }
 
-        SyncLog.Write($"[{item.Label}] 照合しました: 足りない・違うファイル {missing.Count} 件");
+        SyncLog.Write($"[{item.Label}]照合しました: 足りない・違うファイル{missing.Count}件");
         var keep = new HashSet<string>(wanted.Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
         List<string> extras;
         if (item.DeleteUnknown)
@@ -103,7 +103,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         }
         else
         {
-            // 本体: フォルダの中には pakset やユーザーのファイルもあるので、ランチャーが入れたファイルだけを片付ける
+            //本体: フォルダの中にはpaksetやユーザーのファイルもあるので、ランチャーが入れたファイルだけを片付ける
             extras = stamps.Keys.Where(rel => !keep.Contains(rel) && File.Exists(LocalPath(target, rel))).ToList();
         }
 
@@ -126,18 +126,18 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         }
 
         // 2. ダウンロード（同じ中身のファイルは1回だけ落とす）
-        // 途中のファイルは中身の SHA256 を名前にして一時フォルダに置き、全部そろって確かめてから本来の名前で置く。
-        // 一時フォルダはランチャーのデータフォルダ（%LOCALAPPDATA%）に置く。ダウンロード先が OneDrive などの中だと、
-        // 書いている途中のファイルを同期ソフトがつかんで止まることがあるため。展開先ごとに決まった場所なので、
-        // 途中で止めてもやり直したときに続きから使える（終われば消す）
-        TryDeleteDir(Path.Combine(Path.GetDirectoryName(target)!, $".{Path.GetFileName(target)}.partial")); // 以前の版の場所
+        //途中のファイルは中身のSHA256を名前にして一時フォルダに置き、全部そろって確かめてから本来の名前で置く。
+        //一時フォルダはランチャーのデータフォルダ（%LOCALAPPDATA%）に置く。ダウンロード先がOneDriveなどの中だと、
+        //書いている途中のファイルを同期ソフトがつかんで止まることがあるため。展開先ごとに決まった場所なので、
+        //途中で止めてもやり直したときに続きから使える（終われば消す）
+        TryDeleteDir(Path.Combine(Path.GetDirectoryName(target)!, $".{Path.GetFileName(target)}.partial")); //以前の版の場所
         var staging = StagingDirFor(layout, target);
         Directory.CreateDirectory(staging);
         var unique = missing.GroupBy(f => f.Sha256.ToLowerInvariant()).Select(g => g.First()).ToList();
 
-        // 手元のほかの pakset（本体の別リビジョン用など）に同じ中身のファイルがあれば、コピーして使う。
-        // ただし、OneDrive などで中身がクラウドにしかないファイル（開くとダウンロードが始まる）は使わない。
-        // 取り寄せに時間がかかったり、止まったりするため
+        //手元のほかのpakset（本体の別リビジョン用など）に同じ中身のファイルがあれば、コピーして使う。
+        //ただし、OneDriveなどで中身がクラウドにしかないファイル（開くとダウンロードが始まる）は使わない。
+        //取り寄せに時間がかかったり、止まったりするため
         var reused = 0;
         var copies = unique.Count > 0 ? LocalCopies(state, target) : new();
         var checkedCount = 0;
@@ -156,7 +156,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             }
             if (++checkedCount % 20 == 1)
             {
-                progress?.Report(new SyncProgress(item, $"手元にある同じファイルを使い回しています（{checkedCount} 件目）", 0, null));
+                progress?.Report(new SyncProgress(item, $"手元にある同じファイルを使い回しています（{checkedCount}件目）", 0, null));
             }
             var tmp = Path.Combine(staging, f.Sha256.ToLowerInvariant());
             try
@@ -170,30 +170,30 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             }
             catch (Exception e) when (e is IOException or UnauthorizedAccessException)
             {
-                // 使い回せなければダウンロードすればよいので、同期は止めない
-                SyncLog.Write($"[{item.Label}] 手元のファイルを使い回せませんでした（ダウンロードします）: {local}（{e.Message}）");
+                //使い回せなければダウンロードすればよいので、同期は止めない
+                SyncLog.Write($"[{item.Label}]手元のファイルを使い回せませんでした（ダウンロードします）: {local}（{e.Message}）");
             }
         }
-        SyncLog.Write($"[{item.Label}] 手元のファイルを {reused} 件使い回しました。ダウンロードするのは {unique.Count} 件です");
+        SyncLog.Write($"[{item.Label}]手元のファイルを{reused}件使い回しました。ダウンロードするのは{unique.Count}件です");
         if (reused > 0)
         {
-            progress?.Report(new SyncProgress(item, $"手元のファイルを {reused} 件使い回しました", 0, null));
+            progress?.Report(new SyncProgress(item, $"手元のファイルを{reused}件使い回しました", 0, null));
         }
 
         long total = unique.Sum(f => f.Size), done = 0;
         var finished = 0;
         var inFlight = new System.Collections.Concurrent.ConcurrentDictionary<PaksetFile, long>();
-        // 何ファイル目か・何 MB 届いたかを出す（大きいファイルが残っていても止まって見えないように）。
-        // 残りが少なくなったら、どのファイルを待っているかも出す（止まったときに原因を調べられるように）
+        //何ファイル目か・何MB届いたかを出す（大きいファイルが残っていても止まって見えないように）。
+        //残りが少なくなったら、どのファイルを待っているかも出す（止まったときに原因を調べられるように）
         void Report()
         {
             var left = unique.Count - Volatile.Read(ref finished);
-            // 残りのファイルは、届いた量とサーバーリストに書かれた大きさも出す（どこで止まっているか分かるように）
+            //残りのファイルは、届いた量とサーバーリストに書かれた大きさも出す（どこで止まっているか分かるように）
             var waiting = left is > 0 and <= 3 && !inFlight.IsEmpty
-                ? "　残り: " + string.Join("、", inFlight.Select(kv => $"{kv.Key.Path}（{kv.Value:N0} / {kv.Key.Size:N0} バイト）"))
+                ? "　残り: " + string.Join("、", inFlight.Select(kv => $"{kv.Key.Path}（{kv.Value:N0} / {kv.Key.Size:N0}バイト）"))
                 : "";
             progress?.Report(new SyncProgress(item,
-                $"ダウンロード中 {unique.Count - left}/{unique.Count} ファイル（{FormatSize(Interlocked.Read(ref done))} / {FormatSize(total)}）{waiting}",
+                $"ダウンロード中{unique.Count - left}/{unique.Count}ファイル（{FormatSize(Interlocked.Read(ref done))} / {FormatSize(total)}）{waiting}",
                 Interlocked.Read(ref done), total));
         }
         using (var gate = new SemaphoreSlim(Parallelism))
@@ -213,21 +213,21 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
                     }
                     else
                     {
-                        // 通信が途切れたり止まったりしたら、少し待ってやり直す
+                        //通信が途切れたり止まったりしたら、少し待ってやり直す
                         for (var attempt = 1; ; attempt++)
                         {
                             long mine = 0;
                             try
                             {
-                                await Downloader.DownloadAsync(http, FileUri(indexUri, f.Path), tmp, f.Sha256, $"{item.Label} の {f.Path}",
+                                await Downloader.DownloadAsync(http, FileUri(indexUri, f.Path), tmp, f.Sha256, $"{item.Label}の{f.Path}",
                                     n => { mine += n; inFlight[f] = mine; Interlocked.Add(ref done, n); Report(); }, ct);
                                 break;
                             }
                             catch (DownloadInterruptedException e) when (attempt < Attempts && !ct.IsCancellationRequested)
                             {
-                                SyncLog.Write($"[{item.Label}] やり直します（{attempt + 1}/{Attempts} 回目）: {e.Message}");
+                                SyncLog.Write($"[{item.Label}]やり直します（{attempt + 1}/{Attempts}回目）: {e.Message}");
                                 Interlocked.Add(ref done, -mine);
-                                progress?.Report(new SyncProgress(item, $"{f.Path} の通信が途切れたので、やり直しています（{attempt + 1}/{Attempts} 回目）",
+                                progress?.Report(new SyncProgress(item, $"{f.Path}の通信が途切れたので、やり直しています（{attempt + 1}/{Attempts}回目）",
                                     Interlocked.Read(ref done), total));
                                 await Task.Delay(RetryDelay * attempt, ct);
                             }
@@ -245,7 +245,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         }
 
         // 3. 反映
-        SyncLog.Write($"[{item.Label}] ダウンロードが終わりました。反映します");
+        SyncLog.Write($"[{item.Label}]ダウンロードが終わりました。反映します");
         progress?.Report(new SyncProgress(item, "反映中", total, total));
         string? backup = null;
         void Discard(string rel)
@@ -273,7 +273,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             ct.ThrowIfCancellationRequested();
             if (++placed % 20 == 0 || placed == missing.Count)
             {
-                progress?.Report(new SyncProgress(item, $"反映中 {placed}/{missing.Count} ファイル　{f.Path}", placed, missing.Count));
+                progress?.Report(new SyncProgress(item, $"反映中{placed}/{missing.Count}ファイル　{f.Path}", placed, missing.Count));
             }
             var local = LocalPath(target, f.Path);
             Discard(f.Path);
@@ -296,13 +296,13 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
 
         SaveRecord(state, target, item, newStamps);
         TryDeleteDir(staging);
-        SyncLog.Write($"[{item.Label}] 同期が終わりました");
+        SyncLog.Write($"[{item.Label}]同期が終わりました");
         return new SyncSummary(unique.Count, total, extras.Count);
     }
 
-    /// <summary>ほかの展開先の記録にあるファイルを、SHA256 ごとにまとめる（記録どおり変わっていないかは使う直前に確かめる）。</summary>
+    /// <summary>ほかの展開先の記録にあるファイルを、SHA256ごとにまとめる（記録どおり変わっていないかは使う直前に確かめる）。</summary>
     /// <summary>
-    /// 使い回してよい手元のファイルか。記録どおり変わっておらず、中身が手元にある（クラウドにしかないファイルではない）こと。
+    ///使い回してよい手元のファイルか。記録どおり変わっておらず、中身が手元にある（クラウドにしかないファイルではない）こと。
     /// </summary>
     private static bool IsUsableLocalCopy(string path, FileStamp stamp)
     {
@@ -311,7 +311,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         {
             return false;
         }
-        // OneDrive の「オンライン専用」など。0x400000 = FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS、0x40000 = RECALL_ON_OPEN
+        // OneDriveの「オンライン専用」など。0x400000 = FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS、0x40000 = RECALL_ON_OPEN
         const FileAttributes recallOnDataAccess = (FileAttributes)0x400000, recallOnOpen = (FileAttributes)0x40000;
         return (info.Attributes & (FileAttributes.Offline | recallOnDataAccess | recallOnOpen)) == 0;
     }
@@ -321,7 +321,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         var result = new Dictionary<string, List<(string, FileStamp)>>();
         foreach (var (dir, record) in state.Items)
         {
-            // 消したフォルダ（以前のダウンロード先など）の記録は使わない
+            //消したフォルダ（以前のダウンロード先など）の記録は使わない
             if (record.Files is null || string.Equals(Path.TrimEndingDirectorySeparator(dir), target, StringComparison.OrdinalIgnoreCase)
                 || !Directory.Exists(dir))
             {
@@ -340,7 +340,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         return result;
     }
 
-    /// <summary>一覧ファイルを取得する。同じハッシュのものを取得済みなら使い回す。engineExe を渡すと本体の一覧として検証する。</summary>
+    /// <summary>一覧ファイルを取得する。同じハッシュのものを取得済みなら使い回す。engineExeを渡すと本体の一覧として検証する。</summary>
     internal async Task<PaksetIndex> LoadIndexAsync(string url, string sha256, string label, string? engineExe, CancellationToken ct)
     {
         var dir = Path.Combine(layout.Root, "indexes");
@@ -349,7 +349,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         if (!File.Exists(cached) || !SameSha(await Downloader.HashFileAsync(cached, ct), sha256))
         {
             var tmp = cached + ".tmp";
-            await Downloader.DownloadAsync(http, url, tmp, sha256, $"{label} のファイル一覧", null, ct);
+            await Downloader.DownloadAsync(http, url, tmp, sha256, $"{label}のファイル一覧", null, ct);
             File.Move(tmp, cached, overwrite: true);
         }
         try
@@ -381,7 +381,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         var path = Path.GetFullPath(Path.Combine(root, rel.Replace('/', Path.DirectorySeparatorChar)));
         if (!path.StartsWith(Path.TrimEndingDirectorySeparator(root) + Path.DirectorySeparatorChar, StringComparison.Ordinal))
         {
-            throw new SyncException($"pakset のファイル一覧のパスがフォルダの外を指しています: {rel}");
+            throw new SyncException($"paksetのファイル一覧のパスがフォルダの外を指しています: {rel}");
         }
         return path;
     }
@@ -434,7 +434,7 @@ public sealed class FileStamp
     public long ModifiedUtcTicks { get; set; }
     public string Sha256 { get; set; } = "";
 
-    /// <summary>記録どおりか。ファイルがなければ false（FileInfo.Length はファイルがないと例外になるので先に確かめる）。</summary>
+    /// <summary>記録どおりか。ファイルがなければfalse（FileInfo.Lengthはファイルがないと例外になるので先に確かめる）。</summary>
     public bool Matches(FileInfo info) => info.Exists && info.Length == Size && info.LastWriteTimeUtc.Ticks == ModifiedUtcTicks;
 
     public static FileStamp From(FileInfo info, string sha256) =>

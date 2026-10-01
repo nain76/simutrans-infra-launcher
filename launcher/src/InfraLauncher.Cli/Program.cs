@@ -1,12 +1,12 @@
 using InfraLauncher.Core;
 using InfraLauncher.Core.Models;
 
-// コマンドライン版。動作確認とトラブル調査用。
+//コマンドライン版。動作確認とトラブル調査用。
 //   list   <manifest>            サーバー一覧と同期の状態
 //   sync   <manifest> <server>   同期だけ行う
-//   launch <manifest> <server>   同期して起動（--print-only で起動せずにコマンドを表示。
-//                                配布元から入れた本体を初めて起動するときは --trust で承認する）
-// 共通オプション: --data-dir <dir>（ランチャーのデータフォルダ）, --simutrans <exe>（手元の本体）,
+//   launch <manifest> <server>   同期して起動（--print-onlyで起動せずにコマンドを表示。
+//                                配布元から入れた本体を初めて起動するときは--trustで承認する）
+//共通オプション: --data-dir <dir>（ランチャーのデータフォルダ）, --simutrans <exe>（手元の本体）,
 //                 --code <確認コード>（サーバー管理者から聞いた確認コード。一致すれば本体も入れられる）
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -47,7 +47,7 @@ if (simutransExe is not null)
     settings.SimutransExe = simutransExe;
 }
 
-// インストール設定（ダウンロード先と本体の部品）。--components は recommended か、部品の id をカンマで並べる
+//インストール設定（ダウンロード先と本体の部品）。--componentsはrecommendedか、部品のidをカンマで並べる
 InstallOptions? options = installDir is null && components is null ? null : new InstallOptions
 {
     InstallRoot = installDir,
@@ -56,7 +56,7 @@ InstallOptions? options = installDir is null && components is null ? null : new 
 
 try
 {
-    // 確認コードは、画面で登録したものか --code で指定したもの
+    //確認コードは、画面で登録したものか--codeで指定したもの
     var uri = LauncherService.ToUri(positional[1]);
     var pinned = settings.ServerLists.FirstOrDefault(l => LauncherService.ToUri(l.Url) == uri)?.PublicKey;
     var manifest = await service.Manifests.LoadAsync(uri, pinned);
@@ -71,9 +71,9 @@ try
         }
         manifest = await service.Manifests.LoadAsync(uri, sig.PublicKey);
     }
-    // 未確認の確認コードは表示しない（表示すると、管理者に聞かずに写せてしまう）
+    //未確認の確認コードは表示しない（表示すると、管理者に聞かずに写せてしまう）
     Console.WriteLine(manifest.Trusted ? "確認コード: 一致しました"
-        : manifest.Signature is not null ? "署名あり・確認コード未確認（管理者から聞いた確認コードを --code で指定すると本体も入れられます）"
+        : manifest.Signature is not null ? "署名あり・確認コード未確認（管理者から聞いた確認コードを--codeで指定すると本体も入れられます）"
         : "このサーバーリストには署名がありません（本体は自動で入れません）");
     switch (positional[0])
     {
@@ -107,7 +107,7 @@ try
             var summary = await service.Sync.SyncAsync(plan, new ConsoleProgress());
             Console.WriteLine(summary.Downloads == 0 && summary.Removed == 0
                 ? "すべて最新です。ダウンロードは不要でした"
-                : $"同期が完了しました（ダウンロード {summary.Downloads} 件・{summary.Bytes:N0} バイト、片付け {summary.Removed} 件）");
+                : $"同期が完了しました（ダウンロード{summary.Downloads}件・{summary.Bytes:N0}バイト、片付け{summary.Removed}件）");
             return 0;
         }
 
@@ -123,16 +123,16 @@ try
             }
             if (info.NeedsApproval)
             {
-                Console.WriteLine($"配布元から入れた simutrans 本体をまだ承認していません: {info.EngineLabel}");
+                Console.WriteLine($"配布元から入れたsimutrans本体をまだ承認していません: {info.EngineLabel}");
                 Console.WriteLine($"  場所:     {info.ExePath}");
                 Console.WriteLine($"  配布元:   {info.SourceUrl}");
                 Console.WriteLine($"  SHA256:   {info.ExeSha256}");
                 if (!trust)
                 {
-                    Console.WriteLine("内容を確かめてから、--trust を付けてもう一度実行してください");
+                    Console.WriteLine("内容を確かめてから、--trustを付けてもう一度実行してください");
                     return 3;
                 }
-                // --simutrans などの一時的な指定は保存せず、承認だけを保存する
+                // --simutransなどの一時的な指定は保存せず、承認だけを保存する
                 var saved = service.LoadSettings();
                 saved.Approve(info.ExeSha256);
                 saved.Save(layout);
@@ -157,7 +157,7 @@ static ServerEntry Find(Manifest manifest, List<string> positional)
 {
     if (positional.Count < 3)
     {
-        throw new FormatException("サーバーの id か名前を指定してください");
+        throw new FormatException("サーバーのidか名前を指定してください");
     }
     var key = positional[2];
     return manifest.Servers.FirstOrDefault(s => s.Id == key)
@@ -169,14 +169,14 @@ static int Usage()
 {
     Console.Error.WriteLine("""
         使い方:
-          infra-launcher list   <manifest の URL かパス>
-          infra-launcher sync   <manifest> <サーバーの id か名前>
-          infra-launcher launch <manifest> <サーバーの id か名前> [--print-only] [--trust]
+          infra-launcher list   <manifestのURLかパス>
+          infra-launcher sync   <manifest> <サーバーのidか名前>
+          infra-launcher launch <manifest> <サーバーのidか名前> [--print-only] [--trust]
         オプション:
-          --data-dir <dir>    ランチャーのデータフォルダ（既定: %LOCALAPPDATA%\InfraLauncher など）
-          --install-dir <dir> 本体と pakset のダウンロード先
-          --components <c>    本体の部品。recommended（既定）か、部品の id をカンマで並べる（例: music,maps）
-          --simutrans <exe>   サーバーリストにこの PC 用の本体がないときに使う simutrans の実行ファイル
+          --data-dir <dir>    ランチャーのデータフォルダ（既定: %LOCALAPPDATA%\InfraLauncherなど）
+          --install-dir <dir>本体とpaksetのダウンロード先
+          --components <c>    本体の部品。recommended（既定）か、部品のidをカンマで並べる（例: music,maps）
+          --simutrans <exe>   サーバーリストにこのPC用の本体がないときに使うsimutransの実行ファイル
           --code <コード>     サーバー管理者から聞いた確認コード（例: A1B2-C3D4-E5F6-0718-293A）
         """);
     return 2;

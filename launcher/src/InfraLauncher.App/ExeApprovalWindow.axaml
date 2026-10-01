@@ -1,7 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         x:Class="InfraLauncher.App.ExeApprovalWindow"
-        Title="simutrans 本体の実行の確認" Width="640" SizeToContent="Height" CanResize="False"
+        Title="simutrans本体の実行の確認" Width="640" SizeToContent="Height" CanResize="False"
         WindowStartupLocation="CenterOwner">
   <StackPanel Margin="16" Spacing="10">
     <TextBlock x:Name="Heading" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />

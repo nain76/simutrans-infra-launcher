@@ -14,7 +14,7 @@ public partial class ExeApprovalWindow : Window
 
     public ExeApprovalWindow(LaunchInfo info, string serverName, string? listName) : this()
     {
-        Heading.Text = $"サーバー「{serverName}」の simutrans 本体を実行しますか？";
+        Heading.Text = $"サーバー「{serverName}」のsimutrans本体を実行しますか？";
         EngineText.Text = info.EngineLabel ?? "";
         SourceText.Text = listName is null ? info.SourceUrl ?? "" : $"{listName}（{info.SourceUrl}）";
         PathText.Text = info.ExePath;

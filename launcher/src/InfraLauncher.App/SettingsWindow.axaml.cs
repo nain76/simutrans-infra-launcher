@@ -39,7 +39,7 @@ public partial class SettingsWindow : Window
 
     private async void OnBrowse(object? sender, RoutedEventArgs e)
     {
-        if (await Dialogs.PickFileAsync(this, "simutrans の実行ファイルを選択", Dialogs.SimutransExe) is { } path)
+        if (await Dialogs.PickFileAsync(this, "simutransの実行ファイルを選択", Dialogs.SimutransExe) is { } path)
         {
             SimutransExe.Text = path;
         }

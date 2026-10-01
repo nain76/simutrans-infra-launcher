@@ -15,14 +15,14 @@ public sealed class InstallLayout(string root)
 
     public string SettingsPath => Path.Combine(Root, "settings.json");
 
-    /// <summary>展開したファイルの記録（どの sha256 の zip をどこに展開したか）。</summary>
+    /// <summary>展開したファイルの記録（どのsha256のzipをどこに展開したか）。</summary>
     public string InstalledStatePath => Path.Combine(Root, "installed.json");
 
     public string DownloadDir => Path.Combine(Root, "downloads");
 
-    /// <summary>本体と pakset の既定のダウンロード先。設定で変えられる。</summary>
+    /// <summary>本体とpaksetの既定のダウンロード先。設定で変えられる。</summary>
     public string DefaultInstallRoot => Path.Combine(Root, "simutrans");
 
-    /// <summary>既定のダウンロード先での本体のフォルダ。本体はリビジョンごとに別フォルダに置き、pakset はこの中（実行ファイルの横）に入る。</summary>
+    /// <summary>既定のダウンロード先での本体のフォルダ。本体はリビジョンごとに別フォルダに置き、paksetはこの中（実行ファイルの横）に入る。</summary>
     public string EngineDir(string revision) => Path.Combine(DefaultInstallRoot, revision);
 }

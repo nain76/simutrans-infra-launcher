@@ -1,8 +1,8 @@
 namespace InfraLauncher.Core;
 
 /// <summary>
-/// 展開済みのフォルダと、その元になった zip の sha256 の記録。
-/// 展開後のフォルダは zip と直接比べられないので、この記録とマニフェストの sha256 を比べて同期の要否を決める。
+///展開済みのフォルダと、その元になったzipのsha256の記録。
+///展開後のフォルダはzipと直接比べられないので、この記録とマニフェストのsha256を比べて同期の要否を決める。
 /// </summary>
 public sealed class InstalledState
 {
@@ -12,7 +12,7 @@ public sealed class InstalledState
     public static InstalledState Load(InstallLayout layout)
     {
         var state = Json.Load(layout.InstalledStatePath, Json.Context.InstalledState);
-        // 読み込み直後は比較方法が既定に戻るので作り直す
+        //読み込み直後は比較方法が既定に戻るので作り直す
         state.Items = new(state.Items, StringComparer.OrdinalIgnoreCase);
         return state;
     }
@@ -34,7 +34,7 @@ public sealed class InstalledState
         }
     }
 
-    /// <summary>消されたフォルダの記録を捨てる。捨てたものがあれば true。</summary>
+    /// <summary>消されたフォルダの記録を捨てる。捨てたものがあればtrue。</summary>
     public bool RemoveMissing()
     {
         var missing = Items.Keys.Where(k => !Directory.Exists(k)).ToList();
@@ -53,8 +53,8 @@ public sealed class InstalledRecord
     public string Sha256 { get; set; } = "";
     public string Url { get; set; } = "";
     public DateTimeOffset InstalledAt { get; set; }
-    /// <summary>ファイル一覧方式のときだけ、各ファイルの照合用の記録（キーは pakset フォルダからの相対パス）。</summary>
+    /// <summary>ファイル一覧方式のときだけ、各ファイルの照合用の記録（キーはpaksetフォルダからの相対パス）。</summary>
     public Dictionary<string, FileStamp>? Files { get; set; }
-    /// <summary>本体の部品の選び方（"recommended" か、選んだ部品の id を並べたもの）。変わったら同期し直す。</summary>
+    /// <summary>本体の部品の選び方（"recommended" か、選んだ部品のidを並べたもの）。変わったら同期し直す。</summary>
     public string? Selection { get; set; }
 }

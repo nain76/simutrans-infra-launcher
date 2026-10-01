@@ -5,7 +5,7 @@ namespace InfraLauncher.Core;
 /// <summary>接続先。"host"、"host:port"、"[IPv6]:port" を受け付ける。</summary>
 public readonly record struct ServerAddress(string Host, int Port)
 {
-    /// <summary>Simutrans の標準ポート。</summary>
+    /// <summary>Simutransの標準ポート。</summary>
     public const int DefaultPort = 13353;
 
     public static ServerAddress Parse(string text) =>
@@ -45,7 +45,7 @@ public readonly record struct ServerAddress(string Host, int Port)
             var colon = text.LastIndexOf(':');
             if (colon >= 0 && text.IndexOf(':') != colon)
             {
-                // 角かっこなしの IPv6 はポートと区別できないので受け付けない
+                //角かっこなしのIPv6はポートと区別できないので受け付けない
                 return false;
             }
             host = colon >= 0 ? text[..colon] : text;

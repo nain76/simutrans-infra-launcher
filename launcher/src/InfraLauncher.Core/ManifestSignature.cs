@@ -4,7 +4,7 @@ using InfraLauncher.Core.Models;
 
 namespace InfraLauncher.Core;
 
-/// <summary>サーバーリストの署名を確かめた結果。PublicKey は公開鍵（SubjectPublicKeyInfo の base64）、Code は人が入力して確かめる確認コード。</summary>
+/// <summary>サーバーリストの署名を確かめた結果。PublicKeyは公開鍵（SubjectPublicKeyInfoのbase64）、Codeは人が入力して確かめる確認コード。</summary>
 public sealed record SignatureInfo(string PublicKey, string Code);
 
 /// <summary>どう信用できなかったか。</summary>
@@ -18,7 +18,7 @@ public enum SignatureProblem
     KeyChanged,
 }
 
-/// <summary>署名の確認で信用できなかったときの例外。KeyChanged なら NewCode に新しい確認コードが入る。</summary>
+/// <summary>署名の確認で信用できなかったときの例外。KeyChangedならNewCodeに新しい確認コードが入る。</summary>
 public sealed class ManifestSignatureException(SignatureProblem problem, string message, string? newCode = null)
     : ManifestException(message)
 {
@@ -27,18 +27,18 @@ public sealed class ManifestSignatureException(SignatureProblem problem, string 
 }
 
 /// <summary>
-/// サーバーリストの署名。サーバー管理者は VPS にある秘密鍵で manifest.json に署名し、manifest.sig.json に置く。
-/// ランチャーは、ユーザーが管理者から聞いた「確認コード」（公開鍵の SHA256 の先頭）と一致した公開鍵を覚えておき、
-/// 毎回その鍵で署名を確かめる。pakset や本体のファイル一覧は manifest.json に SHA256 が書かれているので、
-/// manifest.json の署名を確かめれば、配っているファイルすべてが管理者の公開したものだと分かる。
-/// 署名は ECDSA P-256 / SHA-256（r と s を並べた 64 バイト）。
+///サーバーリストの署名。サーバー管理者はVPSにある秘密鍵でmanifest.jsonに署名し、manifest.sig.jsonに置く。
+///ランチャーは、ユーザーが管理者から聞いた「確認コード」（公開鍵のSHA256の先頭）と一致した公開鍵を覚えておき、
+///毎回その鍵で署名を確かめる。paksetや本体のファイル一覧はmanifest.jsonにSHA256が書かれているので、
+/// manifest.jsonの署名を確かめれば、配っているファイルすべてが管理者の公開したものだと分かる。
+///署名はECDSA P-256 / SHA-256（rとsを並べた64バイト）。
 /// </summary>
 public static class ManifestSignature
 {
     public const string Format = "infra-launcher-signature-1";
     private const string P256Oid = "1.2.840.10045.3.1.7";
 
-    /// <summary>署名ファイルの場所。manifest.json なら manifest.sig.json（IIS の設定を足さずに配れる拡張子にする）。</summary>
+    /// <summary>署名ファイルの場所。manifest.jsonならmanifest.sig.json（IISの設定を足さずに配れる拡張子にする）。</summary>
     public static Uri SignatureUriFor(Uri manifest)
     {
         var b = new UriBuilder(manifest) { Query = "", Fragment = "" };
@@ -48,7 +48,7 @@ public static class ManifestSignature
         return b.Uri;
     }
 
-    /// <summary>署名ファイルを読み、manifest の中身（バイト列そのもの）に対する署名として正しいか確かめる。</summary>
+    /// <summary>署名ファイルを読み、manifestの中身（バイト列そのもの）に対する署名として正しいか確かめる。</summary>
     public static SignatureInfo Verify(byte[] manifest, string signatureJson)
     {
         SignatureFile? file;
@@ -79,7 +79,7 @@ public static class ManifestSignature
         return new SignatureInfo(file.PublicKey, CodeFor(file.PublicKey));
     }
 
-    /// <summary>公開鍵から確認コードを作る。SHA256 の先頭 10 バイトを 16 進数で4文字ずつ区切ったもの（例: A1B2-C3D4-E5F6-0718-293A）。</summary>
+    /// <summary>公開鍵から確認コードを作る。SHA256の先頭10バイトを16進数で4文字ずつ区切ったもの（例: A1B2-C3D4-E5F6-0718-293A）。</summary>
     public static string CodeFor(string publicKey)
     {
         var hash = SHA256.HashData(Convert.FromBase64String(publicKey));
@@ -87,10 +87,10 @@ public static class ManifestSignature
         return string.Join('-', Enumerable.Range(0, 5).Select(i => hex.Substring(i * 4, 4)));
     }
 
-    /// <summary>人が入力した確認コードを比べる（大文字小文字、区切りの - や空白は問わない）。</summary>
+    /// <summary>人が入力した確認コードを比べる（大文字小文字、区切りの-や空白は問わない）。</summary>
     public static bool SameCode(string a, string b) => Normalize(a) == Normalize(b);
 
-    /// <summary>署名ファイルを作る（テストと動作確認用。実際の署名はサーバー側の PowerShell が作る）。</summary>
+    /// <summary>署名ファイルを作る（テストと動作確認用。実際の署名はサーバー側のPowerShellが作る）。</summary>
     public static string Sign(byte[] manifest, ECDsa key)
     {
         var file = new SignatureFile
@@ -109,7 +109,7 @@ public static class ManifestSignature
         if (key.ExportParameters(false).Curve.Oid?.Value != P256Oid)
         {
             key.Dispose();
-            throw new CryptographicException("P-256 の鍵ではありません");
+            throw new CryptographicException("P-256の鍵ではありません");
         }
         return key;
     }
