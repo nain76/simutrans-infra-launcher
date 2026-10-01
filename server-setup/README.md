@@ -203,15 +203,15 @@ paksetを公開するときは、paksetフォルダの1つ上にある本体も�
 
 | 部品（推奨設定） | 中身 | 扱い |
 |---|---|---|
-| 本体と設定・スクリプト・テーマ | 選んだ本体のexe、`.dll`、`ai` `config` `font` `scenario` `script` `skin` `text` `themes` | 必須（友人は外せない） |
+| 本体と設定・スクリプト・テーマ | 選んだ本体のexe、`.dll`、`ai` `config` `font` `scenario` `script` `skin` `text`、`themes`の直下の`.tab`と`.pak` | 必須（友人は外せない） |
 | 音楽 | `music` | 推奨 |
 | ライセンス・説明書 | `license*.txt` `copyright*.txt` `readme*.txt` | 推奨 |
 
-必須の部品は、友人が外すことはできません。画面の見た目を決める`themes`がないとsimutransは起動しないので、テーマも必須に入れています。推奨の部品は、友人が「推奨」を選んだときに落とします。必須でも推奨でもない部品は、友人が「カスタム」で選んだときだけ落とします。上の表にないもの（`maps`、`generated-scripts`、`history.txt`など）は配りません。配りたいときは部品に足してください。
+必須の部品は、友人が外すことはできません。画面の見た目を決める`themes`がないとsimutransは起動しないので、テーマも必須に入れています。`themes`からは、テーマとして使う直下の`.tab`と`.pak`だけを配ります。中にほかのフォルダやセーブデータが混ざっていても配りません。推奨の部品は、友人が「推奨」を選んだときに落とします。必須でも推奨でもない部品は、友人が「カスタム」で選んだときだけ落とします。上の表にないもの（`maps`、`generated-scripts`、`history.txt`など）は配りません。配りたいときは部品に足してください。
 
 設定にかかわらず、絶対に配らないものもあります。`.bat`や`.cmd`や`.ps1`や`.vbs`などのスクリプト、本体以外のexe（Nettool、makeobj、ほかの版）、`.sve`（セーブデータやパスワード）、`settings.xml`、ログ、`save`と`screenshot`と`addons`のフォルダ、paksetのフォルダです。
 
-部品の設定を変えるときは、[engine-files.default.json](engine-files.default.json)を`engine-files.json`という名前でコピーして編集します。部品（`components`）ごとに`folders`と`files`（`*`が使える）、`required`と`recommended`を書き換えてください。`engine-files.json`があれば、ツールはそちらを使います。公開のたびに、部品ごとのファイル数とサイズ、配らなかったフォルダ、絶対に配らないものを表示するので、確かめてください。
+部品の設定を変えるときは、[engine-files.default.json](engine-files.default.json)を`engine-files.json`という名前でコピーして編集します。部品（`components`）ごとに`folders`と`files`（`*`が使える）、`required`と`recommended`を書き換えてください。`folders`に`themes/*.tab`のように「フォルダ/名前」と書くと、そのフォルダの直下にある名前の合うファイルだけを配ります。`engine-files.json`があれば、ツールはそちらを使います。公開のたびに、部品ごとのファイル数とサイズ、配らなかったフォルダ、絶対に配らないものを表示するので、確かめてください。
 
 本体はファイル一覧方式で`engine\<版>\`に置きます。本体が更新されたときも、友人は変わったファイルだけを落とします。中身が前回と同じなら置き直さず、どのサーバーも使わなくなった古い版は消します。本体はWindows版だけを配ります。MacやLinuxの友人は、手元のsimutransをランチャーの「設定」で指定します。
 

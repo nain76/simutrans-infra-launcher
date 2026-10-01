@@ -39,7 +39,7 @@ $ErrorActionPreference = 'Stop'
 # 絶対に配らないもの（engine-files.jsonに書いても変わらない）
 $NeverFolders = @('save', 'screenshot', 'addons')
 $NeverFiles = @('*.bat', '*.cmd', '*.ps1', '*.psm1', '*.vbs', '*.vbe', '*.js', '*.jse', '*.wsf', '*.hta', '*.lnk', '*.url', '*.reg',
-    '*.exe', '*.com', '*.scr', '*.msi', '*.sve', '*.log', 'settings.xml', '*pwdhash*', 'index.json', 'web.config')
+    '*.exe', '*.com', '*.scr', '*.msi', '*.sve', '*.sv_', '*.log', 'settings.xml', '*pwdhash*', 'index.json', 'web.config')
 
 # 配るもの（推奨設定。engine-files.jsonがあればそちらを使う）
 $rulesPath = Join-Path $PSScriptRoot 'engine-files.json'
@@ -53,7 +53,15 @@ $rules = Read-JsonFile $rulesPath
 $components = @()
 if ($rules.PSObject.Properties['components']) {
     foreach ($c in $rules.components) {
-        $folders = if ($c.PSObject.Properties['folders']) { @($c.folders | ForEach-Object { $_.ToLowerInvariant() }) } else { @() }
+        # "themes/*.tab" のように書いたフォルダは、直下にある、名前が合うファイルだけを配る（中のフォルダは配らない）
+        $entries = if ($c.PSObject.Properties['folders']) { @($c.folders | ForEach-Object { $_.ToLowerInvariant() }) } else { @() }
+        $folders = @($entries | Where-Object { $_ -notmatch '/' })
+        $flat = @{}
+        foreach ($e in @($entries | Where-Object { $_ -match '/' })) {
+            $name, $pattern = $e -split '/', 2
+            if (-not $flat.ContainsKey($name)) { $flat[$name] = @() }
+            $flat[$name] += $pattern
+        }
         $patterns = if ($c.PSObject.Properties['files']) { @($c.files) } else { @() }
         $components += [pscustomobject]@{
             Id          = $c.id
@@ -61,6 +69,7 @@ if ($rules.PSObject.Properties['components']) {
             Required    = [bool]($c.PSObject.Properties['required'] -and $c.required)
             Recommended = [bool]($c.PSObject.Properties['recommended'] -and $c.recommended)
             Folders     = $folders
+            FlatFolders = $flat
             Files       = $patterns
         }
     }
@@ -68,7 +77,7 @@ if ($rules.PSObject.Properties['components']) {
 else {
     # 以前の形式（foldersとfilesだけ）は、必須の部品1つとして扱う
     $components += [pscustomobject]@{ Id = 'core'; Name = '本体'; Required = $true; Recommended = $false
-        Folders = @($rules.folders | ForEach-Object { $_.ToLowerInvariant() }); Files = @($rules.files) }
+        Folders = @($rules.folders | ForEach-Object { $_.ToLowerInvariant() }); FlatFolders = @{}; Files = @($rules.files) }
 }
 $coreComponent = @($components | Where-Object { $_.Required })[0]
 if (-not $coreComponent) { throw "$rulesPath に必須（required）の部品がありません" }
@@ -111,6 +120,20 @@ foreach ($item in Get-ChildItem -LiteralPath $src -Force) {
         if ($NeverFolders -contains $item.Name.ToLowerInvariant()) { $neverItems += "$($item.Name)\"; continue }
         # 部品に書いてあるフォルダは配る。themes には見た目の画像として .pak が入っているので、
         # .pak の有無で pakset と決めつけるのは、部品に書いていないフォルダだけにする
+        $flatOwner = @($components | Where-Object { $_.FlatFolders.ContainsKey($item.Name.ToLowerInvariant()) })[0]
+        if ($flatOwner) {
+            # 直下の、名前が合うファイルだけ（themes の *.tab と *.pak など）。中のフォルダやほかのファイルは配らない
+            $wantedPatterns = $flatOwner.FlatFolders[$item.Name.ToLowerInvariant()]
+            $leftOut = 0
+            foreach ($f in Get-ChildItem -LiteralPath $item.FullName -Force) {
+                if (-not $f.PSIsContainer -and -not (Test-SkipOsFile $f $src) -and (Test-Like $f.Name $wantedPatterns) -and -not (Test-Like $f.Name $NeverFiles)) {
+                    $files += [pscustomobject]@{ Rel = "$($item.Name)/$($f.Name)"; File = $f; Component = $flatOwner.Id }
+                }
+                else { $leftOut++ }
+            }
+            if ($leftOut -gt 0) { $skippedFolders += "$($item.Name) の中の $($wantedPatterns -join '・') 以外（$leftOut 件）" }
+            continue
+        }
         $owner = @($components | Where-Object { $_.Folders -contains $item.Name.ToLowerInvariant() })[0]
         if (-not $owner) {
             $isPakset = $null -ne (Get-ChildItem -LiteralPath $item.FullName -Filter '*.pak' -File -Force | Select-Object -First 1)
