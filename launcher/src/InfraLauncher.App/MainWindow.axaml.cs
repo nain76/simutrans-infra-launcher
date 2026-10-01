@@ -11,6 +11,11 @@ public partial class MainWindow : Window
     private readonly LauncherSettings _settings;
     private List<ServerRow> _rows = new();
     private bool _busy;
+    /// <summary>同期中なら、中止に使う。</summary>
+    private CancellationTokenSource? _syncCts;
+    /// <summary>最後に進み具合が届いた時刻（止まっていないかを見るため）。</summary>
+    private DateTime _lastProgress;
+    private string _lastStage = "";
 
     public MainWindow()
     {
@@ -55,6 +60,7 @@ public partial class MainWindow : Window
             }
             _rows = rows;
             ShowRows(selectKey);
+            _ = ProbeAsync(rows);
 
             var failed = sources.Count(s => s.Error is not null);
             StatusText.Text = failed > 0
@@ -65,6 +71,17 @@ public partial class MainWindow : Window
         {
             SetBusy(false);
         }
+    }
+
+    /// <summary>各サーバーのポートにつながるかを確かめ、稼働状況の札に反映する（一覧の表示は待たない）。</summary>
+    private static async Task ProbeAsync(IEnumerable<ServerRow> rows)
+    {
+        await Task.WhenAll(rows.Where(r => r is { Kind: ServerRowKind.Listed, Server: not null }).Select(async r =>
+        {
+            var ok = ServerAddress.TryParse(r.Server!.Address, out var address)
+                && await ServerProbe.IsReachableAsync(address, TimeSpan.FromSeconds(4));
+            r.SetReachable(ok);
+        }));
     }
 
     /// <summary>お気に入りを上に並べ、絞り込みを反映して表示する。</summary>
@@ -110,7 +127,9 @@ public partial class MainWindow : Window
     private void UpdateButtons()
     {
         var row = Selected;
-        SyncButton.IsEnabled = !_busy && row is { CanSync: true };
+        // 同期中は「同期」ボタンを「中止」にする
+        SyncButton.Content = _syncCts is null ? "同期" : "中止";
+        SyncButton.IsEnabled = _syncCts is not null || !_busy && row is { CanSync: true };
         InstallOptionsButton.IsEnabled = !_busy && row is { Kind: ServerRowKind.Listed, Server.EngineDownloadAllowed: true };
         LaunchButton.IsEnabled = !_busy && row is { IsReady: true };
         EditButton.IsEnabled = !_busy && row is not null;
@@ -257,17 +276,35 @@ public partial class MainWindow : Window
     /// <summary>本体と pakset をサーバーと同じ状態にする。起動はしない。</summary>
     private async void OnSync(object? sender, RoutedEventArgs e)
     {
+        if (_syncCts is { } running)
+        {
+            running.Cancel();
+            StatusText.Text = "中止しています…";
+            return;
+        }
         if (_busy || Selected is not { CanSync: true, Server: { } server } row)
         {
             return;
         }
         SetBusy(true, $"{row.Name} を同期しています…");
+        using var cts = new CancellationTokenSource();
+        // 進み具合が長いあいだ届かなければ、考えられる原因と対処を出す
+        var watchdog = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        watchdog.Tick += (_, _) =>
+        {
+            if (DateTime.Now - _lastProgress > TimeSpan.FromSeconds(60))
+            {
+                StatusText.Text = $"{_lastStage}\n1分以上進んでいません。ダウンロード先が OneDrive などの同期フォルダの中だと止まることがあります。" +
+                    "「中止」を押し、「インストール設定」でダウンロード先を OneDrive の外に変えてから、もう一度「同期」を押してください";
+            }
+        };
         try
         {
             var progress = new Progress<SyncProgress>(p =>
             {
+                _lastProgress = DateTime.Now;
                 var percent = p.BytesTotal is > 0 ? $"  {p.BytesDone * 100 / p.BytesTotal.Value}%" : "";
-                StatusText.Text = $"{p.Item.Label}: {p.Stage}{percent}";
+                StatusText.Text = _lastStage = $"{p.Item.Label}: {p.Stage}{percent}";
                 Progress.IsIndeterminate = p.BytesTotal is not > 0;
                 if (p.BytesTotal is > 0)
                 {
@@ -285,11 +322,20 @@ public partial class MainWindow : Window
                 SetBusy(true, $"{row.Name} を同期しています…");
             }
             var options = OptionsFor(row);
-            var summary = await _service.SyncServerAsync(server, _settings, progress, options: options);
+            _syncCts = cts;
+            _lastProgress = DateTime.Now;
+            _lastStage = StatusText.Text ?? "";
+            watchdog.Start();
+            UpdateButtons();
+            var summary = await _service.SyncServerAsync(server, _settings, progress, cts.Token, options);
             row.SetPlan(_service.Sync.Plan(server, _settings, options), null);
             StatusText.Text = summary.Downloads == 0 && summary.Removed == 0
                 ? $"{row.Name}: すでに最新です。「起動」で接続できます"
                 : $"{row.Name}: 同期しました（ダウンロード {summary.Downloads} 件）。「起動」で接続できます";
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            StatusText.Text = "同期を中止しました。もう一度「同期」を押すと、ダウンロード済みのファイルは使い回して続きから始めます";
         }
         catch (Exception ex) when (ex is SyncException or FormatException or FileNotFoundException)
         {
@@ -297,6 +343,8 @@ public partial class MainWindow : Window
         }
         finally
         {
+            watchdog.Stop();
+            _syncCts = null;
             SetBusy(false);
         }
     }

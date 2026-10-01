@@ -42,13 +42,6 @@ public sealed class ServerRow : INotifyPropertyChanged
 
     public static ServerRow Listed(ServerListSource list, ServerEntry server, SyncPlan? plan, string? planError)
     {
-        var (label, brush) = server.Status switch
-        {
-            "online" => ("● 稼働中", Green),
-            "offline" => ("停止中", Gray),
-            "maintenance" => ("メンテナンス中", Orange),
-            _ => ("状態不明", Gray),
-        };
         var engine = server.Engine is { } e ? $"本体: {e.Revision}" : "本体: 手元のものを使う";
         var row = new ServerRow(ServerRowKind.Listed, FavoriteKeys.ForListed(list, server.Id))
         {
@@ -56,8 +49,8 @@ public sealed class ServerRow : INotifyPropertyChanged
             Server = server,
             Name = server.Name,
             AddressText = server.Address,
-            StatusText = label,
-            StatusBrush = brush,
+            _statusText = server.Status == "maintenance" ? "メンテナンス中" : "確認中…",
+            _statusBrush = server.Status == "maintenance" ? Orange : Gray,
             PlayersText = server.Players is { } n ? $"{n}人" : "",
             Message = server.Message ?? "",
             DetailText = string.Join("　｜　", $"pakset: {server.Pakset.DisplayName}", engine,
@@ -82,8 +75,8 @@ public sealed class ServerRow : INotifyPropertyChanged
     {
         List = list,
         Name = list.Name,
-        StatusText = "読み込めませんでした",
-        StatusBrush = Red,
+        _statusText = "読み込めませんでした",
+        _statusBrush = Red,
         DetailText = "サーバーリスト（「編集」でアドレスを確かめるか、「削除」で消せます）",
         _syncLabel = "エラー",
         _syncBrush = Red,
@@ -98,9 +91,36 @@ public sealed class ServerRow : INotifyPropertyChanged
 
     public string Name { get; private init; } = "";
     public string AddressText { get; private init; } = "";
-    public string StatusText { get; private init; } = "";
-    public IBrush StatusBrush { get; private init; } = Gray;
-    public bool HasStatus => StatusText.Length > 0;
+    private string _statusText = "";
+    private IBrush _statusBrush = Gray;
+
+    /// <summary>稼働状況の札。サーバーリストの値ではなく、実際にポートにつながるかで決める（<see cref="SetReachable"/>）。</summary>
+    public string StatusText
+    {
+        get => _statusText;
+        private set { _statusText = value; OnPropertyChanged(); OnPropertyChanged(nameof(HasStatus)); }
+    }
+
+    public IBrush StatusBrush
+    {
+        get => _statusBrush;
+        private set { _statusBrush = value; OnPropertyChanged(); }
+    }
+
+    public bool HasStatus => _statusText.Length > 0;
+
+    /// <summary>
+    /// ポートにつながったかを反映する。管理者が「メンテナンス中」にしているときはそれを優先する。
+    /// つながらないときは「停止中」（サーバーが起動していないか、ポートが外から届かない）。
+    /// </summary>
+    public void SetReachable(bool reachable)
+    {
+        if (Server?.Status == "maintenance")
+        {
+            return;
+        }
+        (StatusText, StatusBrush) = reachable ? ("● 稼働中", Green) : ("停止中", Gray);
+    }
     public string PlayersText { get; private init; } = "";
     public bool HasPlayers => PlayersText.Length > 0;
     public string Message { get; private init; } = "";

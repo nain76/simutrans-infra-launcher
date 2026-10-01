@@ -1,3 +1,4 @@
+using System.Security.Cryptography;
 using InfraLauncher.Core.Models;
 
 namespace InfraLauncher.Core;
@@ -84,13 +85,13 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
 
         // 2. ダウンロード（同じ中身のファイルは1回だけ落とす）
         // 途中のファイルは中身の SHA256 を名前にして一時フォルダに置き、全部そろって確かめてから本来の名前で置く。
-        // 一時フォルダはユーザーが触らないよう、Windows では隠しフォルダにする（終われば消す）
-        var staging = Path.Combine(Path.GetDirectoryName(target)!, $".{Path.GetFileName(target)}.partial");
-        var stagingDir = Directory.CreateDirectory(staging);
-        if (OperatingSystem.IsWindows())
-        {
-            stagingDir.Attributes |= FileAttributes.Hidden;
-        }
+        // 一時フォルダはランチャーのデータフォルダ（%LOCALAPPDATA%）に置く。ダウンロード先が OneDrive などの中だと、
+        // 書いている途中のファイルを同期ソフトがつかんで止まることがあるため。展開先ごとに決まった場所なので、
+        // 途中で止めてもやり直したときに続きから使える（終われば消す）
+        TryDeleteDir(Path.Combine(Path.GetDirectoryName(target)!, $".{Path.GetFileName(target)}.partial")); // 以前の版の場所
+        var staging = Path.Combine(layout.DownloadDir, "partial",
+            Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(target).ToLowerInvariant())))[..16]);
+        Directory.CreateDirectory(staging);
         var unique = missing.GroupBy(f => f.Sha256.ToLowerInvariant()).Select(g => g.First()).ToList();
 
         // 手元のほかの pakset（本体の別リビジョン用など）に同じ中身のファイルがあれば、コピーして使う
@@ -119,15 +120,23 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
 
         long total = unique.Sum(f => f.Size), done = 0;
         var finished = 0;
-        // 何ファイル目か・何 MB 届いたかを出す（大きいファイルが残っていても止まって見えないように）
-        void Report() => progress?.Report(new SyncProgress(item,
-            $"ダウンロード中 {Volatile.Read(ref finished)}/{unique.Count} ファイル（{FormatSize(Interlocked.Read(ref done))} / {FormatSize(total)}）",
-            Interlocked.Read(ref done), total));
+        var inFlight = new System.Collections.Concurrent.ConcurrentDictionary<string, byte>();
+        // 何ファイル目か・何 MB 届いたかを出す（大きいファイルが残っていても止まって見えないように）。
+        // 残りが少なくなったら、どのファイルを待っているかも出す（止まったときに原因を調べられるように）
+        void Report()
+        {
+            var left = unique.Count - Volatile.Read(ref finished);
+            var waiting = left is > 0 and <= 3 && !inFlight.IsEmpty ? $"　残り: {string.Join("、", inFlight.Keys)}" : "";
+            progress?.Report(new SyncProgress(item,
+                $"ダウンロード中 {unique.Count - left}/{unique.Count} ファイル（{FormatSize(Interlocked.Read(ref done))} / {FormatSize(total)}）{waiting}",
+                Interlocked.Read(ref done), total));
+        }
         using (var gate = new SemaphoreSlim(Parallelism))
         {
             await Task.WhenAll(unique.Select(async f =>
             {
                 await gate.WaitAsync(ct);
+                inFlight[f.Path] = 0;
                 try
                 {
                     var tmp = Path.Combine(staging, f.Sha256.ToLowerInvariant());
@@ -163,6 +172,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
                 }
                 finally
                 {
+                    inFlight.TryRemove(f.Path, out _);
                     gate.Release();
                 }
             }));
@@ -190,8 +200,14 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         }
 
         Directory.CreateDirectory(target);
+        var placed = 0;
         foreach (var f in missing)
         {
+            ct.ThrowIfCancellationRequested();
+            if (++placed % 20 == 0 || placed == missing.Count)
+            {
+                progress?.Report(new SyncProgress(item, $"反映中 {placed}/{missing.Count} ファイル　{f.Path}", placed, missing.Count));
+            }
             var local = LocalPath(target, f.Path);
             Discard(f.Path);
             Directory.CreateDirectory(Path.GetDirectoryName(local)!);

@@ -25,7 +25,7 @@
 | `servers[].id` | ○ | 変わらない識別子（英数字と `_ . + -`）。表示名を変えてもこれは変えない |
 | `servers[].name` | ○ | 表示名 |
 | `servers[].address` | ○ | `host` か `host:port`。ポートを省略すると 13353 |
-| `servers[].status` | | `online` / `offline` / `maintenance` / `unknown` |
+| `servers[].status` | | `online` / `offline` / `maintenance` / `unknown`。ランチャーは稼働中かどうかを実際にポートにつないで確かめるので、`online` / `offline` は表示に使わない。`maintenance` だけは「メンテナンス中」と出す |
 | `servers[].players` | | 接続中の人数 |
 | `servers[].message` | | お知らせ |
 | `servers[].engine.revision` | | 本体のリビジョン名。ランチャーはリビジョンごとに別フォルダに本体を入れる |

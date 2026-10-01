@@ -139,7 +139,7 @@ C:\simutrans-dist\                 ← 8080 番で公開（増やしても1つ�
 |---|---|
 | アドオンを足す・入れ替える | ① `C:\simutrans-server\pak128.japan` に pak をコピー → ② simutrans サーバーを再起動 → ③ `Publish-Pakset.bat` をダブルクリック |
 | アドオンを外す | ① pak を消す → ② 再起動 → ③ `Publish-Pakset.bat` をダブルクリック（外したアドオンを使っているセーブデータは読めなくなることがあります） |
-| お知らせや状態を変える | `manifest.json` の `message` や `status`（`online` / `offline` / `maintenance`）を書き換え、**`Manage-SigningKey.bat` の「3. サーバーリストに署名し直す」を実行する**（署名し直さないと、友人のランチャーは書き換えを改ざんとみなして読み込みません） |
+| お知らせや状態を変える | `manifest.json` の `message` や `status`（`maintenance` にするとメンテナンス中と出る。稼働中かどうかはランチャーが実際につないで確かめるので、書き換えなくてよい）を書き換え、**`Manage-SigningKey.bat` の「3. サーバーリストに署名し直す」を実行する**（署名し直さないと、友人のランチャーは書き換えを改ざんとみなして読み込みません） |
 | 確認コードをもう一度見る | `Manage-SigningKey.bat` をダブルクリック |
 | simutrans サーバーを増やす | `Add-Server.bat` をダブルクリック |
 

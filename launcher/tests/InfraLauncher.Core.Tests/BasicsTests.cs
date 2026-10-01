@@ -87,3 +87,17 @@ public class PaksetDisplayNameTests
         Assert.Equal(expected, p.DisplayName);
     }
 }
+
+public class ServerProbeTests
+{
+    [Fact]
+    public async Task DetectsListeningPort()
+    {
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+        Assert.True(await ServerProbe.IsReachableAsync(new ServerAddress("127.0.0.1", port), TimeSpan.FromSeconds(3)));
+        listener.Stop();
+        Assert.False(await ServerProbe.IsReachableAsync(new ServerAddress("127.0.0.1", port), TimeSpan.FromSeconds(3)));
+    }
+}
