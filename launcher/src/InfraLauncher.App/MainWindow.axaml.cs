@@ -448,15 +448,20 @@ public partial class MainWindow : Window
         {
             return false;
         }
-        // ダウンロード先が変わったら、前のフォルダの記録は捨てる（前のフォルダのファイルは使わない）
-        var previous = _service.Sync.ForgetPreviousInstall(server, _settings, OptionsFor(row), dialog.Result);
+        // ダウンロード先が変わったら、前のフォルダはもう使わない（記録を捨てる）。ランチャーが入れたファイルを消すかは聞く
+        var previous = _service.Sync.PreviousInstallDir(server, _settings, OptionsFor(row), dialog.Result);
         _settings.ServerInstall[row.FavoriteKey] = dialog.Result;
         _settings.Save(_service.Layout);
-        if (previous is not null && Directory.Exists(Path.Combine(previous, server.Engine!.Revision)))
+        if (previous is not null)
         {
-            await Dialogs.ConfirmAsync(this, "前のダウンロード先",
-                $"ダウンロード先を変えました。前のフォルダはもう使いません。\n{Path.Combine(previous, server.Engine.Revision)}\n\n" +
-                "要らなければ、エクスプローラーで消してかまいません（ランチャーは消しません）。", "OK");
+            var delete = Directory.Exists(previous) && await Dialogs.ConfirmAsync(this, "前のダウンロード先",
+                $"ダウンロード先を変えました。前のフォルダはもう使いません。\n{previous}\n\n" +
+                "このフォルダにある、ランチャーが入れたファイル（simutrans 本体と pakset）を消しますか？\n" +
+                "自分で置いたファイル（セーブデータやスクリーンショットなど）は消しません。", "消す");
+            if (_service.Sync.ForgetInstall(previous, delete) && delete)
+            {
+                StatusText.Text = $"前のフォルダに、ランチャーが入れたもの以外のファイルが残っています。要らなければ消してください: {previous}";
+            }
         }
         return true;
     }

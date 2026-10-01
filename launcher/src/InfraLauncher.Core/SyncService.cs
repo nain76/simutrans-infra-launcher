@@ -61,22 +61,86 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         return await _fileIndex.LoadIndexAsync(build.IndexUrl!, build.IndexSha256!, $"simutrans {server.Engine!.Revision}", build.Exe, ct);
     }
 
-    /// <summary>
-    /// ダウンロード先を変えたとき、前のダウンロード先にあるこのサーバーの本体と pakset の記録を捨てる
-    /// （前のフォルダのファイルは使い回しにも使わない。フォルダ自体は消さないので、要らなければユーザーが消す）。
-    /// 前のフォルダを返す（変わっていなければ null）。
-    /// </summary>
-    public string? ForgetPreviousInstall(ServerEntry server, LauncherSettings settings, InstallOptions? before, InstallOptions? after)
+    /// <summary>ダウンロード先を変えたとき、前のダウンロード先にあるこのサーバーの本体のフォルダ（変わっていなければ null）。</summary>
+    public string? PreviousInstallDir(ServerEntry server, LauncherSettings settings, InstallOptions? before, InstallOptions? after)
     {
         var oldRoot = InstallRoot(settings, before);
-        if (string.Equals(oldRoot, InstallRoot(settings, after), StringComparison.OrdinalIgnoreCase) || server.Engine is null)
-        {
-            return null;
-        }
+        return string.Equals(oldRoot, InstallRoot(settings, after), StringComparison.OrdinalIgnoreCase) || server.Engine is null
+            ? null
+            : Path.Combine(oldRoot, server.Engine.Revision);
+    }
+
+    /// <summary>
+    /// 使わなくなったフォルダ（前のダウンロード先）の記録と、ダウンロード途中の一時ファイルを捨てる。以後は使い回しにも使わない。
+    /// <paramref name="deleteFiles"/> なら、ランチャーが入れたファイル（記録にあるもの）も消し、空になったフォルダを消す。
+    /// 自分で置いたファイル（セーブデータなど）は記録にないので消さない。フォルダが残ったら true。
+    /// </summary>
+    public bool ForgetInstall(string dir, bool deleteFiles)
+    {
         var state = InstalledState.Load(layout);
-        state.RemoveUnder(Path.Combine(oldRoot, server.Engine.Revision));
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(dir));
+        foreach (var (key, record) in state.Items.Where(kv => kv.Key.Equals(full, StringComparison.OrdinalIgnoreCase)
+                     || kv.Key.StartsWith(full + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)).ToList())
+        {
+            FileIndexSync.TryDeleteDir(FileIndexSync.StagingDirFor(layout, key));
+            if (deleteFiles)
+            {
+                foreach (var rel in record.Files?.Keys ?? Enumerable.Empty<string>())
+                {
+                    Downloader.TryDelete(Path.Combine(key, rel.Replace('/', Path.DirectorySeparatorChar)));
+                }
+            }
+        }
+        state.RemoveUnder(full);
         state.Save(layout);
-        return oldRoot;
+        if (deleteFiles && Directory.Exists(full))
+        {
+            try
+            {
+                FileIndexSync.RemoveEmptyDirectories(full);
+                if (!Directory.EnumerateFileSystemEntries(full).Any())
+                {
+                    Directory.Delete(full);
+                }
+            }
+            catch (IOException) { }
+            catch (UnauthorizedAccessException) { }
+        }
+        return Directory.Exists(full);
+    }
+
+    /// <summary>
+    /// 残骸を片付ける。消されたフォルダの記録と、長いあいだ使われていない一時ファイル（ダウンロード途中のもの、取得済みのファイル一覧）を捨てる。
+    /// </summary>
+    private void CleanUp()
+    {
+        var state = InstalledState.Load(layout);
+        if (state.RemoveMissing())
+        {
+            state.Save(layout);
+        }
+        var limit = DateTime.Now.AddDays(-14);
+        try
+        {
+            var partial = Path.Combine(layout.DownloadDir, "partial");
+            if (Directory.Exists(partial))
+            {
+                foreach (var dir in Directory.EnumerateDirectories(partial).Where(d => Directory.GetLastWriteTime(d) < limit).ToList())
+                {
+                    FileIndexSync.TryDeleteDir(dir);
+                }
+            }
+            var indexes = Path.Combine(layout.Root, "indexes");
+            if (Directory.Exists(indexes))
+            {
+                foreach (var file in Directory.EnumerateFiles(indexes).Where(f => File.GetLastWriteTime(f) < limit.AddDays(-16)).ToList())
+                {
+                    Downloader.TryDelete(file);
+                }
+            }
+        }
+        catch (IOException) { }
+        catch (UnauthorizedAccessException) { }
     }
 
     /// <summary>pakset のファイル一覧（全体のサイズを画面に出すため）。zip 方式の pakset なら null。</summary>
@@ -154,12 +218,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     public async Task<SyncSummary> SyncAsync(SyncPlan plan, IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
     {
         var summary = new SyncSummary(0, 0, 0);
-        // 消されたフォルダ（以前のダウンロード先など）の記録は捨てる
-        var current = InstalledState.Load(layout);
-        if (current.RemoveMissing())
-        {
-            current.Save(layout);
-        }
+        // 消されたフォルダ（以前のダウンロード先など）の記録や、古い一時ファイルを片付ける
+        CleanUp();
         // 本体を先に入れる。本体を入れ直すと中の pakset も消えるので、そのあと pakset を判定し直す
         foreach (var item in plan.Items.OrderBy(i => i.Kind))
         {

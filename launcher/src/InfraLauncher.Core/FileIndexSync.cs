@@ -91,8 +91,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         // 書いている途中のファイルを同期ソフトがつかんで止まることがあるため。展開先ごとに決まった場所なので、
         // 途中で止めてもやり直したときに続きから使える（終われば消す）
         TryDeleteDir(Path.Combine(Path.GetDirectoryName(target)!, $".{Path.GetFileName(target)}.partial")); // 以前の版の場所
-        var staging = Path.Combine(layout.DownloadDir, "partial",
-            Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(target).ToLowerInvariant())))[..16]);
+        var staging = StagingDirFor(layout, target);
         Directory.CreateDirectory(staging);
         var unique = missing.GroupBy(f => f.Sha256.ToLowerInvariant()).Select(g => g.First()).ToList();
 
@@ -353,7 +352,12 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
 
     private static bool SameSha(string a, string b) => a.Equals(b, StringComparison.OrdinalIgnoreCase);
 
-    private static void RemoveEmptyDirectories(string root)
+    /// <summary>展開先ごとの、ダウンロード途中のファイルを置く一時フォルダ。</summary>
+    internal static string StagingDirFor(InstallLayout layout, string target) =>
+        Path.Combine(layout.DownloadDir, "partial",
+            Convert.ToHexStringLower(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(target).ToLowerInvariant())))[..16]);
+
+    internal static void RemoveEmptyDirectories(string root)
     {
         foreach (var dir in Directory.EnumerateDirectories(root, "*", SearchOption.AllDirectories).OrderByDescending(d => d.Length))
         {
@@ -369,7 +373,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         : bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024:0.0} MB"
         : $"{Math.Max(0, bytes) / 1024} KB";
 
-    private static void TryDeleteDir(string path)
+    internal static void TryDeleteDir(string path)
     {
         try
         {

@@ -132,11 +132,38 @@ public sealed class EngineComponentsTests : IDisposable
         var before = new InstallOptions { InstallRoot = Path.Combine(_dir, "old") };
         var after = new InstallOptions { InstallRoot = Path.Combine(_dir, "new") };
         await _service.SyncServerAsync(server, settings, options: before);
-        Assert.NotNull(InstalledState.Load(_layout).Get(Path.Combine(_dir, "old", "r1")));
+        var oldDir = Path.Combine(_dir, "old", "r1");
+        Assert.NotNull(InstalledState.Load(_layout).Get(oldDir));
+        Assert.Null(_service.Sync.PreviousInstallDir(server, settings, before, before));
+        Assert.Equal(oldDir, _service.Sync.PreviousInstallDir(server, settings, before, after));
 
-        Assert.Null(_service.Sync.ForgetPreviousInstall(server, settings, before, before));
-        Assert.Equal(Path.Combine(_dir, "old"), _service.Sync.ForgetPreviousInstall(server, settings, before, after));
+        // 消さないことを選んだら、記録だけ捨ててファイルは残す
+        Assert.True(_service.Sync.ForgetInstall(oldDir, deleteFiles: false));
         Assert.Empty(InstalledState.Load(_layout).Items);
+        Assert.True(File.Exists(Path.Combine(oldDir, "sim.exe")));
+    }
+
+    [Fact]
+    public async Task DeletesOnlyFilesTheLauncherInstalled()
+    {
+        var server = Default();
+        var settings = new LauncherSettings();
+        var before = new InstallOptions { InstallRoot = Path.Combine(_dir, "old") };
+        await _service.SyncServerAsync(server, settings, options: before);
+        var oldDir = Path.Combine(_dir, "old", "r1");
+        // 自分で置いたセーブデータは消さない
+        Directory.CreateDirectory(Path.Combine(oldDir, "save"));
+        File.WriteAllText(Path.Combine(oldDir, "save", "my.sve"), "x");
+
+        Assert.True(_service.Sync.ForgetInstall(oldDir, deleteFiles: true));
+        Assert.False(File.Exists(Path.Combine(oldDir, "sim.exe")));
+        Assert.False(Directory.Exists(Path.Combine(oldDir, "p")));
+        Assert.True(File.Exists(Path.Combine(oldDir, "save", "my.sve")));
+
+        // 何も置いていなければ、フォルダごと消える
+        await _service.SyncServerAsync(server, settings, options: new InstallOptions { InstallRoot = Path.Combine(_dir, "old2") });
+        Assert.False(_service.Sync.ForgetInstall(Path.Combine(_dir, "old2", "r1"), deleteFiles: true));
+        Assert.False(Directory.Exists(Path.Combine(_dir, "old2", "r1")));
     }
 
     [Fact]
