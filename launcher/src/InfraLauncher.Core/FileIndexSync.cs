@@ -24,6 +24,14 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
     /// config/simuconf.tabはユーザーが自分で書き換えたり、ランチャーがプレイヤー名を書き込んだりするので、
     ///手元になければ入れるが、あれば書き換えない（サーバー側で変わっても上書きしない）。
     /// </summary>
+    /// <summary>
+    /// Windows などが自動で作るファイル。遊ぶのに要らず、IIS は隠しファイルを配信しないので、一覧にあっても落とさない。
+    /// 手元にあっても片付けない（エクスプローラーが作り直すため）。
+    /// </summary>
+    internal static readonly HashSet<string> IgnoredNames = new(StringComparer.OrdinalIgnoreCase) { "desktop.ini", "thumbs.db", "ehthumbs.db", ".ds_store" };
+
+    private static bool IsIgnored(string rel) => IgnoredNames.Contains(rel[(rel.LastIndexOf('/') + 1)..]);
+
     internal static readonly HashSet<string> PreservedFiles = new(StringComparer.OrdinalIgnoreCase) { "config/simuconf.tab" };
 
     /// <summary>手元のフォルダと一覧を照合した結果。</summary>
@@ -51,7 +59,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         var exeRel = item.ExePath is null ? null : Path.GetRelativePath(target, item.ExePath).Replace('\\', '/');
         var index = await LoadIndexAsync(item.Url, item.Sha256, item.Label, exeRel, ct);
         var indexUri = new Uri(item.Url);
-        var wanted = ComponentSelection.SelectFiles(index, item.Components);
+        var wanted = ComponentSelection.SelectFiles(index, item.Components).Where(f => !IsIgnored(f.Path)).ToList();
         var state = InstalledState.Load(layout);
         var record = state.Get(target);
         var managed = record is not null;
@@ -97,7 +105,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             extras = Directory.Exists(target)
                 ? Directory.EnumerateFiles(target, "*", SearchOption.AllDirectories)
                     .Select(p => Path.GetRelativePath(target, p).Replace('\\', '/'))
-                    .Where(rel => !keep.Contains(rel))
+                    .Where(rel => !keep.Contains(rel) && !IsIgnored(rel))
                     .ToList()
                 : new List<string>();
         }

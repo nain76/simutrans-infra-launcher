@@ -132,8 +132,13 @@ New-Item -ItemType Directory -Force -Path $dst | Out-Null
 
 # --- 1. 公開するファイルを集める---
 $files = @()
+$skippedOs = 0
 foreach ($f in Get-ChildItem -LiteralPath $src -Recurse -File -Force) {
     $rel = Get-RelativePath $src $f.FullName
+    if (Test-SkipOsFile $f $src) {
+        $skippedOs++
+        continue
+    }
     if ($BlockedExtensions -contains $f.Extension.ToLowerInvariant()) {
         Write-Warning "実行ファイルなどは公開しません（ランチャーが受け付けないため）: $rel"
         continue
@@ -144,6 +149,9 @@ foreach ($f in Get-ChildItem -LiteralPath $src -Recurse -File -Force) {
     $files += [pscustomobject]@{ Rel = $rel; Source = $f }
 }
 $files = @($files | Sort-Object -Property Rel -CaseSensitive)
+if ($skippedOs -gt 0) {
+    Write-Host "   Windowsが作るファイル（desktop.iniなど）と隠しファイルは公開しません: $skippedOs 件"
+}
 if ($files.Count -eq 0) {
     throw "paksetフォルダにファイルがありません: $src"
 }

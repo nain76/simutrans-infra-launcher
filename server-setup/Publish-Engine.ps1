@@ -106,12 +106,14 @@ $files = @([pscustomobject]@{ Rel = $exeName; File = (Get-Item -LiteralPath $exe
 $skippedFolders = @()
 $neverItems = @()
 foreach ($item in Get-ChildItem -LiteralPath $src -Force) {
+    if (Test-SkipOsFile $item $src) { continue }
     if ($item.PSIsContainer) {
         $isPakset = $null -ne (Get-ChildItem -LiteralPath $item.FullName -Filter '*.pak' -File -Force | Select-Object -First 1)
         if ($isPakset -or ($NeverFolders -contains $item.Name.ToLowerInvariant())) { $neverItems += "$($item.Name)\"; continue }
         $owner = @($components | Where-Object { $_.Folders -contains $item.Name.ToLowerInvariant() })[0]
         if (-not $owner) { $skippedFolders += $item.Name; continue }
         foreach ($f in Get-ChildItem -LiteralPath $item.FullName -Recurse -File -Force) {
+            if (Test-SkipOsFile $f $src) { continue }
             # フォルダの中でも、スクリプトやexeなどは配らない
             if (Test-Like $f.Name $NeverFiles) { $neverItems += $f.FullName.Substring($src.Length + 1); continue }
             $files += [pscustomobject]@{ Rel = $f.FullName.Substring($src.Length + 1).Replace('\', '/'); File = $f; Component = $owner.Id }

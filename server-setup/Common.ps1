@@ -180,3 +180,19 @@ $maps
 </configuration>
 "@
 }
+
+# Windows などが自動で作るファイル（desktop.ini や Thumbs.db）と、隠しファイル・システムファイルは配らない。
+# 遊ぶのに要らないうえ、IIS は隠しファイルを配信しないので、ランチャーの同期が 404 で止まってしまうため。
+# 隠しフォルダの中のファイルも同じ扱いにする
+$OsJunkNames = @('desktop.ini', 'thumbs.db', 'ehthumbs.db', '.ds_store')
+function Test-SkipOsFile($file, [string] $root) {
+    if ($OsJunkNames -contains $file.Name.ToLowerInvariant()) { return $true }
+    $hiddenOrSystem = [System.IO.FileAttributes]::Hidden -bor [System.IO.FileAttributes]::System
+    $item = $file
+    $rootFull = $root.TrimEnd('\', '/')
+    while ($item -and $item.FullName.TrimEnd('\', '/') -ne $rootFull) {
+        if ($item.Attributes -band $hiddenOrSystem) { return $true }
+        $item = if ($item.PSIsContainer) { $item.Parent } else { $item.Directory }
+    }
+    return $false
+}

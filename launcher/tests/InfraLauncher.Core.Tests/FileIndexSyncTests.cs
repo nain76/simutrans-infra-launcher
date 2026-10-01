@@ -213,6 +213,22 @@ public sealed class FileIndexSyncTests : IDisposable
     }
 
     [Fact]
+    public async Task SkipsWindowsMetadataFiles()
+    {
+        // サーバーの一覧に desktop.ini が載っていても（IIS は隠しファイルを配らず 404 になる）、落とさずに同期を終える
+        var s = Publish(new() { ["a.pak"] = "aaaa", ["desktop.ini"] = "[.ShellClassInfo]", ["sub/Thumbs.db"] = "x" });
+        _server.Files.Remove(Base + "desktop.ini");
+        _server.Files.Remove(Base + "sub/Thumbs.db");
+        var r = await Sync(s);
+        Assert.Equal(1, r.Downloads);
+
+        // 手元にエクスプローラーが作った desktop.ini があっても片付けない
+        File.WriteAllText(Path.Combine(PakDir, "desktop.ini"), "local");
+        await Sync(s);
+        Assert.True(File.Exists(Path.Combine(PakDir, "desktop.ini")));
+    }
+
+    [Fact]
     public async Task IgnoresDeletedFoldersWhenReusingFiles()
     {
         // 別の場所に一度入れてから、その場所を消す（ダウンロード先を変えて古いフォルダを消した場合）
