@@ -25,6 +25,16 @@ public partial class MainWindow : Window
         SyncLog.FilePath = _service.Layout.SyncLogPath;
         _settings = _service.LoadSettings();
         Opened += async (_, _) => await RefreshAsync();
+        // サーバーを起動したり止めたりしたのが分かるよう、稼働状況は1分ごとに確かめ直す
+        var statusTimer = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
+        statusTimer.Tick += async (_, _) =>
+        {
+            if (!_busy)
+            {
+                await ProbeAsync(_rows, showProbing: false);
+            }
+        };
+        statusTimer.Start();
     }
 
     private ServerRow? Selected => ServerList.SelectedItem as ServerRow;
@@ -75,14 +85,28 @@ public partial class MainWindow : Window
     }
 
     /// <summary>各サーバーのポートにつながるかを確かめ、稼働状況の札に反映する（一覧の表示は待たない）。</summary>
-    private static async Task ProbeAsync(IEnumerable<ServerRow> rows)
+    private static async Task ProbeAsync(IEnumerable<ServerRow> rows, bool showProbing = true)
     {
-        await Task.WhenAll(rows.Where(r => r is { Kind: ServerRowKind.Listed, Server: not null }).Select(async r =>
+        await Task.WhenAll(rows.Where(r => r is { Kind: ServerRowKind.Listed, Server: not null }).ToList().Select(async r =>
         {
+            if (showProbing)
+            {
+                r.SetProbing();
+            }
             var ok = ServerAddress.TryParse(r.Server!.Address, out var address)
                 && await ServerProbe.IsReachableAsync(address, TimeSpan.FromSeconds(4));
             r.SetReachable(ok);
         }));
+    }
+
+    /// <summary>稼働状況の札の横の「再確認」。そのサーバーのポートにつながるかを確かめ直す（サーバーリストの取り直しや同期はしない）。</summary>
+    private async void OnReprobe(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is ServerRow { Kind: ServerRowKind.Listed } row)
+        {
+            await ProbeAsync([row]);
+            StatusText.Text = $"{row.Name}: {row.StatusText}（{DateTime.Now:HH:mm:ss}に確かめました）";
+        }
     }
 
     /// <summary>お気に入りを上に並べ、絞り込みを反映して表示する。</summary>
@@ -128,7 +152,7 @@ public partial class MainWindow : Window
     private void UpdateButtons()
     {
         var row = Selected;
-        //同期中は「同期」ボタンを「中止」にする
+        // 同期中は「同期」ボタンを「中止」にする
         SyncButton.Content = _syncCts is null ? "同期" : "中止";
         SyncButton.IsEnabled = _syncCts is not null || !_busy && row is { CanSync: true };
         CheckButton.IsEnabled = !_busy && _rows.Any(r => r.Kind == ServerRowKind.Listed);
@@ -194,7 +218,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        //共有リストのサーバーは中身を管理者が管理しているので、リストの表示名と配信アドレスを編集する
+        // 共有リストのサーバーは中身を管理者が管理しているので、リストの表示名と配信アドレスを編集する
         var list = row.List!;
         var note = row.Kind == ServerRowKind.Listed
             ? $"「{row.Name}」はサーバーリスト「{list.Name}」から配信されています。サーバーの内容はサーバー管理者が管理しているため、ここではリストの表示名と配信アドレスを変更できます。"
@@ -202,13 +226,13 @@ public partial class MainWindow : Window
         var lw = new ServerListWindow(_service.Manifests, list, note);
         if (await lw.ShowDialog<bool>(this) && lw.Result is { } edited)
         {
-            //配信アドレスが変わったら、お気に入りの印も引き継ぐ
+            // 配信アドレスが変わったら、お気に入りの印も引き継ぐ
             var oldPrefix = FavoriteKeys.ForListed(list, "");
             var newPrefix = FavoriteKeys.ForListed(edited, "");
             _settings.FavoriteKeys = _settings.FavoriteKeys
                 .Select(k => k.StartsWith(oldPrefix, StringComparison.Ordinal) ? newPrefix + k[oldPrefix.Length..] : k)
                 .ToList();
-            //インストール設定も引き継ぐ
+            // インストール設定も引き継ぐ
             foreach (var key in _settings.ServerInstall.Keys.Where(k => k.StartsWith(oldPrefix, StringComparison.Ordinal)).ToList())
             {
                 var value = _settings.ServerInstall[key];
@@ -242,7 +266,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        //共有リストのサーバーは1件だけ消すことはできないので、リストごと削除する
+        // 共有リストのサーバーは1件だけ消すことはできないので、リストごと削除する
         var list = row.List!;
         var count = _rows.Count(r => r.Kind == ServerRowKind.Listed && r.List == list);
         var message = row.Kind == ServerRowKind.Listed
@@ -264,7 +288,7 @@ public partial class MainWindow : Window
 
     private void OnDoubleTapped(object? sender, RoutedEventArgs e)
     {
-        //ダブルクリックは、起動できるなら起動、まだなら同期（同期だけでは何も実行しない）
+        // ダブルクリックは、起動できるなら起動、まだなら同期（同期だけでは何も実行しない）
         if (Selected is { IsReady: true })
         {
             OnLaunch(sender, e);
@@ -290,7 +314,7 @@ public partial class MainWindow : Window
         }
         SetBusy(true, $"{row.Name}を同期しています…");
         using var cts = new CancellationTokenSource();
-        //進み具合が長いあいだ届かなければ、考えられる原因と対処を出す
+        // 進み具合が長いあいだ届かなければ、考えられる原因と対処を出す
         var watchdog = new Avalonia.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
         watchdog.Tick += (_, _) =>
         {
@@ -305,7 +329,7 @@ public partial class MainWindow : Window
         {
             var progress = new Progress<SyncProgress>(p =>
             {
-                //進み具合は後から届くことがあるので、同期が終わったあとに届いたものは捨てる（結果の表示を上書きしないように）
+                // 進み具合は後から届くことがあるので、同期が終わったあとに届いたものは捨てる（結果の表示を上書きしないように）
                 if (!ReferenceEquals(_syncCts, cts))
                 {
                     return;
@@ -319,7 +343,7 @@ public partial class MainWindow : Window
                     Progress.Value = p.BytesDone * 100.0 / p.BytesTotal.Value;
                 }
             });
-            //本体を配っているサーバーを初めて同期するときは、先にインストール設定を決めてもらう
+            // 本体を配っているサーバーを初めて同期するときは、先にインストール設定を決めてもらう
             if (server.EngineDownloadAllowed && !_settings.ServerInstall.ContainsKey(row.FavoriteKey))
             {
                 if (!await EditInstallOptionsAsync(row))
@@ -404,8 +428,8 @@ public partial class MainWindow : Window
         _settings.ServerInstall.GetValueOrDefault(FavoriteKeys.ForListed(list, server.Id));
 
     /// <summary>
-    ///アップデートチェック。サーバーリストを取り直し、選んだサーバー（選んでいなければすべて）について、
-    ///同期で何を落とすことになるかを調べて表示する。ダウンロードや書き換えはしない。
+    /// アップデートチェック。サーバーリストを取り直し、選んだサーバー（選んでいなければすべて）について、
+    /// 同期で何を落とすことになるかを調べて表示する。ダウンロードや書き換えはしない。
     /// </summary>
     private async void OnCheck(object? sender, RoutedEventArgs e)
     {
@@ -428,7 +452,16 @@ public partial class MainWindow : Window
             var lines = new List<string>();
             foreach (var row in targets)
             {
-                var progress = new Progress<SyncProgress>(p => StatusText.Text = $"{row.Name}: {p.Item.Label}を確かめています");
+                var progress = new Progress<SyncProgress>(p =>
+                {
+                    var percent = p.BytesTotal is > 0 ? $"  {p.BytesDone * 100 / p.BytesTotal.Value}%" : "";
+                    StatusText.Text = $"{row.Name}: {p.Item.Label}を確かめています（{p.Stage}）{percent}";
+                    Progress.IsIndeterminate = p.BytesTotal is not > 0;
+                    if (p.BytesTotal is > 0)
+                    {
+                        Progress.Value = p.BytesDone * 100.0 / p.BytesTotal.Value;
+                    }
+                });
                 var results = await _service.Sync.CheckAsync(row.Plan!, progress);
                 row.SetCheckResult(results);
                 lines.Add($"{row.Name}: {row.SyncDetail}");
@@ -491,13 +524,13 @@ public partial class MainWindow : Window
         {
             return false;
         }
-        //ダウンロード先が変わったら、前のフォルダはもう使わない（記録を捨てる）。ランチャーが入れたファイルを消すかは聞く
+        // ダウンロード先が変わったら、前のフォルダはもう使わない（記録を捨てる）。ランチャーが入れたファイルを消すかは聞く
         var previous = _service.Sync.PreviousInstallDir(server, _settings, OptionsFor(row), dialog.Result);
         _settings.ServerInstall[row.FavoriteKey] = dialog.Result;
         _settings.Save(_service.Layout);
         if (previous is not null)
         {
-            //ランチャーが入れたもの以外のファイル（セーブデータなど）があれば、バックアップを取るよう案内する
+            // ランチャーが入れたもの以外のファイル（セーブデータなど）があれば、バックアップを取るよう案内する
             var userFiles = _service.Sync.UserFilesIn(previous);
             var saves = userFiles.Count(f => f.EndsWith(".sve", StringComparison.OrdinalIgnoreCase));
             var backup = userFiles.Count == 0

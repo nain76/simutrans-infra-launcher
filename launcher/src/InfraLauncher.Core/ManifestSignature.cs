@@ -27,11 +27,11 @@ public sealed class ManifestSignatureException(SignatureProblem problem, string 
 }
 
 /// <summary>
-///サーバーリストの署名。サーバー管理者はVPSにある秘密鍵でmanifest.jsonに署名し、manifest.sig.jsonに置く。
-///ランチャーは、ユーザーが管理者から聞いた「確認コード」（公開鍵のSHA256の先頭）と一致した公開鍵を覚えておき、
-///毎回その鍵で署名を確かめる。paksetや本体のファイル一覧はmanifest.jsonにSHA256が書かれているので、
+/// サーバーリストの署名。サーバー管理者はVPSにある秘密鍵でmanifest.jsonに署名し、manifest.sig.jsonに置く。
+/// ランチャーは、ユーザーが管理者から聞いた「確認コード」（公開鍵のSHA256の先頭）と一致した公開鍵を覚えておき、
+/// 毎回その鍵で署名を確かめる。paksetや本体のファイル一覧はmanifest.jsonにSHA256が書かれているので、
 /// manifest.jsonの署名を確かめれば、配っているファイルすべてが管理者の公開したものだと分かる。
-///署名はECDSA P-256 / SHA-256（rとsを並べた64バイト）。
+/// 署名はECDSA P-256 / SHA-256（rとsを並べた64バイト）。
 /// </summary>
 public static class ManifestSignature
 {

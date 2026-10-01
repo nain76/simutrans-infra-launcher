@@ -15,10 +15,10 @@ public sealed partial class ManifestClient(HttpClient http)
     internal static TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(2);
 
     /// <summary>
-    ///サーバーリストと、隣にある署名（manifest.sig.json）を取得して検証する。
+    /// サーバーリストと、隣にある署名（manifest.sig.json）を取得して検証する。
     /// <paramref name="pinnedKey"/>（ユーザーが確認コードを登録した鍵）を渡すと、その鍵の正しい署名がなければ例外にする。
-    ///渡さなければ署名は任意（あれば中身と合うかだけ確かめ、確認コードを<see cref="Manifest.Signature"/>に入れる）。
-    ///本体の自動インストールは、登録した鍵で確かめられたリストだけに許す。
+    /// 渡さなければ署名は任意（あれば中身と合うかだけ確かめ、確認コードを<see cref="Manifest.Signature"/>に入れる）。
+    /// 本体の自動インストールは、登録した鍵で確かめられたリストだけに許す。
     /// </summary>
     public async Task<Manifest> LoadAsync(Uri uri, string? pinnedKey = null, CancellationToken ct = default)
     {
@@ -30,7 +30,7 @@ public sealed partial class ManifestClient(HttpClient http)
         }
         catch (ManifestSignatureException e) when (e.Problem == SignatureProblem.Invalid && !uri.IsFile)
         {
-            //管理者がちょうど公開し直している最中だと、新しいリストと古い署名を取ってしまうことがある。少し待って1回だけ取り直す
+            // 管理者がちょうど公開し直している最中だと、新しいリストと古い署名を取ってしまうことがある。少し待って1回だけ取り直す
             await Task.Delay(RetryDelay, ct);
             (bytes, signature) = await FetchAsync(uri, ct);
             info = Check(bytes, signature, pinnedKey);
@@ -82,7 +82,7 @@ public sealed partial class ManifestClient(HttpClient http)
         if (!Convert.FromBase64String(info.PublicKey).AsSpan().SequenceEqual(Convert.FromBase64String(pinnedKey)))
         {
             throw new ManifestSignatureException(SignatureProblem.KeyChanged,
-                //新しい確認コードは画面に出さない（出すと、ユーザーがそれを写して入力できてしまう）
+                // 新しい確認コードは画面に出さない（出すと、ユーザーがそれを写して入力できてしまう）
                 "サーバーリストの確認コードが変わりました。" +
                 "管理者が鍵を作り直したのなら、新しい確認コードを管理者に聞いて「編集」で入力し直してください。" +
                 "心当たりがなければ、配信しているファイルが書き換えられたおそれがあります", info.Code);
@@ -95,8 +95,8 @@ public sealed partial class ManifestClient(HttpClient http)
         bytes is [0xEF, 0xBB, 0xBF, ..] ? System.Text.Encoding.UTF8.GetString(bytes, 3, bytes.Length - 3) : System.Text.Encoding.UTF8.GetString(bytes);
 
     /// <summary>
-    ///解析して検証する。<paramref name="baseUri"/>を渡すと、リスト内の相対アドレス（"pak128.japan/index.json" など）を
-    ///サーバーリストの場所から見た絶対アドレスに置き換える。
+    /// 解析して検証する。<paramref name="baseUri"/>を渡すと、リスト内の相対アドレス（"pak128.japan/index.json" など）を
+    /// サーバーリストの場所から見た絶対アドレスに置き換える。
     /// <paramref name="trusted"/>は署名を確かめたリストか（本体の自動インストールを許すか）。
     /// </summary>
     public static Manifest Parse(string json, Uri? baseUri = null, bool trusted = false)
@@ -174,14 +174,14 @@ public sealed partial class ManifestClient(HttpClient http)
                     }
                     Require(IsSafeRelativePath(b.Exe), $"{what}.exeが不正です");
                 }
-                //本体のファイルはSHA256でサーバーリストに結び付いているので、リストの署名を確かめていれば取得経路は問わない
+                // 本体のファイルはSHA256でサーバーリストに結び付いているので、リストの署名を確かめていれば取得経路は問わない
                 s.EngineDownloadAllowed = trusted;
             }
         }
     }
 
     /// <summary>
-    ///アドレスを絶対アドレスにする。相対アドレスはbaseUriから見た位置になる。
+    /// アドレスを絶対アドレスにする。相対アドレスはbaseUriから見た位置になる。
     /// Web上のリストが手元のファイル（file://）を指すことは許さない。
     /// </summary>
     internal static string ResolveUrl(string? url, Uri? baseUri, string what)
@@ -202,7 +202,7 @@ public sealed partial class ManifestClient(HttpClient http)
     }
 
     /// <summary>
-    ///ファイル一覧（index.json）を解析して検証する。
+    /// ファイル一覧（index.json）を解析して検証する。
     /// <paramref name="engineExe"/>を渡すと本体のファイル一覧として扱い、その実行ファイルと、直下の.dllだけは許す。
     /// </summary>
     public static PaksetIndex ParseIndex(string json, string? engineExe = null)

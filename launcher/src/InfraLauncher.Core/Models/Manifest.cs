@@ -39,8 +39,8 @@ public sealed class ServerEntry
     public PaksetInfo Pakset { get; set; } = new();
 
     /// <summary>
-    ///このサーバーの本体（実行ファイル）を自動で入れてよいか。
-    ///本体をすり替えられないよう、ユーザーが確認コードを登録した鍵でサーバーリストが署名されているときだけ許す。
+    /// このサーバーの本体（実行ファイル）を自動で入れてよいか。
+    /// 本体をすり替えられないよう、ユーザーが確認コードを登録した鍵でサーバーリストが署名されているときだけ許す。
     /// <see cref="ManifestClient"/>が設定する。
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
@@ -57,7 +57,7 @@ public sealed class EngineInfo
 /// <summary>
 /// OSごとの本体。配り方は2通り。
 /// zip方式: urlとsha256
-///ファイル一覧方式: index_urlとindex_sha256（部品ごとに選んで落とせる。変わったファイルだけを落とす）
+/// ファイル一覧方式: index_urlとindex_sha256（部品ごとに選んで落とせる。変わったファイルだけを落とす）
 /// </summary>
 public sealed class EngineBuild
 {
@@ -75,7 +75,7 @@ public sealed class EngineBuild
 /// <summary>
 /// paksetの配り方は2通り。
 /// zip方式: urlとsha256（zip 1つを丸ごと入れ替える）
-///ファイル一覧方式: index_urlとindex_sha256（変わったファイルだけを落とす）
+/// ファイル一覧方式: index_urlとindex_sha256（変わったファイルだけを落とす）
 /// </summary>
 public sealed class PaksetInfo
 {

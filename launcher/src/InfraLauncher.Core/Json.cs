@@ -9,7 +9,7 @@ namespace InfraLauncher.Core;
 
 /// <summary>
 /// JSONの読み書き。exeを小さくするために未使用コードを削っても動くよう、
-///リフレクションではなくソース生成（<see cref="JsonContext"/>）を使う。
+/// リフレクションではなくソース生成（<see cref="JsonContext"/>）を使う。
 /// </summary>
 internal static class Json
 {

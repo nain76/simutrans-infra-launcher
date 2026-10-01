@@ -3,11 +3,11 @@ using System.Text;
 namespace InfraLauncher.Core;
 
 /// <summary>
-///ネットワークゲームで表示されるプレイヤー名（simutransのnickname）を、本体のconfig/simuconf.tabに書き込む。
+/// ネットワークゲームで表示されるプレイヤー名（simutransのnickname）を、本体のconfig/simuconf.tabに書き込む。
 /// simutransには名前を指定する起動オプションがないため、設定ファイルに書く。
 /// simutransはsettings.xmlを読んだあとにconfig/simuconf.tabを読むので、ここに書いた名前が優先される。
-///また、同じ項目が2回あると最初の行が使われるので、ファイルの先頭に書く。
-///ランチャーが書いた行は目印で囲み、書き直すときはその部分だけを入れ替える。
+/// また、同じ項目が2回あると最初の行が使われるので、ファイルの先頭に書く。
+/// ランチャーが書いた行は目印で囲み、書き直すときはその部分だけを入れ替える。
 /// </summary>
 public static class NicknameConfig
 {
@@ -35,8 +35,8 @@ public static class NicknameConfig
     }
 
     /// <summary>
-    ///本体のフォルダのconfig/simuconf.tabに名前を書く。名前が空なら、ランチャーが書いた行を消す。
-    ///ファイルがなければ何もしない（同期で入る）。書き換えたらtrue。
+    /// 本体のフォルダのconfig/simuconf.tabに名前を書く。名前が空なら、ランチャーが書いた行を消す。
+    /// ファイルがなければ何もしない（同期で入る）。書き換えたらtrue。
     /// </summary>
     public static bool Apply(string engineDir, string? name)
     {

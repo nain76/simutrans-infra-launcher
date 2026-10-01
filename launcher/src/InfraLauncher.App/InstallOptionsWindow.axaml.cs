@@ -54,7 +54,7 @@ public sealed class ComponentChoice(IndexComponent component, long size, Action 
 }
 
 /// <summary>
-///サーバーごとのインストール設定。ダウンロード先と、本体の部品を「推奨」で落とすか「カスタム」で選ぶかを決める。
+/// サーバーごとのインストール設定。ダウンロード先と、本体の部品を「推奨」で落とすか「カスタム」で選ぶかを決める。
 /// paksetはサーバーと同じでないと接続できないので、選択肢は出さずにすべて落とす。
 /// </summary>
 public partial class InstallOptionsWindow : Window

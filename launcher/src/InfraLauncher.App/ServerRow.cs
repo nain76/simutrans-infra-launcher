@@ -17,12 +17,12 @@ public enum ServerRowKind
 }
 
 /// <summary>
-///サーバー一覧の1行。ひと目で分かるよう、サーバーの稼働状況と同期の状態は色付きの札（バッジ）で出し、
-///細かい情報は下の行に小さく出す。
+/// サーバー一覧の1行。ひと目で分かるよう、サーバーの稼働状況と同期の状態は色付きの札（バッジ）で出し、
+/// 細かい情報は下の行に小さく出す。
 /// </summary>
 public sealed class ServerRow : INotifyPropertyChanged
 {
-    //札の色。明るい画面でも暗い画面でも白い文字が読める濃さにする
+    // 札の色。明るい画面でも暗い画面でも白い文字が読める濃さにする
     private static readonly IBrush Green = new SolidColorBrush(Color.Parse("#1f7a3a"));
     private static readonly IBrush Orange = new SolidColorBrush(Color.Parse("#b35c00"));
     private static readonly IBrush Red = new SolidColorBrush(Color.Parse("#b3261e"));
@@ -42,7 +42,7 @@ public sealed class ServerRow : INotifyPropertyChanged
 
     public static ServerRow Listed(ServerListSource list, ServerEntry server, SyncPlan? plan, string? planError)
     {
-        //本体はexeの名前で出す（版の名前より分かりやすいため）
+        // 本体はexeの名前で出す（版の名前より分かりやすいため）
         var engine = server.Engine?.Builds?.GetValueOrDefault(PlatformInfo.CurrentKey) is { } build
             ? $"本体: {Path.GetFileName(build.Exe)}"
             : "本体: 手元のものを使う";
@@ -113,9 +113,21 @@ public sealed class ServerRow : INotifyPropertyChanged
     public bool HasStatus => _statusText.Length > 0;
 
     /// <summary>
-    ///ポートにつながったかを反映する。管理者が「メンテナンス中」にしているときはそれを優先する。
-    ///つながらないときは「停止中」（サーバーが起動していないか、ポートが外から届かない）。
+    /// ポートにつながったかを反映する。管理者が「メンテナンス中」にしているときはそれを優先する。
+    /// つながらないときは「停止中」（サーバーが起動していないか、ポートが外から届かない）。
     /// </summary>
+    /// <summary>稼働状況を確かめている間の表示。</summary>
+    public void SetProbing()
+    {
+        if (Server?.Status != "maintenance")
+        {
+            (StatusText, StatusBrush) = ("確認中…", Gray);
+        }
+    }
+
+    /// <summary>「再確認」ボタンを出すか（共有リストのサーバーだけ）。</summary>
+    public bool CanReprobe => Kind == ServerRowKind.Listed;
+
     public void SetReachable(bool reachable)
     {
         if (Server?.Status == "maintenance")

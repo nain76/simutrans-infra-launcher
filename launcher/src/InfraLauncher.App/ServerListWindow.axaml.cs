@@ -7,9 +7,9 @@ using InfraLauncher.Core.Models;
 namespace InfraLauncher.App;
 
 /// <summary>
-///共有されたサーバーリストの追加・編集。保存の前に実際に読み込んで確かめる。
-///署名があれば、サーバー管理者から聞いた確認コードを入力してもらい、合っていればその鍵を登録する。
-///画面には確認コードを出さない（出すと、見比べずに「同じ」を押したり、表示を写したりできてしまう）。
+/// 共有されたサーバーリストの追加・編集。保存の前に実際に読み込んで確かめる。
+/// 署名があれば、サーバー管理者から聞いた確認コードを入力してもらい、合っていればその鍵を登録する。
+/// 画面には確認コードを出さない（出すと、見比べずに「同じ」を押したり、表示を写したりできてしまう）。
 /// </summary>
 public partial class ServerListWindow : Window
 {
@@ -59,26 +59,26 @@ public partial class ServerListWindow : Window
         Show("読み込んで確認しています…", error: false);
         try
         {
-            //鍵を指定せずに読む（署名があれば、中身と合うかはここで確かめられる）
+            // 鍵を指定せずに読む（署名があれば、中身と合うかはここで確かめられる）
             var manifest = await _client!.LoadAsync(LauncherService.ToUri(url));
             _url = url;
             _loaded = manifest;
             if (manifest.Signature is null && _existing?.PublicKey is not null)
             {
-                //確認コードを登録済みのリストから署名が消えた。書き換えのおそれがあるので、登録を外して保存することはしない
+                // 確認コードを登録済みのリストから署名が消えた。書き換えのおそれがあるので、登録を外して保存することはしない
                 Show("このサーバーリストには署名がありません。確認コードを登録済みのリストから署名が消えるのは、配信しているファイルが書き換えられたおそれがあります。" +
                      "サーバー管理者に確かめてください（どうしても使う場合は、いったん削除してから追加し直してください）", error: true);
                 return;
             }
             if (manifest.Signature is not { } sig)
             {
-                //署名のないリスト。paksetは同期できるが、本体は自動で入れない
+                // 署名のないリスト。paksetは同期できるが、本体は自動で入れない
                 Finish(publicKey: null);
                 return;
             }
             if (_existing?.PublicKey is { } known && ManifestSignature.SameCode(ManifestSignature.CodeFor(known), sig.Code))
             {
-                //登録済みの鍵と同じなら、入力し直す必要はない
+                // 登録済みの鍵と同じなら、入力し直す必要はない
                 Finish(known);
                 return;
             }
@@ -103,7 +103,7 @@ public partial class ServerListWindow : Window
             ? "このサーバーリストの確認コードが、以前登録したものから変わっています（サーバー管理者が鍵を作り直すと変わります）。" +
               "新しい確認コードをサーバー管理者に聞いて入力してください。"
             : "サーバー管理者から聞いた確認コード（Discordなどで教えてもらったもの）を入力してください。";
-        //登録済みの鍵が変わった場合は「あとで」を出さない（書き換えられたリストを、登録を外して使い続けることにならないように）
+        // 登録済みの鍵が変わった場合は「あとで」を出さない（書き換えられたリストを、登録を外して使い続けることにならないように）
         LaterButton.IsVisible = _existing?.PublicKey is null;
         CodePanel.IsVisible = true;
         SaveButtons.IsVisible = false;
@@ -129,7 +129,7 @@ public partial class ServerListWindow : Window
             return;
         }
         _failures++;
-        //正しいコードは出さない。何度も違うなら、アドレス違いか書き換えのおそれを伝える
+        // 正しいコードは出さない。何度も違うなら、アドレス違いか書き換えのおそれを伝える
         CodeError.Text = input.Length == 0 ? "確認コードを入力してください"
             : _failures < 3 ? "確認コードが一致しません。入力を見直してください（20文字の英数字です）"
             : "確認コードが一致しません。アドレスが違うか、配信しているファイルが書き換えられているおそれがあります。" +

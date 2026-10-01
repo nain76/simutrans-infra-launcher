@@ -13,7 +13,7 @@ public enum SyncMethod { Zip, FileIndex }
 
 /// <summary>
 /// 1つのダウンロード対象（本体またはpakset）と、その展開先。
-///ファイル一覧方式ではUrlとSha256は一覧ファイル（index.json）のもの。
+/// ファイル一覧方式ではUrlとSha256は一覧ファイル（index.json）のもの。
 /// </summary>
 /// Componentsは本体の部品の選び方（nullなら推奨）。Selectionはそれを文字列にしたもの（記録と比べる）。
 /// DeleteUnknownは一覧にないファイルを片付けるか（paksetは片付ける。本体はランチャーが入れたものだけ片付ける）。
@@ -39,9 +39,9 @@ public sealed record SyncSummary(int Downloads, long Bytes, int Removed)
 }
 
 /// <summary>
-///サーバーリストとinstalled.jsonを比べ、必要なものだけをダウンロード・展開する。
+/// サーバーリストとinstalled.jsonを比べ、必要なものだけをダウンロード・展開する。
 /// zip方式: ダウンロード →sha256確認 → 展開先の横の一時フォルダに展開 → 置き換え。
-///ファイル一覧方式: <see cref="FileIndexSync"/>を参照。
+/// ファイル一覧方式: <see cref="FileIndexSync"/>を参照。
 /// </summary>
 public sealed class SyncService(InstallLayout layout, HttpClient http)
 {
@@ -74,8 +74,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    ///フォルダの中にある、ランチャーが入れたもの以外のファイル（セーブデータやスクリーンショット、書き換えた設定ファイルなど）。
-    ///片付ける前に、バックアップを取るよう案内するために使う。
+    /// フォルダの中にある、ランチャーが入れたもの以外のファイル（セーブデータやスクリーンショット、書き換えた設定ファイルなど）。
+    /// 片付ける前に、バックアップを取るよう案内するために使う。
     /// </summary>
     public IReadOnlyList<string> UserFilesIn(string dir)
     {
@@ -105,9 +105,9 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    ///使わなくなったフォルダ（前のダウンロード先）の記録と、ダウンロード途中の一時ファイルを捨てる。以後は使い回しにも使わない。
+    /// 使わなくなったフォルダ（前のダウンロード先）の記録と、ダウンロード途中の一時ファイルを捨てる。以後は使い回しにも使わない。
     /// <paramref name="deleteFiles"/>なら、ランチャーが入れたファイル（記録にあるもの）も消し、空になったフォルダを消す。
-    ///自分で置いたファイル（セーブデータなど）は記録にないので消さない。フォルダが残ったらtrue。
+    /// 自分で置いたファイル（セーブデータなど）は記録にないので消さない。フォルダが残ったらtrue。
     /// </summary>
     public bool ForgetInstall(string dir, bool deleteFiles)
     {
@@ -144,7 +144,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    ///残骸を片付ける。消されたフォルダの記録と、長いあいだ使われていない一時ファイル（ダウンロード途中のもの、取得済みのファイル一覧）を捨てる。
+    /// 残骸を片付ける。消されたフォルダの記録と、長いあいだ使われていない一時ファイル（ダウンロード途中のもの、取得済みのファイル一覧）を捨てる。
     /// </summary>
     private void CleanUp()
     {
@@ -202,7 +202,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
             exe = Path.GetFullPath(Path.Combine(engineDir, build.Exe));
             EnsureInside(engineDir, exe, "engineのexe");
             var record = state.Get(engineDir);
-            //インストール後に実行ファイルが書き換えられていたら、入れ直す
+            // インストール後に実行ファイルが書き換えられていたら、入れ直す
             var exeRel = Path.GetRelativePath(engineDir, exe).Replace('\\', '/');
             var exeChanged = record?.Files?.FirstOrDefault(kv => string.Equals(kv.Key, exeRel, StringComparison.OrdinalIgnoreCase)).Value is { } stamp
                 && !stamp.Matches(new FileInfo(exe));
@@ -250,8 +250,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    ///アップデートチェック。サーバーと同じにするのに何を落とす必要があるかを確かめるだけで、何も書き換えない。
-    ///ファイル一覧方式なら手元のファイルを1つずつ照合する（記録と違うファイルはハッシュを計算し直す）。
+    /// アップデートチェック。サーバーと同じにするのに何を落とす必要があるかを確かめるだけで、何も書き換えない。
+    /// ファイル一覧方式なら手元のファイルを1つずつ照合する（記録と違うファイルはハッシュを計算し直す）。
     /// </summary>
     public async Task<IReadOnlyList<CheckResult>> CheckAsync(SyncPlan plan, IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
     {
@@ -274,14 +274,14 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     public async Task<SyncSummary> SyncAsync(SyncPlan plan, IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
     {
         var summary = new SyncSummary(0, 0, 0);
-        //消されたフォルダ（以前のダウンロード先など）の記録や、古い一時ファイルを片付ける
+        // 消されたフォルダ（以前のダウンロード先など）の記録や、古い一時ファイルを片付ける
         CleanUp();
-        //本体を先に入れる。本体を入れ直すと中のpaksetも消えるので、そのあとpaksetを判定し直す
+        // 本体を先に入れる。本体を入れ直すと中のpaksetも消えるので、そのあとpaksetを判定し直す
         foreach (var item in plan.Items.OrderBy(i => i.Kind))
         {
             if (item.Method == SyncMethod.FileIndex)
             {
-                //照合は軽いので毎回行い、手元で消えたり書き換わったりしたファイルも直す
+                // 照合は軽いので毎回行い、手元で消えたり書き換わったりしたファイルも直す
                 summary = summary.Add(await _fileIndex.SyncAsync(item, progress, ct));
                 continue;
             }
@@ -335,7 +335,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         var target = Path.GetFullPath(item.TargetDir);
         var parent = Path.GetDirectoryName(target)!;
         Directory.CreateDirectory(parent);
-        //別ドライブへの移動にならないよう、一時フォルダは展開先の横に作る
+        // 別ドライブへの移動にならないよう、一時フォルダは展開先の横に作る
         var staging = Path.Combine(parent, $".{Path.GetFileName(target)}.partial");
         TryDeleteDir(staging);
         Directory.CreateDirectory(staging);
@@ -368,7 +368,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
             var record = new InstalledRecord { Sha256 = item.Sha256.ToLowerInvariant(), Url = item.Url, InstalledAt = DateTimeOffset.Now };
             if (item.ExePath is not null && File.Exists(item.ExePath))
             {
-                //実行ファイルのサイズと更新日時を覚えておき、あとで書き換えられていないか確かめる
+                // 実行ファイルのサイズと更新日時を覚えておき、あとで書き換えられていないか確かめる
                 var info = new FileInfo(item.ExePath);
                 record.Files = new() { [Path.GetRelativePath(target, item.ExePath).Replace('\\', '/')] = FileStamp.From(info, "") };
             }
@@ -382,8 +382,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    ///展開先を置き換える。ランチャーが入れたフォルダなら消し、そうでないもの（ユーザーが自分で入れたpaksetなど）は
-    ///名前を変えて残しておく。
+    /// 展開先を置き換える。ランチャーが入れたフォルダなら消し、そうでないもの（ユーザーが自分で入れたpaksetなど）は
+    /// 名前を変えて残しておく。
     /// </summary>
     private static void ReplaceDirectory(string target, string content, InstalledState state)
     {

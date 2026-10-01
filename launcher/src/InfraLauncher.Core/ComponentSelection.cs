@@ -6,8 +6,8 @@ namespace InfraLauncher.Core;
 public static class ComponentSelection
 {
     /// <summary>
-    ///落とすファイルを選ぶ。部品の一覧がなければ全部。
-    ///必須の部品と、部品の指定がないファイルはいつも落とす。componentsがnullなら推奨の部品、あればその部品も落とす。
+    /// 落とすファイルを選ぶ。部品の一覧がなければ全部。
+    /// 必須の部品と、部品の指定がないファイルはいつも落とす。componentsがnullなら推奨の部品、あればその部品も落とす。
     /// </summary>
     public static List<PaksetFile> SelectFiles(PaksetIndex index, IReadOnlyCollection<string>? components)
     {

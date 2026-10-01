@@ -132,7 +132,7 @@ public class ManifestFileIndexTests
     [InlineData("/abs.pak")]
     [InlineData("C:/abs.pak")]
     [InlineData("a\\b.pak")]
-    [InlineData("a//b.pak")]
+    [InlineData("a// b.pak")]
     [InlineData("./a.pak")]
     [InlineData("con.pak")]
     [InlineData("a./b.pak")]

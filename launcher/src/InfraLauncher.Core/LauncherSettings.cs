@@ -25,8 +25,8 @@ public sealed class LauncherSettings
     public Dictionary<string, InstallOptions> ServerInstall { get; set; } = new();
 
     /// <summary>
-    ///ユーザーが実行を承認した本体（ランチャーが配布元から入れたもの）のSHA256。
-    ///本体が更新されたり書き換えられたりしてSHA256が変わると、もう一度確認する。
+    /// ユーザーが実行を承認した本体（ランチャーが配布元から入れたもの）のSHA256。
+    /// 本体が更新されたり書き換えられたりしてSHA256が変わると、もう一度確認する。
     /// </summary>
     public List<string> ApprovedExecutables { get; set; } = new();
 
@@ -70,7 +70,7 @@ public sealed class LauncherSettings
 }
 
 /// <summary>
-///サーバーごとのインストール設定。
+/// サーバーごとのインストール設定。
 /// InstallRoot: ダウンロード先（空なら既定のフォルダ）。本体はこの下の &lt;リビジョン&gt; フォルダに入り、paksetはその中に入る
 /// Components: 落とす本体の部品。nullなら「推奨」（サーバーが推奨する部品。サーバー側で推奨が変われば追従する）、
 ///             リストなら「カスタム」（必須の部品は書かなくても落とす）
@@ -85,7 +85,7 @@ public sealed class InstallOptions
 }
 
 /// <summary>
-///共有されたサーバーリスト。表示名と配信アドレス（URLかファイルのパス）。
+/// 共有されたサーバーリスト。表示名と配信アドレス（URLかファイルのパス）。
 /// PublicKeyは、ユーザーが管理者から聞いた確認コードと一致した署名の鍵。以後はこの鍵の署名がないと読み込まない。
 /// </summary>
 public sealed class ServerListSource

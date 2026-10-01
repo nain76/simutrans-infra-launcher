@@ -1,8 +1,8 @@
 namespace InfraLauncher.Core;
 
 /// <summary>
-///展開済みのフォルダと、その元になったzipのsha256の記録。
-///展開後のフォルダはzipと直接比べられないので、この記録とマニフェストのsha256を比べて同期の要否を決める。
+/// 展開済みのフォルダと、その元になったzipのsha256の記録。
+/// 展開後のフォルダはzipと直接比べられないので、この記録とマニフェストのsha256を比べて同期の要否を決める。
 /// </summary>
 public sealed class InstalledState
 {
@@ -12,7 +12,7 @@ public sealed class InstalledState
     public static InstalledState Load(InstallLayout layout)
     {
         var state = Json.Load(layout.InstalledStatePath, Json.Context.InstalledState);
-        //読み込み直後は比較方法が既定に戻るので作り直す
+        // 読み込み直後は比較方法が既定に戻るので作り直す
         state.Items = new(state.Items, StringComparer.OrdinalIgnoreCase);
         return state;
     }

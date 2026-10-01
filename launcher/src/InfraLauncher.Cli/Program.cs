@@ -1,12 +1,12 @@
 using InfraLauncher.Core;
 using InfraLauncher.Core.Models;
 
-//コマンドライン版。動作確認とトラブル調査用。
+// コマンドライン版。動作確認とトラブル調査用。
 //   list   <manifest>            サーバー一覧と同期の状態
 //   sync   <manifest> <server>   同期だけ行う
 //   launch <manifest> <server>   同期して起動（--print-onlyで起動せずにコマンドを表示。
 //                                配布元から入れた本体を初めて起動するときは--trustで承認する）
-//共通オプション: --data-dir <dir>（ランチャーのデータフォルダ）, --simutrans <exe>（手元の本体）,
+// 共通オプション: --data-dir <dir>（ランチャーのデータフォルダ）, --simutrans <exe>（手元の本体）,
 //                 --code <確認コード>（サーバー管理者から聞いた確認コード。一致すれば本体も入れられる）
 
 Console.OutputEncoding = System.Text.Encoding.UTF8;
@@ -47,7 +47,7 @@ if (simutransExe is not null)
     settings.SimutransExe = simutransExe;
 }
 
-//インストール設定（ダウンロード先と本体の部品）。--componentsはrecommendedか、部品のidをカンマで並べる
+// インストール設定（ダウンロード先と本体の部品）。--componentsはrecommendedか、部品のidをカンマで並べる
 InstallOptions? options = installDir is null && components is null ? null : new InstallOptions
 {
     InstallRoot = installDir,
@@ -56,7 +56,7 @@ InstallOptions? options = installDir is null && components is null ? null : new 
 
 try
 {
-    //確認コードは、画面で登録したものか--codeで指定したもの
+    // 確認コードは、画面で登録したものか--codeで指定したもの
     var uri = LauncherService.ToUri(positional[1]);
     var pinned = settings.ServerLists.FirstOrDefault(l => LauncherService.ToUri(l.Url) == uri)?.PublicKey;
     var manifest = await service.Manifests.LoadAsync(uri, pinned);
@@ -71,7 +71,7 @@ try
         }
         manifest = await service.Manifests.LoadAsync(uri, sig.PublicKey);
     }
-    //未確認の確認コードは表示しない（表示すると、管理者に聞かずに写せてしまう）
+    // 未確認の確認コードは表示しない（表示すると、管理者に聞かずに写せてしまう）
     Console.WriteLine(manifest.Trusted ? "確認コード: 一致しました"
         : manifest.Signature is not null ? "署名あり・確認コード未確認（管理者から聞いた確認コードを--codeで指定すると本体も入れられます）"
         : "このサーバーリストには署名がありません（本体は自動で入れません）");

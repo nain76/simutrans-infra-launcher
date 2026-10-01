@@ -9,14 +9,14 @@ internal sealed class DownloadInterruptedException(string message, Exception inn
 internal static class Downloader
 {
     /// <summary>
-    ///この時間データが1バイトも届かなければ、通信が止まったとみなして打ち切る。
-    ///（HttpClientのTimeoutは応答の頭までしか見ないので、途中で通信が途切れたまま待ち続けることがあるため）
+    /// この時間データが1バイトも届かなければ、通信が止まったとみなして打ち切る。
+    /// （HttpClientのTimeoutは応答の頭までしか見ないので、途中で通信が途切れたまま待ち続けることがあるため）
     /// </summary>
     internal static TimeSpan IdleTimeout { get; set; } = TimeSpan.FromSeconds(30);
 
     /// <summary>
     /// <paramref name="url"/>を<paramref name="dest"/>に保存し、SHA256が<paramref name="expectedSha256"/>と一致するか確かめる。
-    ///一致しなければファイルを消して<see cref="SyncException"/>を投げる。
+    /// 一致しなければファイルを消して<see cref="SyncException"/>を投げる。
     /// </summary>
     public static async Task DownloadAsync(HttpClient http, string url, string dest, string expectedSha256, string what,
         Action<long>? onBytes, CancellationToken ct)

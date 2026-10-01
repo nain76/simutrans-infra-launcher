@@ -45,7 +45,7 @@ public readonly record struct ServerAddress(string Host, int Port)
             var colon = text.LastIndexOf(':');
             if (colon >= 0 && text.IndexOf(':') != colon)
             {
-                //角かっこなしのIPv6はポートと区別できないので受け付けない
+                // 角かっこなしのIPv6はポートと区別できないので受け付けない
                 return false;
             }
             host = colon >= 0 ? text[..colon] : text;

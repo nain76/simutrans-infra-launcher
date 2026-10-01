@@ -1,7 +1,7 @@
 namespace InfraLauncher.Core;
 
 /// <summary>
-///同期の記録（&lt;データフォルダ&gt;/logs/sync.log）。止まったり失敗したりしたときに、どこで何が起きたかを調べるために残す。
+/// 同期の記録（&lt;データフォルダ&gt;/logs/sync.log）。止まったり失敗したりしたときに、どこで何が起きたかを調べるために残す。
 /// 2 MBを超えたらsync.old.logに移して書き直す。記録に失敗しても同期は続ける。
 /// </summary>
 public static class SyncLog

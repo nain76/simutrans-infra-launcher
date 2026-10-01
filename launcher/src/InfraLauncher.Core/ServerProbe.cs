@@ -4,8 +4,8 @@ namespace InfraLauncher.Core;
 
 /// <summary>
 /// simutransサーバーが動いているかを、そのポートにつながるかで確かめる。
-///サーバーリストのstatusは管理者が書いた値なので、実際に動いているかはこちらで確かめる。
-///つないですぐ切るだけで、ゲームのデータは送らない。
+/// サーバーリストのstatusは管理者が書いた値なので、実際に動いているかはこちらで確かめる。
+/// つないですぐ切るだけで、ゲームのデータは送らない。
 /// </summary>
 public static class ServerProbe
 {

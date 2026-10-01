@@ -86,6 +86,8 @@
                 <Border Classes="badge" Background="{Binding StatusBrush}" IsVisible="{Binding HasStatus}">
                   <TextBlock Text="{Binding StatusText}" />
                 </Border>
+                <Button Content="再確認" IsVisible="{Binding CanReprobe}" Click="OnReprobe" FontSize="11" Padding="6,1"
+                        VerticalAlignment="Center" ToolTip.Tip="サーバーが動いているかを確かめ直す（ダウンロードはしない）" />
                 <TextBlock Text="{Binding PlayersText}" IsVisible="{Binding HasPlayers}" VerticalAlignment="Center" />
               </StackPanel>
               <TextBlock Grid.Column="2" Text="{Binding AddressText}" Opacity="0.7" VerticalAlignment="Center" />

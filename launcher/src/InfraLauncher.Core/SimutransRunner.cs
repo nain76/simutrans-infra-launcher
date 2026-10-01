@@ -10,7 +10,7 @@ public static class SimutransRunner
         {
             throw new FileNotFoundException($"simutransの実行ファイルが見つかりません: {exe}", exe);
         }
-        //本体はargv[0]のフォルダをデータフォルダにするので、フルパスで起動する
+        // 本体はargv[0]のフォルダをデータフォルダにするので、フルパスで起動する
         var psi = new ProcessStartInfo(Path.GetFullPath(exe))
         {
             WorkingDirectory = SimutransPaths.DataDirFor(exe),

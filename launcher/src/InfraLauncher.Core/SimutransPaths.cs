@@ -3,7 +3,7 @@ namespace InfraLauncher.Core;
 public static class SimutransPaths
 {
     /// <summary>
-    ///本体がデータフォルダとして使う場所。-objectsのフォルダはここから見た位置になる。
+    /// 本体がデータフォルダとして使う場所。-objectsのフォルダはここから見た位置になる。
     /// simmain.ccと同じく、実行ファイルのあるフォルダ。macOSの.appの中なら.appのあるフォルダ。
     /// </summary>
     public static string DataDirFor(string exePath)

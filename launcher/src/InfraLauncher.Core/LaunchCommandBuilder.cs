@@ -3,7 +3,7 @@ namespace InfraLauncher.Core;
 public static class LaunchCommandBuilder
 {
     /// <summary>
-    ///サーバーへ接続する起動引数。
+    /// サーバーへ接続する起動引数。
     /// -objects: 使うpakset（simmain.ccの-objects処理）
     /// -noaddons: 個人のアドオンが混ざってチェックサムがずれるのを防ぐ
     /// -load net:host:port: 指定サーバーへ接続（simmain.ccの-load処理）

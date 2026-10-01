@@ -6,7 +6,7 @@ namespace InfraLauncher.Core;
 public sealed record ManifestSource(ServerListSource List, Manifest? Manifest, string? Error);
 
 /// <summary>
-///起動に必要な情報。ManagedEngineはランチャーが配布元から入れた本体か（そうなら初回に承認が要る）。
+/// 起動に必要な情報。ManagedEngineはランチャーが配布元から入れた本体か（そうなら初回に承認が要る）。
 /// </summary>
 public sealed record LaunchInfo(string ExePath, IReadOnlyList<string> Args, string Command, string ExeSha256,
     bool ManagedEngine, bool NeedsApproval, string? EngineLabel, string? SourceUrl);
@@ -43,8 +43,8 @@ public sealed class LauncherService(InstallLayout layout, HttpClient http)
         await Sync.SyncAsync(Sync.Plan(server, settings, options), progress, ct);
 
     /// <summary>
-    ///起動の準備。同期が済んでいることを確かめ、実行ファイルのSHA256を求め、ユーザーの承認が要るかを判断する。
-    ///ランチャーが配布元から入れた本体は、同じSHA256のものを一度承認するまで起動しない。
+    /// 起動の準備。同期が済んでいることを確かめ、実行ファイルのSHA256を求め、ユーザーの承認が要るかを判断する。
+    /// ランチャーが配布元から入れた本体は、同じSHA256のものを一度承認するまで起動しない。
     /// </summary>
     public LaunchInfo PrepareLaunch(ServerEntry server, LauncherSettings settings, InstallOptions? options = null)
     {
@@ -76,7 +76,7 @@ public sealed class LauncherService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
-    ///起動する。承認が要る本体が未承認なら起動しない。準備のあとで実行ファイルが書き換えられていないかも確かめる。
+    /// 起動する。承認が要る本体が未承認なら起動しない。準備のあとで実行ファイルが書き換えられていないかも確かめる。
     /// </summary>
     public static System.Diagnostics.Process Launch(LaunchInfo info, LauncherSettings settings)
     {
@@ -88,7 +88,7 @@ public sealed class LauncherService(InstallLayout layout, HttpClient http)
         {
             throw new SyncException("確認したあとでsimutrans本体が書き換えられました。もう一度「起動」を押してください");
         }
-        //ランチャーが入れた本体なら、プレイヤー名を設定ファイルに書いてから起動する
+        // ランチャーが入れた本体なら、プレイヤー名を設定ファイルに書いてから起動する
         if (info.ManagedEngine)
         {
             NicknameConfig.Apply(Path.GetDirectoryName(info.ExePath)!, settings.Nickname);

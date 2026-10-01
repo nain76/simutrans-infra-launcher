@@ -110,6 +110,25 @@ public sealed class EngineComponentsTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdateCheckReportsProgress()
+    {
+        var server = Default();
+        var settings = new LauncherSettings();
+        await _service.SyncServerAsync(server, settings);
+        var reports = new List<SyncProgress>();
+        await _service.Sync.CheckAsync(_service.Sync.Plan(server, settings), new ListProgress(reports));
+        var counted = reports.Where(r => r.BytesTotal is > 0).ToList();
+        Assert.NotEmpty(counted);
+        Assert.Contains(counted, r => r.Stage.StartsWith("確認中"));
+        Assert.All(counted, r => Assert.InRange(r.BytesDone, 0, r.BytesTotal!.Value));
+    }
+
+    private sealed class ListProgress(List<SyncProgress> list) : IProgress<SyncProgress>
+    {
+        public void Report(SyncProgress value) => list.Add(value);
+    }
+
+    [Fact]
     public async Task ListsUserFilesBeforeCleaningUp()
     {
         var server = Default();
