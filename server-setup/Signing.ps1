@@ -277,9 +277,9 @@ function Invoke-BackupPrompt {
         if ($p1 -ne $p2) { Write-Warning 'パスワードが一致しません'; continue }
         break
     }
-    $path = Read-Value 'バックアップの保存先' (Join-Path $PSScriptRoot 'signing-key-backup.json')
-    Export-SigningKeyBackup (Get-FullPath $path) $p1
-    Write-Ok "バックアップを作りました: $(Get-FullPath $path)"
+    $path = Resolve-BackupPath (Read-Value 'バックアップの保存先（フォルダかファイルのフルパス）' (Join-Path $PSScriptRoot 'signing-key-backup.json'))
+    Export-SigningKeyBackup $path $p1
+    Write-Ok "バックアップを作りました: $path"
     Write-Host '   このファイルは自分の PC や USB メモリなど、VPS の外にコピーして保管してください（VPS からは消してかまいません）'
     Write-Host '   配信フォルダには絶対に置かないでください'
 }
@@ -315,12 +315,25 @@ function Initialize-SigningKey([string] $manifestPath) {
     Invoke-BackupPrompt
 }
 
+# バックアップの置き場所。フォルダを指定した場合や、拡張子のない名前を指定した場合は、その中の signing-key-backup.json にする
+# （ただし、拡張子のない名前でも同じ名前のファイルがすでにあれば、そのファイルを使う。以前の版はそのまま保存していたため）
+function Resolve-BackupPath([string] $path, [switch] $Existing) {
+    $full = Get-FullPath $path.Trim().Trim('"')
+    if (Test-Path -LiteralPath $full -PathType Leaf) { return $full }
+    if ((Test-Path -LiteralPath $full -PathType Container) -or -not [System.IO.Path]::GetExtension($full)) {
+        if (-not $Existing) { New-Item -ItemType Directory -Force -Path $full | Out-Null }
+        return (Join-Path $full 'signing-key-backup.json')
+    }
+    return $full
+}
+
 function Restore-SigningKeyInteractive {
-    $path = Read-Value 'バックアップのファイル（signing-key-backup.json）のフルパス' (Join-Path $PSScriptRoot 'signing-key-backup.json')
+    $path = Resolve-BackupPath (Read-Value 'バックアップのファイル（signing-key-backup.json）か、それを入れたフォルダのフルパス' (Join-Path $PSScriptRoot 'signing-key-backup.json')) -Existing
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "バックアップのファイルが見つかりません: $path" }
     while ($true) {
         $password = Read-Password 'バックアップのパスワード'
         try {
-            Import-SigningKeyBackup (Get-FullPath $path) $password
+            Import-SigningKeyBackup $path $password
             break
         }
         catch {

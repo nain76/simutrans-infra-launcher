@@ -130,7 +130,9 @@ Write-Host "   配るものの設定: $rulesName"
 foreach ($c in $components) {
     $mine = @($files | Where-Object { $_.Component -eq $c.Id })
     $kind = if ($c.Required) { '必須' } elseif ($c.Recommended) { '推奨' } else { '任意' }
-    $size = ($mine | Measure-Object -Property { $_.File.Length } -Sum).Sum
+    # Measure-Object -Property { ... } は Windows PowerShell 5.1 では使えないので、自分で足す
+    $size = [long]0
+    foreach ($f in $mine) { $size += $f.File.Length }
     Write-Host ("   部品「{0}」（{1}）: {2} ファイル、{3:N0} バイト" -f $c.Name, $kind, $mine.Count, [long]$size)
 }
 if ($skippedFolders.Count -gt 0) { Write-Host ("   配らなかったフォルダ: {0}（配るには engine-files.json の部品の folders に足す）" -f ($skippedFolders -join ', ')) }
@@ -227,7 +229,8 @@ foreach ($old in Get-ChildItem -LiteralPath $dst -Force) {
     elseif (-not $old.PSIsContainer -and $old.Name -like 'simutrans-*-windows-x64.zip') { Remove-Item -LiteralPath $old.FullName -Force }
 }
 
-$total = ($files | Measure-Object -Property { $_.File.Length } -Sum).Sum
+$total = [long]0
+foreach ($f in $files) { $total += $f.File.Length }
 $state = if ($created) { '公開しました' } else { '前回と同じなので置き直していません' }
 Write-Host ("本体を公開しました: {0}（{1} ファイル、{2:N0} バイト、{3}）" -f $revision, $files.Count, [long]$total, $state)
 Write-Host "サーバーリストの engine を更新しました（$($ServerId -join ', ')、revision $revision）"
