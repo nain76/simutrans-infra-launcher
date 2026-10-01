@@ -304,6 +304,11 @@ public partial class MainWindow : Window
         {
             var progress = new Progress<SyncProgress>(p =>
             {
+                // 進み具合は後から届くことがあるので、同期が終わったあとに届いたものは捨てる（結果の表示を上書きしないように）
+                if (!ReferenceEquals(_syncCts, cts))
+                {
+                    return;
+                }
                 _lastProgress = DateTime.Now;
                 var percent = p.BytesTotal is > 0 ? $"  {p.BytesDone * 100 / p.BytesTotal.Value}%" : "";
                 StatusText.Text = _lastStage = $"{p.Item.Label}: {p.Stage}{percent}";
@@ -330,6 +335,7 @@ public partial class MainWindow : Window
             watchdog.Start();
             UpdateButtons();
             var summary = await _service.SyncServerAsync(server, _settings, progress, cts.Token, options);
+            _syncCts = null;
             row.SetPlan(_service.Sync.Plan(server, _settings, options), null);
             StatusText.Text = summary.Downloads == 0 && summary.Removed == 0
                 ? $"{row.Name}: すでに最新です。「起動」で接続できます"
@@ -337,11 +343,13 @@ public partial class MainWindow : Window
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
+            _syncCts = null;
             StatusText.Text = "同期を中止しました。もう一度「同期」を押すと、ダウンロード済みのファイルは使い回して続きから始めます";
         }
-        catch (Exception ex) when (ex is SyncException or FormatException or FileNotFoundException)
+        catch (Exception ex) when (ex is SyncException or FormatException or IOException or UnauthorizedAccessException)
         {
-            SyncLog.Write($"エラー: {ex.Message}");
+            _syncCts = null;
+            SyncLog.Write($"エラー: {ex}");
             StatusText.Text = $"エラー: {ex.Message}\n詳しい記録: {_service.Layout.SyncLogPath}";
         }
         finally

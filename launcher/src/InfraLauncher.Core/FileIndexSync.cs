@@ -120,11 +120,19 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
                 progress?.Report(new SyncProgress(item, $"手元にある同じファイルを使い回しています（{checkedCount} 件目）", 0, null));
             }
             var tmp = Path.Combine(staging, f.Sha256.ToLowerInvariant());
-            File.Copy(local, tmp, overwrite: true);
-            if (SameSha(await Downloader.HashFileAsync(tmp, ct), f.Sha256))
+            try
             {
-                unique.Remove(f);
-                reused++;
+                File.Copy(local, tmp, overwrite: true);
+                if (SameSha(await Downloader.HashFileAsync(tmp, ct), f.Sha256))
+                {
+                    unique.Remove(f);
+                    reused++;
+                }
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                // 使い回せなければダウンロードすればよいので、同期は止めない
+                SyncLog.Write($"[{item.Label}] 手元のファイルを使い回せませんでした（ダウンロードします）: {local}（{e.Message}）");
             }
         }
         SyncLog.Write($"[{item.Label}] 手元のファイルを {reused} 件使い回しました。ダウンロードするのは {unique.Count} 件です");
@@ -274,7 +282,9 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         var result = new Dictionary<string, List<(string, FileStamp)>>();
         foreach (var (dir, record) in state.Items)
         {
-            if (record.Files is null || string.Equals(Path.TrimEndingDirectorySeparator(dir), target, StringComparison.OrdinalIgnoreCase))
+            // 消したフォルダ（以前のダウンロード先など）の記録は使わない
+            if (record.Files is null || string.Equals(Path.TrimEndingDirectorySeparator(dir), target, StringComparison.OrdinalIgnoreCase)
+                || !Directory.Exists(dir))
             {
                 continue;
             }
@@ -380,7 +390,8 @@ public sealed class FileStamp
     public long ModifiedUtcTicks { get; set; }
     public string Sha256 { get; set; } = "";
 
-    public bool Matches(FileInfo info) => info.Length == Size && info.LastWriteTimeUtc.Ticks == ModifiedUtcTicks;
+    /// <summary>記録どおりか。ファイルがなければ false（FileInfo.Length はファイルがないと例外になるので先に確かめる）。</summary>
+    public bool Matches(FileInfo info) => info.Exists && info.Length == Size && info.LastWriteTimeUtc.Ticks == ModifiedUtcTicks;
 
     public static FileStamp From(FileInfo info, string sha256) =>
         new() { Size = info.Length, ModifiedUtcTicks = info.LastWriteTimeUtc.Ticks, Sha256 = sha256 };

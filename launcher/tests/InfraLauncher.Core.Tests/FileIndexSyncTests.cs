@@ -213,6 +213,37 @@ public sealed class FileIndexSyncTests : IDisposable
     }
 
     [Fact]
+    public async Task IgnoresDeletedFoldersWhenReusingFiles()
+    {
+        // 別の場所に一度入れてから、その場所を消す（ダウンロード先を変えて古いフォルダを消した場合）
+        var s = Publish(new() { ["a.pak"] = "aaaa", ["b.pak"] = "bbbb" });
+        var old = Path.Combine(_dir, "old");
+        Directory.CreateDirectory(old);
+        File.WriteAllText(Path.Combine(old, "simutrans.exe"), "");
+        await _sync.SyncAsync(_sync.Plan(s, new LauncherSettings { SimutransExe = Path.Combine(old, "simutrans.exe") }));
+        Directory.Delete(old, recursive: true);
+
+        var r = await Sync(s);
+        Assert.Equal(2, r.Downloads);
+        Assert.Equal("bbbb", File.ReadAllText(Path.Combine(PakDir, "b.pak")));
+    }
+
+    [Fact]
+    public async Task IgnoresDeletedFilesWhenReusingFiles()
+    {
+        var s = Publish(new() { ["a.pak"] = "aaaa", ["b.pak"] = "bbbb" });
+        var old = Path.Combine(_dir, "old");
+        Directory.CreateDirectory(old);
+        File.WriteAllText(Path.Combine(old, "simutrans.exe"), "");
+        await _sync.SyncAsync(_sync.Plan(s, new LauncherSettings { SimutransExe = Path.Combine(old, "simutrans.exe") }));
+        File.Delete(Path.Combine(old, "pak128.japan", "a.pak"));
+
+        var r = await Sync(s);
+        Assert.Equal(1, r.Downloads);
+        Assert.Equal("aaaa", File.ReadAllText(Path.Combine(PakDir, "a.pak")));
+    }
+
+    [Fact]
     public async Task RetriesWhenDownloadStalls()
     {
         Downloader.IdleTimeout = TimeSpan.FromMilliseconds(300);
