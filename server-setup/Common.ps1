@@ -192,7 +192,8 @@ function Test-SkipOsFile($file, [string] $root) {
     $rootFull = $root.TrimEnd('\', '/')
     while ($item -and $item.FullName.TrimEnd('\', '/') -ne $rootFull) {
         if ($item.Attributes -band $hiddenOrSystem) { return $true }
-        $item = if ($item.PSIsContainer) { $item.Parent } else { $item.Directory }
+        # PSIsContainer は Get-ChildItem が付ける情報で、.Directory などでたどったものには付かない（Windows PowerShell 5.1）
+    $item = if ($item -is [System.IO.DirectoryInfo]) { $item.Parent } else { $item.Directory }
     }
     return $false
 }
