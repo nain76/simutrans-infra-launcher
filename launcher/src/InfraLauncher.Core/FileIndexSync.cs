@@ -120,13 +120,16 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
 
         long total = unique.Sum(f => f.Size), done = 0;
         var finished = 0;
-        var inFlight = new System.Collections.Concurrent.ConcurrentDictionary<string, byte>();
+        var inFlight = new System.Collections.Concurrent.ConcurrentDictionary<PaksetFile, long>();
         // 何ファイル目か・何 MB 届いたかを出す（大きいファイルが残っていても止まって見えないように）。
         // 残りが少なくなったら、どのファイルを待っているかも出す（止まったときに原因を調べられるように）
         void Report()
         {
             var left = unique.Count - Volatile.Read(ref finished);
-            var waiting = left is > 0 and <= 3 && !inFlight.IsEmpty ? $"　残り: {string.Join("、", inFlight.Keys)}" : "";
+            // 残りのファイルは、届いた量とサーバーリストに書かれた大きさも出す（どこで止まっているか分かるように）
+            var waiting = left is > 0 and <= 3 && !inFlight.IsEmpty
+                ? "　残り: " + string.Join("、", inFlight.Select(kv => $"{kv.Key.Path}（{kv.Value:N0} / {kv.Key.Size:N0} バイト）"))
+                : "";
             progress?.Report(new SyncProgress(item,
                 $"ダウンロード中 {unique.Count - left}/{unique.Count} ファイル（{FormatSize(Interlocked.Read(ref done))} / {FormatSize(total)}）{waiting}",
                 Interlocked.Read(ref done), total));
@@ -136,7 +139,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             await Task.WhenAll(unique.Select(async f =>
             {
                 await gate.WaitAsync(ct);
-                inFlight[f.Path] = 0;
+                inFlight[f] = 0;
                 try
                 {
                     var tmp = Path.Combine(staging, f.Sha256.ToLowerInvariant());
@@ -155,7 +158,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
                             try
                             {
                                 await Downloader.DownloadAsync(http, FileUri(indexUri, f.Path), tmp, f.Sha256, $"{item.Label} の {f.Path}",
-                                    n => { mine += n; Interlocked.Add(ref done, n); Report(); }, ct);
+                                    n => { mine += n; inFlight[f] = mine; Interlocked.Add(ref done, n); Report(); }, ct);
                                 break;
                             }
                             catch (DownloadInterruptedException) when (attempt < Attempts && !ct.IsCancellationRequested)
@@ -172,7 +175,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
                 }
                 finally
                 {
-                    inFlight.TryRemove(f.Path, out _);
+                    inFlight.TryRemove(f, out _);
                     gate.Release();
                 }
             }));

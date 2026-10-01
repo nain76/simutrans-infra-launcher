@@ -405,6 +405,10 @@ public partial class MainWindow : Window
                 row.SetPlan(_service.Sync.Plan(server, _settings, OptionsFor(row)), null);
                 StatusText.Text = "インストール設定を保存しました。「同期」で反映します";
             }
+            else
+            {
+                StatusText.Text = "インストール設定は変えませんでした";
+            }
         }
         catch (Exception ex) when (ex is SyncException or FormatException)
         {
