@@ -93,7 +93,32 @@ public sealed class ServerRow : INotifyPropertyChanged
     public ManualProfile? Profile { get; private init; }
 
     public string Name { get; private init; } = "";
+    /// <summary>接続先（host:port）。画面には、ユーザーが「表示」を押したときだけ出す。</summary>
     public string AddressText { get; private init; } = "";
+    public bool HasAddress => AddressText.Length > 0;
+    private bool _addressRevealed;
+
+    /// <summary>
+    /// 接続先を画面に出すか。配信や画面共有で接続先が見えてしまわないよう、ふだんは隠しておく。
+    /// 隠しているときも「非表示」という言葉で出すので、読み上げソフトでも状態が分かる。
+    /// </summary>
+    public bool AddressRevealed
+    {
+        get => _addressRevealed;
+        set
+        {
+            _addressRevealed = value;
+            OnPropertyChanged();
+            OnPropertyChanged(nameof(AddressDisplay));
+            OnPropertyChanged(nameof(RevealLabel));
+            OnPropertyChanged(nameof(RevealAccessibleName));
+        }
+    }
+
+    public string AddressDisplay => _addressRevealed ? AddressText : "接続先は非表示";
+    public string RevealLabel => _addressRevealed ? "隠す" : "表示";
+    public string RevealAccessibleName => _addressRevealed ? $"{Name}の接続先を隠す" : $"{Name}の接続先を表示する";
+    public string CopyAccessibleName => $"{Name}の接続先をコピーする";
     private string _statusText = "";
     private IBrush _statusBrush = Gray;
 

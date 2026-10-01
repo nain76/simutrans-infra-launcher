@@ -109,6 +109,33 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnToggleAddress(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is ServerRow row)
+        {
+            row.AddressRevealed = !row.AddressRevealed;
+        }
+    }
+
+    /// <summary>
+    /// 接続先（host:port）をコピーする。サーバーとの接続が切れたとき、simutrans の「ゲームに参加」に貼り付けて再接続できるように。
+    /// 接続先は画面には出さない。
+    /// </summary>
+    private async void OnCopyAddress(object? sender, RoutedEventArgs e)
+    {
+        if ((sender as Control)?.DataContext is not ServerRow row || !ServerAddress.TryParse(row.AddressText, out var address))
+        {
+            return;
+        }
+        if (GetTopLevel(this)?.Clipboard is not { } clipboard)
+        {
+            StatusText.Text = "クリップボードを使えませんでした";
+            return;
+        }
+        await clipboard.SetTextAsync($"{address.Host}:{address.Port}");
+        StatusText.Text = $"{row.Name}の接続先をコピーしました。simutransの「ゲームに参加」でアドレス欄を選び、Ctrl+Vで貼り付けてください";
+    }
+
     /// <summary>お気に入りを上に並べ、絞り込みを反映して表示する。</summary>
     private void ShowRows(string? selectKey = null)
     {
@@ -409,7 +436,8 @@ public partial class MainWindow : Window
                 _settings.Save(_service.Layout);
             }
             LauncherService.Launch(info, _settings);
-            StatusText.Text = $"起動しました: {info.Command}";
+            // 起動コマンドには接続先が入るので、画面には出さない
+            StatusText.Text = $"{row.Name}に接続するsimutransを起動しました（{Path.GetFileName(info.ExePath)}）";
         }
         catch (Exception ex) when (ex is SyncException or FormatException or FileNotFoundException or System.ComponentModel.Win32Exception)
         {

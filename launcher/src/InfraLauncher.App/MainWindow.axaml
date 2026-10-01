@@ -90,7 +90,15 @@
                         VerticalAlignment="Center" ToolTip.Tip="サーバーが動いているかを確かめ直す（ダウンロードはしない）" />
                 <TextBlock Text="{Binding PlayersText}" IsVisible="{Binding HasPlayers}" VerticalAlignment="Center" />
               </StackPanel>
-              <TextBlock Grid.Column="2" Text="{Binding AddressText}" Opacity="0.7" VerticalAlignment="Center" />
+              <!-- 接続先はふだん隠す（配信や画面共有で見えないように）。コピーは隠したままでもできる -->
+              <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center" IsVisible="{Binding HasAddress}">
+                <TextBlock Text="{Binding AddressDisplay}" Opacity="0.7" VerticalAlignment="Center" />
+                <Button Content="{Binding RevealLabel}" Click="OnToggleAddress" FontSize="11" Padding="6,1"
+                        AutomationProperties.Name="{Binding RevealAccessibleName}" ToolTip.Tip="接続先（アドレスとポート）を表示する／隠す" />
+                <Button Content="コピー" Click="OnCopyAddress" FontSize="11" Padding="6,1"
+                        AutomationProperties.Name="{Binding CopyAccessibleName}"
+                        ToolTip.Tip="接続先をコピーします。simutransの「ゲームに参加」のアドレス欄に貼り付けて再接続できます" />
+              </StackPanel>
 
               <!-- 2行目: お知らせ-->
               <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" IsVisible="{Binding HasMessage}"

@@ -112,12 +112,16 @@ if (-not $dst.StartsWith($manifestDir + [System.IO.Path]::DirectorySeparatorChar
 # --- 1. 配るファイルを部品ごとに集める---
 $exeName = Split-Path -Leaf $exe
 $files = @([pscustomobject]@{ Rel = $exeName; File = (Get-Item -LiteralPath $exe); Component = $coreComponent.Id })
+# 配らなかったものは、理由ごと（設定に書いていない／絶対に配らない）・フォルダとファイルごとに分けて表示する
 $skippedFolders = @()
-$neverItems = @()
+$skippedFiles = @()
+$skippedInside = @()
+$neverFolderItems = @()
+$neverFileItems = @()
 foreach ($item in Get-ChildItem -LiteralPath $src -Force) {
     if (Test-SkipOsFile $item $src) { continue }
     if ($item.PSIsContainer) {
-        if ($NeverFolders -contains $item.Name.ToLowerInvariant()) { $neverItems += "$($item.Name)\"; continue }
+        if ($NeverFolders -contains $item.Name.ToLowerInvariant()) { $neverFolderItems += $item.Name; continue }
         # 部品に書いてあるフォルダは配る。themes には見た目の画像として .pak が入っているので、
         # .pak の有無で pakset と決めつけるのは、部品に書いていないフォルダだけにする
         $flatOwner = @($components | Where-Object { $_.FlatFolders.ContainsKey($item.Name.ToLowerInvariant()) })[0]
@@ -131,45 +135,59 @@ foreach ($item in Get-ChildItem -LiteralPath $src -Force) {
                 }
                 else { $leftOut++ }
             }
-            if ($leftOut -gt 0) { $skippedFolders += "$($item.Name) の中の $($wantedPatterns -join '・') 以外（$leftOut 件）" }
+            if ($leftOut -gt 0) { $skippedInside += "$($item.Name)の中の$($wantedPatterns -join '・')以外のもの $leftOut 件" }
             continue
         }
         $owner = @($components | Where-Object { $_.Folders -contains $item.Name.ToLowerInvariant() })[0]
         if (-not $owner) {
             $isPakset = $null -ne (Get-ChildItem -LiteralPath $item.FullName -Filter '*.pak' -File -Force | Select-Object -First 1)
-            if ($isPakset) { $neverItems += "$($item.Name)\" } else { $skippedFolders += $item.Name }
+            if ($isPakset) { $neverFolderItems += "$($item.Name)（pakset）" } else { $skippedFolders += $item.Name }
             continue
         }
         foreach ($f in Get-ChildItem -LiteralPath $item.FullName -Recurse -File -Force) {
             if (Test-SkipOsFile $f $src) { continue }
             # フォルダの中でも、スクリプトやexeなどは配らない
-            if (Test-Like $f.Name $NeverFiles) { $neverItems += $f.FullName.Substring($src.Length + 1); continue }
+            if (Test-Like $f.Name $NeverFiles) { $neverFileItems += $f.FullName.Substring($src.Length + 1).Replace('\', '/'); continue }
             $files += [pscustomobject]@{ Rel = $f.FullName.Substring($src.Length + 1).Replace('\', '/'); File = $f; Component = $owner.Id }
         }
     }
     elseif ($item.Name -ne $exeName) {
         $isDll = $item.Extension -ieq '.dll'
-        if (-not $isDll -and (Test-Like $item.Name $NeverFiles)) { $neverItems += $item.Name; continue }
+        if (-not $isDll -and (Test-Like $item.Name $NeverFiles)) { $neverFileItems += $item.Name; continue }
         $owner = @($components | Where-Object { Test-Like $item.Name $_.Files })[0]
         if ($owner) { $files += [pscustomobject]@{ Rel = $item.Name; File = $item; Component = $owner.Id } }
+        else { $skippedFiles += $item.Name }
     }
 }
 $files = @($files | Sort-Object -Property Rel -CaseSensitive)
 
+function Write-NameList([string] $label, [string[]] $names, [int] $max = 10) {
+    if ($names.Count -eq 0) { return }
+    $shown = @($names | Select-Object -First $max)
+    $more = if ($names.Count -gt $shown.Count) { " ほか $($names.Count - $shown.Count)件" } else { '' }
+    Write-Host ("     {0}: {1}{2}" -f $label, ($shown -join ', '), $more)
+}
+
 Write-Host "   配るものの設定: $rulesName"
+Write-Host "   配るもの"
 foreach ($c in $components) {
     $mine = @($files | Where-Object { $_.Component -eq $c.Id })
     $kind = if ($c.Required) { '必須' } elseif ($c.Recommended) { '推奨' } else { '任意' }
     # Measure-Object -Property { ... } はWindows PowerShell 5.1では使えないので、自分で足す
     $size = [long]0
     foreach ($f in $mine) { $size += $f.File.Length }
-    Write-Host ("   部品「{0}」（{1}）: {2} ファイル、{3:N0} バイト" -f $c.Name, $kind, $mine.Count, [long]$size)
+    Write-Host ("     部品「{0}」（{1}）: {2} ファイル、{3:N0} バイト" -f $c.Name, $kind, $mine.Count, [long]$size)
 }
-if ($skippedFolders.Count -gt 0) { Write-Host ("   配らなかったフォルダ: {0}（配るにはengine-files.jsonの部品のfoldersに足す）" -f ($skippedFolders -join ', ')) }
-if ($neverItems.Count -gt 0) {
-    $shown = @($neverItems | Select-Object -First 12)
-    $more = if ($neverItems.Count -gt $shown.Count) { " ほか $($neverItems.Count - $shown.Count)件" } else { '' }
-    Write-Host ("   絶対に配らないもの: {0}{1}" -f ($shown -join ', '), $more)
+if ($skippedFolders.Count + $skippedFiles.Count + $skippedInside.Count -gt 0) {
+    Write-Host "   配らないもの（設定に書いていないため。配りたいときはengine-files.jsonの部品に足す）"
+    Write-NameList 'フォルダ' $skippedFolders
+    Write-NameList 'ファイル' $skippedFiles
+    foreach ($inside in $skippedInside) { Write-Host "     $inside" }
+}
+if ($neverFolderItems.Count + $neverFileItems.Count -gt 0) {
+    Write-Host "   絶対に配らないもの（設定にかかわらず。セーブデータ、スクリプト、ほかのexe、paksetなど）"
+    Write-NameList 'フォルダ' $neverFolderItems
+    Write-NameList 'ファイル' $neverFileItems
 }
 
 # --- 2. 識別名（中身と部品の分け方が同じなら同じ名前になる）---
