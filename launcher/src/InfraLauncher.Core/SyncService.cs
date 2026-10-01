@@ -61,6 +61,24 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         return await _fileIndex.LoadIndexAsync(build.IndexUrl!, build.IndexSha256!, $"simutrans {server.Engine!.Revision}", build.Exe, ct);
     }
 
+    /// <summary>
+    /// ダウンロード先を変えたとき、前のダウンロード先にあるこのサーバーの本体と pakset の記録を捨てる
+    /// （前のフォルダのファイルは使い回しにも使わない。フォルダ自体は消さないので、要らなければユーザーが消す）。
+    /// 前のフォルダを返す（変わっていなければ null）。
+    /// </summary>
+    public string? ForgetPreviousInstall(ServerEntry server, LauncherSettings settings, InstallOptions? before, InstallOptions? after)
+    {
+        var oldRoot = InstallRoot(settings, before);
+        if (string.Equals(oldRoot, InstallRoot(settings, after), StringComparison.OrdinalIgnoreCase) || server.Engine is null)
+        {
+            return null;
+        }
+        var state = InstalledState.Load(layout);
+        state.RemoveUnder(Path.Combine(oldRoot, server.Engine.Revision));
+        state.Save(layout);
+        return oldRoot;
+    }
+
     /// <summary>pakset のファイル一覧（全体のサイズを画面に出すため）。zip 方式の pakset なら null。</summary>
     public async Task<PaksetIndex?> LoadPaksetIndexAsync(ServerEntry server, CancellationToken ct = default)
     {
@@ -136,6 +154,12 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     public async Task<SyncSummary> SyncAsync(SyncPlan plan, IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
     {
         var summary = new SyncSummary(0, 0, 0);
+        // 消されたフォルダ（以前のダウンロード先など）の記録は捨てる
+        var current = InstalledState.Load(layout);
+        if (current.RemoveMissing())
+        {
+            current.Save(layout);
+        }
         // 本体を先に入れる。本体を入れ直すと中の pakset も消えるので、そのあと pakset を判定し直す
         foreach (var item in plan.Items.OrderBy(i => i.Kind))
         {

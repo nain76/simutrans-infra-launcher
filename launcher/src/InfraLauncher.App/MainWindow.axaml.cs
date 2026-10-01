@@ -448,8 +448,16 @@ public partial class MainWindow : Window
         {
             return false;
         }
+        // ダウンロード先が変わったら、前のフォルダの記録は捨てる（前のフォルダのファイルは使わない）
+        var previous = _service.Sync.ForgetPreviousInstall(server, _settings, OptionsFor(row), dialog.Result);
         _settings.ServerInstall[row.FavoriteKey] = dialog.Result;
         _settings.Save(_service.Layout);
+        if (previous is not null && Directory.Exists(Path.Combine(previous, server.Engine!.Revision)))
+        {
+            await Dialogs.ConfirmAsync(this, "前のダウンロード先",
+                $"ダウンロード先を変えました。前のフォルダはもう使いません。\n{Path.Combine(previous, server.Engine.Revision)}\n\n" +
+                "要らなければ、エクスプローラーで消してかまいません（ランチャーは消しません）。", "OK");
+        }
         return true;
     }
 

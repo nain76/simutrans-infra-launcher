@@ -75,6 +75,7 @@ public partial class InstallOptionsWindow : Window
         _defaultRoot = defaultRoot;
         Heading.Text = $"「{serverName}」のインストール設定";
         RootBox.Watermark = $"既定: {defaultRoot}";
+        AdviceText.Text = SyncFolders.Advice;
         RootBox.Text = current?.InstallRoot ?? "";
         _paksetName = paksetName;
         PaksetNote.Text = "pakset はサーバーと完全に同じでないと接続できないため、すべてダウンロードします。手元にすでにあるファイルは落としません。";
@@ -135,7 +136,9 @@ public partial class InstallOptionsWindow : Window
         var root = RootBox.Text?.Trim();
         var effective = string.IsNullOrEmpty(root) ? _defaultRoot : root;
         if (OneDriveWarning is null) return;
-        OneDriveWarning.IsVisible = effective.Contains("OneDrive", StringComparison.OrdinalIgnoreCase);
+        var service = SyncFolders.Detect(effective);
+        OneDriveWarning.IsVisible = service is not null;
+        OneDriveWarningText.Text = service is null ? "" : SyncFolders.Warning(service);
     }
 
     private async void OnBrowse(object? sender, RoutedEventArgs e)
@@ -146,13 +149,18 @@ public partial class InstallOptionsWindow : Window
         }
     }
 
-    private void OnSave(object? sender, RoutedEventArgs e)
+    private async void OnSave(object? sender, RoutedEventArgs e)
     {
         var root = RootBox.Text?.Trim().Trim('"');
         if (!string.IsNullOrEmpty(root) && !Path.IsPathRooted(root))
         {
-            ErrorText.Text = "ダウンロード先はフルパスで入れてください（例: D:\\Games\\simutrans）";
+            ErrorText.Text = "ダウンロード先はフルパスで入れてください（例: C:\\Games\\simutrans）";
             ErrorText.IsVisible = true;
+            return;
+        }
+        if (SyncFolders.Detect(string.IsNullOrEmpty(root) ? _defaultRoot : root) is { } service
+            && !await Dialogs.ConfirmAsync(this, "ダウンロード先の確認", SyncFolders.Warning(service) + "\n\nこのまま保存しますか？", "このまま保存"))
+        {
             return;
         }
         Result = new InstallOptions

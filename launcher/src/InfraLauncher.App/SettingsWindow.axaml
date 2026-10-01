@@ -16,9 +16,14 @@
     <TextBlock Text="サーバーから入れる simutrans 本体と pakset の置き場所です。空欄ならランチャーのデータフォルダの中に入れます。サーバーごとの「インストール設定」で個別に変えることもできます。"
                Opacity="0.75" TextWrapping="Wrap" />
     <Grid ColumnDefinitions="*,Auto">
-      <TextBox x:Name="InstallRoot" />
+      <TextBox x:Name="InstallRoot" TextChanged="OnRootChanged" />
       <Button Grid.Column="1" Content="参照…" Margin="8,0,0,0" Click="OnBrowseRoot" />
     </Grid>
+    <TextBlock x:Name="AdviceText" TextWrapping="Wrap" Opacity="0.75" />
+    <Border x:Name="SyncWarning" IsVisible="False" Background="#33c47a00" BorderBrush="#c47a00" BorderThickness="1"
+            CornerRadius="4" Padding="10,6">
+      <TextBlock x:Name="SyncWarningText" TextWrapping="Wrap" FontWeight="SemiBold" />
+    </Border>
 
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,16,0,0">
       <Button Content="キャンセル" Click="OnCancel" />

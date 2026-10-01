@@ -124,6 +124,33 @@ public sealed class EngineComponentsTests : IDisposable
         Assert.Equal(Path.Combine(global, "r1", "sim.exe"), info.ExePath);
     }
 
+    [Fact]
+    public async Task ForgetsPreviousFolderWhenChanged()
+    {
+        var server = Default();
+        var settings = new LauncherSettings();
+        var before = new InstallOptions { InstallRoot = Path.Combine(_dir, "old") };
+        var after = new InstallOptions { InstallRoot = Path.Combine(_dir, "new") };
+        await _service.SyncServerAsync(server, settings, options: before);
+        Assert.NotNull(InstalledState.Load(_layout).Get(Path.Combine(_dir, "old", "r1")));
+
+        Assert.Null(_service.Sync.ForgetPreviousInstall(server, settings, before, before));
+        Assert.Equal(Path.Combine(_dir, "old"), _service.Sync.ForgetPreviousInstall(server, settings, before, after));
+        Assert.Empty(InstalledState.Load(_layout).Items);
+    }
+
+    [Fact]
+    public async Task DropsRecordsOfDeletedFolders()
+    {
+        var server = Default();
+        var settings = new LauncherSettings();
+        var old = new InstallOptions { InstallRoot = Path.Combine(_dir, "old") };
+        await _service.SyncServerAsync(server, settings, options: old);
+        Directory.Delete(Path.Combine(_dir, "old"), recursive: true);
+        await _service.SyncServerAsync(server, settings, options: new InstallOptions { InstallRoot = Path.Combine(_dir, "new") });
+        Assert.All(InstalledState.Load(_layout).Items.Keys, k => Assert.StartsWith(Path.Combine(_dir, "new"), k));
+    }
+
     [Theory]
     [InlineData("other.exe", "core")]
     [InlineData("config/lib.dll", "core")]

@@ -34,6 +34,17 @@ public sealed class InstalledState
         }
     }
 
+    /// <summary>消されたフォルダの記録を捨てる。捨てたものがあれば true。</summary>
+    public bool RemoveMissing()
+    {
+        var missing = Items.Keys.Where(k => !Directory.Exists(k)).ToList();
+        foreach (var k in missing)
+        {
+            Items.Remove(k);
+        }
+        return missing.Count > 0;
+    }
+
     private static string Key(string dir) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(dir));
 }
 
