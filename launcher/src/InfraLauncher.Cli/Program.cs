@@ -40,6 +40,7 @@ var layout = dataDir is null ? InstallLayout.Default() : new InstallLayout(dataD
 using var http = new HttpClient();
 http.DefaultRequestHeaders.UserAgent.ParseAdd("InfraLauncher/0.1");
 var service = new LauncherService(layout, http);
+SyncLog.FilePath = layout.SyncLogPath;
 var settings = service.LoadSettings();
 if (simutransExe is not null)
 {

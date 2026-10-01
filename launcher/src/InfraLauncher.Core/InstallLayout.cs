@@ -5,6 +5,9 @@ public sealed class InstallLayout(string root)
 {
     public string Root { get; } = Path.GetFullPath(root);
 
+    /// <summary>同期の記録。</summary>
+    public string SyncLogPath => Path.Combine(Root, "logs", "sync.log");
+
     /// <summary>Windows: %LOCALAPPDATA%\InfraLauncher、Linux: ~/.local/share/InfraLauncher、macOS: ~/Library/Application Support/InfraLauncher</summary>
     public static InstallLayout Default() => new(Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolderOption.Create),

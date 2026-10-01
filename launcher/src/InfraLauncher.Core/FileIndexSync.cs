@@ -32,6 +32,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         var stamps = record?.Files ?? new Dictionary<string, FileStamp>();
 
         // 1. 照合
+        SyncLog.Write($"[{item.Label}] 同期を始めます: {target}（一覧 {item.Url}、{wanted.Count} ファイル）");
         progress?.Report(new SyncProgress(item, "確認中", 0, null));
         var newStamps = new Dictionary<string, FileStamp>(StringComparer.OrdinalIgnoreCase);
         var missing = new List<PaksetFile>();
@@ -56,6 +57,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             missing.Add(f);
         }
 
+        SyncLog.Write($"[{item.Label}] 照合しました: 足りない・違うファイル {missing.Count} 件");
         var keep = new HashSet<string>(wanted.Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
         List<string> extras;
         if (item.DeleteUnknown)
@@ -94,18 +96,30 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         Directory.CreateDirectory(staging);
         var unique = missing.GroupBy(f => f.Sha256.ToLowerInvariant()).Select(g => g.First()).ToList();
 
-        // 手元のほかの pakset（本体の別リビジョン用など）に同じ中身のファイルがあれば、コピーして使う
+        // 手元のほかの pakset（本体の別リビジョン用など）に同じ中身のファイルがあれば、コピーして使う。
+        // ただし、OneDrive などで中身がクラウドにしかないファイル（開くとダウンロードが始まる）は使わない。
+        // 取り寄せに時間がかかったり、止まったりするため
         var reused = 0;
         var copies = unique.Count > 0 ? LocalCopies(state, target) : new();
+        var checkedCount = 0;
         foreach (var f in unique.ToList())
         {
-            var tmp = Path.Combine(staging, f.Sha256.ToLowerInvariant());
-            var local = copies.GetValueOrDefault(f.Sha256.ToLowerInvariant())?
-                .FirstOrDefault(c => c.Stamp.Size == f.Size && c.Stamp.Matches(new FileInfo(c.Path))).Path;
+            ct.ThrowIfCancellationRequested();
+            var candidates = copies.GetValueOrDefault(f.Sha256.ToLowerInvariant());
+            if (candidates is null)
+            {
+                continue;
+            }
+            var local = candidates.FirstOrDefault(c => c.Stamp.Size == f.Size && IsUsableLocalCopy(c.Path, c.Stamp)).Path;
             if (local is null)
             {
                 continue;
             }
+            if (++checkedCount % 20 == 1)
+            {
+                progress?.Report(new SyncProgress(item, $"手元にある同じファイルを使い回しています（{checkedCount} 件目）", 0, null));
+            }
+            var tmp = Path.Combine(staging, f.Sha256.ToLowerInvariant());
             File.Copy(local, tmp, overwrite: true);
             if (SameSha(await Downloader.HashFileAsync(tmp, ct), f.Sha256))
             {
@@ -113,6 +127,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
                 reused++;
             }
         }
+        SyncLog.Write($"[{item.Label}] 手元のファイルを {reused} 件使い回しました。ダウンロードするのは {unique.Count} 件です");
         if (reused > 0)
         {
             progress?.Report(new SyncProgress(item, $"手元のファイルを {reused} 件使い回しました", 0, null));
@@ -161,8 +176,9 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
                                     n => { mine += n; inFlight[f] = mine; Interlocked.Add(ref done, n); Report(); }, ct);
                                 break;
                             }
-                            catch (DownloadInterruptedException) when (attempt < Attempts && !ct.IsCancellationRequested)
+                            catch (DownloadInterruptedException e) when (attempt < Attempts && !ct.IsCancellationRequested)
                             {
+                                SyncLog.Write($"[{item.Label}] やり直します（{attempt + 1}/{Attempts} 回目）: {e.Message}");
                                 Interlocked.Add(ref done, -mine);
                                 progress?.Report(new SyncProgress(item, $"{f.Path} の通信が途切れたので、やり直しています（{attempt + 1}/{Attempts} 回目）",
                                     Interlocked.Read(ref done), total));
@@ -182,6 +198,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         }
 
         // 3. 反映
+        SyncLog.Write($"[{item.Label}] ダウンロードが終わりました。反映します");
         progress?.Report(new SyncProgress(item, "反映中", total, total));
         string? backup = null;
         void Discard(string rel)
@@ -232,10 +249,26 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
 
         SaveRecord(state, target, item, newStamps);
         TryDeleteDir(staging);
+        SyncLog.Write($"[{item.Label}] 同期が終わりました");
         return new SyncSummary(unique.Count, total, extras.Count);
     }
 
     /// <summary>ほかの展開先の記録にあるファイルを、SHA256 ごとにまとめる（記録どおり変わっていないかは使う直前に確かめる）。</summary>
+    /// <summary>
+    /// 使い回してよい手元のファイルか。記録どおり変わっておらず、中身が手元にある（クラウドにしかないファイルではない）こと。
+    /// </summary>
+    private static bool IsUsableLocalCopy(string path, FileStamp stamp)
+    {
+        var info = new FileInfo(path);
+        if (!stamp.Matches(info))
+        {
+            return false;
+        }
+        // OneDrive の「オンライン専用」など。0x400000 = FILE_ATTRIBUTE_RECALL_ON_DATA_ACCESS、0x40000 = RECALL_ON_OPEN
+        const FileAttributes recallOnDataAccess = (FileAttributes)0x400000, recallOnOpen = (FileAttributes)0x40000;
+        return (info.Attributes & (FileAttributes.Offline | recallOnDataAccess | recallOnOpen)) == 0;
+    }
+
     private static Dictionary<string, List<(string Path, FileStamp Stamp)>> LocalCopies(InstalledState state, string target)
     {
         var result = new Dictionary<string, List<(string, FileStamp)>>();

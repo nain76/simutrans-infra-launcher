@@ -22,6 +22,7 @@ public partial class MainWindow : Window
         InitializeComponent();
         _http.DefaultRequestHeaders.UserAgent.ParseAdd("InfraLauncher/0.1");
         _service = new LauncherService(InstallLayout.Default(), _http);
+        SyncLog.FilePath = _service.Layout.SyncLogPath;
         _settings = _service.LoadSettings();
         Opened += async (_, _) => await RefreshAsync();
     }
@@ -295,7 +296,8 @@ public partial class MainWindow : Window
             if (DateTime.Now - _lastProgress > TimeSpan.FromSeconds(60))
             {
                 StatusText.Text = $"{_lastStage}\n1分以上進んでいません。ダウンロード先が OneDrive などの同期フォルダの中だと止まることがあります。" +
-                    "「中止」を押し、「インストール設定」でダウンロード先を OneDrive の外に変えてから、もう一度「同期」を押してください";
+                    "「中止」を押し、「インストール設定」でダウンロード先を OneDrive の外に変えてから、もう一度「同期」を押してください。" +
+                    $"詳しい記録: {_service.Layout.SyncLogPath}";
             }
         };
         try
@@ -339,7 +341,8 @@ public partial class MainWindow : Window
         }
         catch (Exception ex) when (ex is SyncException or FormatException or FileNotFoundException)
         {
-            StatusText.Text = $"エラー: {ex.Message}";
+            SyncLog.Write($"エラー: {ex.Message}");
+            StatusText.Text = $"エラー: {ex.Message}\n詳しい記録: {_service.Layout.SyncLogPath}";
         }
         finally
         {

@@ -41,11 +41,16 @@ internal static class Downloader
             }
             else
             {
+                SyncLog.Write($"要求: {url}");
                 response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, idle.Token);
+                SyncLog.Write($"応答: {url} {(int)response.StatusCode} 長さ {response.Content.Headers.ContentLength?.ToString() ?? "不明"}");
                 response.EnsureSuccessStatusCode();
                 source = await response.Content.ReadAsStreamAsync(idle.Token);
             }
 
+            var received = 0L;
+            var nextLog = 64L * 1024 * 1024;
+            var started = DateTime.Now;
             using (response)
             await using (source)
             await using (var file = File.Create(dest))
@@ -55,21 +60,33 @@ internal static class Downloader
                 while ((n = await source.ReadAsync(buffer, idle.Token)) > 0)
                 {
                     idle.CancelAfter(IdleTimeout);
+                    received += n;
+                    if (received >= nextLog)
+                    {
+                        SyncLog.Write($"受信中: {url} {received:N0} バイト");
+                        nextLog += 64L * 1024 * 1024;
+                    }
                     hash.AppendData(buffer, 0, n);
                     await file.WriteAsync(buffer.AsMemory(0, n), ct);
                     onBytes?.Invoke(n);
                 }
             }
+            if (response is not null)
+            {
+                SyncLog.Write($"受信完了: {url} {received:N0} バイト（{(DateTime.Now - started).TotalSeconds:0.0} 秒）");
+            }
         }
         catch (OperationCanceledException e) when (!ct.IsCancellationRequested)
         {
             TryDelete(dest);
+            SyncLog.Write($"止まったので打ち切り: {url}");
             throw new DownloadInterruptedException($"{what} のダウンロードが {IdleTimeout.TotalSeconds:0} 秒間止まったので打ち切りました: {url}", e);
         }
         catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException && !ct.IsCancellationRequested)
         {
             TryDelete(dest);
             var message = $"{what} をダウンロードできませんでした: {url} ({e.Message})";
+            SyncLog.Write($"失敗: {message}");
             // 404 などサーバーがはっきり断った場合は、やり直しても同じなのでやり直さない
             var interrupted = e is IOException || e is HttpRequestException { StatusCode: null or >= System.Net.HttpStatusCode.InternalServerError };
             throw interrupted ? new DownloadInterruptedException(message, e) : new SyncException(message, e);
@@ -83,6 +100,7 @@ internal static class Downloader
         var actual = Convert.ToHexStringLower(hash.GetHashAndReset());
         if (!actual.Equals(expectedSha256, StringComparison.OrdinalIgnoreCase))
         {
+            SyncLog.Write($"ハッシュ不一致: {url} 期待 {expectedSha256} 実際 {actual}");
             TryDelete(dest);
             throw new SyncException(
                 $"{what} のハッシュがサーバーリストの記載と一致しません。ダウンロードが壊れているか、サーバーリストが古い可能性があります。サーバー管理者に確認してください。" +
