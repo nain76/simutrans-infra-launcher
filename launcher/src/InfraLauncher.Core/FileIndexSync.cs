@@ -102,6 +102,7 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         }
 
         SyncLog.Write($"[{item.Label}]照合しました: 足りない・違うファイル{missing.Count}件");
+        progress?.Report(new SyncProgress(item, $"確認中 {wanted.Count}/{wanted.Count}ファイル", totalBytes, totalBytes));
         var keep = new HashSet<string>(wanted.Select(f => f.Path), StringComparer.OrdinalIgnoreCase);
         List<string> extras;
         if (item.DeleteUnknown)

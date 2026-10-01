@@ -447,6 +447,8 @@ public partial class MainWindow : Window
             return;
         }
         SetBusy(true, "アップデートを確かめています…");
+        // 進み具合は後から届くことがあるので、調べ終わったあとに届いたものは捨てる（結果の表示を上書きしないように）
+        var checking = true;
         try
         {
             var lines = new List<string>();
@@ -454,6 +456,10 @@ public partial class MainWindow : Window
             {
                 var progress = new Progress<SyncProgress>(p =>
                 {
+                    if (!checking)
+                    {
+                        return;
+                    }
                     var percent = p.BytesTotal is > 0 ? $"  {p.BytesDone * 100 / p.BytesTotal.Value}%" : "";
                     StatusText.Text = $"{row.Name}: {p.Item.Label}を確かめています（{p.Stage}）{percent}";
                     Progress.IsIndeterminate = p.BytesTotal is not > 0;
@@ -466,10 +472,12 @@ public partial class MainWindow : Window
                 row.SetCheckResult(results);
                 lines.Add($"{row.Name}: {row.SyncDetail}");
             }
+            checking = false;
             StatusText.Text = string.Join("\n", lines);
         }
         catch (Exception ex) when (ex is SyncException or ManifestException or IOException or UnauthorizedAccessException)
         {
+            checking = false;
             StatusText.Text = $"エラー: {ex.Message}";
         }
         finally
