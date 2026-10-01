@@ -15,6 +15,9 @@ public sealed class LauncherSettings
     /// <summary>サーバーリストに今の OS 用の本体が含まれていないときに使う、手元の simutrans の実行ファイル。</summary>
     public string? SimutransExe { get; set; }
 
+    /// <summary>ネットワークゲームで表示されるプレイヤー名。空なら simutrans の設定のまま。</summary>
+    public string? Nickname { get; set; }
+
     /// <summary>本体と pakset をダウンロードする既定のフォルダ。空なら &lt;データフォルダ&gt;/simutrans。</summary>
     public string? InstallRoot { get; set; }
 

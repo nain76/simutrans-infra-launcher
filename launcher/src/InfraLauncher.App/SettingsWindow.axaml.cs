@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using InfraLauncher.Core;
 
 namespace InfraLauncher.App;
 
@@ -7,8 +8,9 @@ public partial class SettingsWindow : Window
 {
     public SettingsWindow() => InitializeComponent();
 
-    public SettingsWindow(string? simutransExe, string? installRoot, string defaultRoot) : this()
+    public SettingsWindow(string? simutransExe, string? installRoot, string defaultRoot, string? nickname) : this()
     {
+        NicknameBox.Text = nickname ?? "";
         SimutransExe.Text = simutransExe ?? "";
         InstallRoot.Text = installRoot ?? "";
         InstallRoot.Watermark = $"既定: {defaultRoot}";
@@ -25,6 +27,7 @@ public partial class SettingsWindow : Window
 
     public string? Result { get; private set; }
     public string? InstallRootResult { get; private set; }
+    public string? NicknameResult { get; private set; }
 
     private async void OnBrowseRoot(object? sender, RoutedEventArgs e)
     {
@@ -44,6 +47,13 @@ public partial class SettingsWindow : Window
 
     private async void OnSave(object? sender, RoutedEventArgs e)
     {
+        if (NicknameConfig.Validate(NicknameBox.Text) is { } problem)
+        {
+            NicknameError.Text = problem;
+            NicknameError.IsVisible = true;
+            return;
+        }
+        NicknameResult = string.IsNullOrWhiteSpace(NicknameBox.Text) ? null : NicknameBox.Text.Trim();
         if (SyncFolders.Detect(InstallRoot.Text) is { } service
             && !await Dialogs.ConfirmAsync(this, "ダウンロード先の確認", SyncFolders.Warning(service) + "\n\nこのまま保存しますか？", "このまま保存"))
         {

@@ -88,6 +88,11 @@ public sealed class LauncherService(InstallLayout layout, HttpClient http)
         {
             throw new SyncException("確認したあとで simutrans 本体が書き換えられました。もう一度「起動」を押してください");
         }
+        // ランチャーが入れた本体なら、プレイヤー名を設定ファイルに書いてから起動する
+        if (info.ManagedEngine)
+        {
+            NicknameConfig.Apply(Path.GetDirectoryName(info.ExePath)!, settings.Nickname);
+        }
         return SimutransRunner.Start(info.ExePath, info.Args);
     }
 

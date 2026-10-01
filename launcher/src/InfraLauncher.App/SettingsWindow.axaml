@@ -4,7 +4,13 @@
         Title="設定" Width="600" SizeToContent="Height" CanResize="False"
         WindowStartupLocation="CenterOwner">
   <StackPanel Margin="16" Spacing="6">
-    <TextBlock Text="手元の simutrans 本体（任意）" FontWeight="SemiBold" />
+    <TextBlock Text="プレイヤー名" FontWeight="SemiBold" />
+    <TextBlock Text="サーバーに入ったときに、ほかのプレイヤーに表示される名前です。空欄なら simutrans の設定のままにします。サーバーから入れた simutrans に、起動するたびに書き込みます。"
+               Opacity="0.75" TextWrapping="Wrap" />
+    <TextBox x:Name="NicknameBox" Watermark="例: たろう" MaxLength="32" />
+    <TextBlock x:Name="NicknameError" Foreground="#d13438" TextWrapping="Wrap" IsVisible="False" />
+
+    <TextBlock Text="手元の simutrans 本体（任意）" FontWeight="SemiBold" Margin="0,12,0,0" />
     <TextBlock Text="共有されたサーバーリストに、この PC 用の simutrans 本体が含まれていない場合に使います。手動プロファイルを追加するときの初期値にもなります。"
                Opacity="0.75" TextWrapping="Wrap" />
     <Grid ColumnDefinitions="*,Auto">

@@ -69,6 +69,60 @@ public sealed class EngineComponentsTests : IDisposable
         ("music/a.ogg", "music", "music"), ("maps/map.png", "map", "maps"));
 
     [Fact]
+    public async Task KeepsLocallyEditedSimuconf()
+    {
+        var server = Default();
+        var settings = new LauncherSettings();
+        await _service.SyncServerAsync(server, settings);
+        var dir = Path.Combine(_layout.DefaultInstallRoot, "r1");
+        var conf = Path.Combine(dir, "config", "simuconf.tab");
+        File.WriteAllText(conf, "my settings");
+        var plan = _service.Sync.Plan(server, settings);
+        Assert.All(await _service.Sync.CheckAsync(plan), r => Assert.True(r.UpToDate));
+        await _service.SyncServerAsync(server, settings);
+        Assert.Equal("my settings", File.ReadAllText(conf));
+
+        // 消したら入れ直す
+        File.Delete(conf);
+        await _service.SyncServerAsync(server, settings);
+        Assert.Equal("conf", File.ReadAllText(conf));
+    }
+
+    [Fact]
+    public async Task UpdateCheckReportsWithoutChangingFiles()
+    {
+        var server = Default();
+        var settings = new LauncherSettings();
+        var first = (await _service.Sync.CheckAsync(_service.Sync.Plan(server, settings))).Single(r => r.Item.Kind == SyncItemKind.Engine);
+        Assert.False(first.UpToDate);
+        Assert.Equal(3, first.Files);
+        Assert.False(Directory.Exists(Path.Combine(_layout.DefaultInstallRoot, "r1")));
+
+        await _service.SyncServerAsync(server, settings);
+        var music = Path.Combine(_layout.DefaultInstallRoot, "r1", "music", "a.ogg");
+        File.WriteAllText(music, "changed!");
+        var results = await _service.Sync.CheckAsync(_service.Sync.Plan(server, settings));
+        Assert.True(results.Single(r => r.Item.Kind == SyncItemKind.Pakset).UpToDate);
+        var check = results.Single(r => r.Item.Kind == SyncItemKind.Engine);
+        Assert.False(check.UpToDate);
+        Assert.Equal(1, check.Files);
+        Assert.Equal("changed!", File.ReadAllText(music));
+    }
+
+    [Fact]
+    public async Task ListsUserFilesBeforeCleaningUp()
+    {
+        var server = Default();
+        await _service.SyncServerAsync(server, new LauncherSettings());
+        var dir = Path.Combine(_layout.DefaultInstallRoot, "r1");
+        Directory.CreateDirectory(Path.Combine(dir, "save"));
+        File.WriteAllText(Path.Combine(dir, "save", "my.sve"), "x");
+        File.WriteAllText(Path.Combine(dir, "config", "simuconf.tab"), "edited");
+        var files = _service.Sync.UserFilesIn(dir);
+        Assert.Equal(Path.Combine(dir, "save", "my.sve"), Assert.Single(files));
+    }
+
+    [Fact]
     public async Task RecommendedGetsRequiredAndRecommended()
     {
         var server = Default();

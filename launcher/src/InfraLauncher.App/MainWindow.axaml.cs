@@ -131,6 +131,7 @@ public partial class MainWindow : Window
         // 同期中は「同期」ボタンを「中止」にする
         SyncButton.Content = _syncCts is null ? "同期" : "中止";
         SyncButton.IsEnabled = _syncCts is not null || !_busy && row is { CanSync: true };
+        CheckButton.IsEnabled = !_busy && _rows.Any(r => r.Kind == ServerRowKind.Listed);
         InstallOptionsButton.IsEnabled = !_busy && row is { Kind: ServerRowKind.Listed, Server.EngineDownloadAllowed: true };
         LaunchButton.IsEnabled = !_busy && row is { IsReady: true };
         EditButton.IsEnabled = !_busy && row is not null;
@@ -402,6 +403,48 @@ public partial class MainWindow : Window
     private InstallOptions? OptionsFor(ServerListSource list, InfraLauncher.Core.Models.ServerEntry server) =>
         _settings.ServerInstall.GetValueOrDefault(FavoriteKeys.ForListed(list, server.Id));
 
+    /// <summary>
+    /// アップデートチェック。サーバーリストを取り直し、選んだサーバー（選んでいなければすべて）について、
+    /// 同期で何を落とすことになるかを調べて表示する。ダウンロードや書き換えはしない。
+    /// </summary>
+    private async void OnCheck(object? sender, RoutedEventArgs e)
+    {
+        if (_busy)
+        {
+            return;
+        }
+        var selectedKey = Selected is { } s ? RowKey(s) : null;
+        await RefreshAsync(selectedKey);
+        var targets = (Selected is { Kind: ServerRowKind.Listed } one ? [one] : _rows.Where(r => r.Kind == ServerRowKind.Listed))
+            .Where(r => r.Plan is not null).ToList();
+        if (targets.Count == 0)
+        {
+            StatusText.Text = "調べられるサーバーがありません。同期できない理由は一覧に出ています";
+            return;
+        }
+        SetBusy(true, "アップデートを確かめています…");
+        try
+        {
+            var lines = new List<string>();
+            foreach (var row in targets)
+            {
+                var progress = new Progress<SyncProgress>(p => StatusText.Text = $"{row.Name}: {p.Item.Label} を確かめています");
+                var results = await _service.Sync.CheckAsync(row.Plan!, progress);
+                row.SetCheckResult(results);
+                lines.Add($"{row.Name}: {row.SyncDetail}");
+            }
+            StatusText.Text = string.Join("\n", lines);
+        }
+        catch (Exception ex) when (ex is SyncException or ManifestException or IOException or UnauthorizedAccessException)
+        {
+            StatusText.Text = $"エラー: {ex.Message}";
+        }
+        finally
+        {
+            SetBusy(false);
+        }
+    }
+
     private async void OnInstallOptions(object? sender, RoutedEventArgs e)
     {
         if (_busy || Selected is not { Kind: ServerRowKind.Listed, Server: { } server } row)
@@ -454,10 +497,17 @@ public partial class MainWindow : Window
         _settings.Save(_service.Layout);
         if (previous is not null)
         {
+            // ランチャーが入れたもの以外のファイル（セーブデータなど）があれば、バックアップを取るよう案内する
+            var userFiles = _service.Sync.UserFilesIn(previous);
+            var saves = userFiles.Count(f => f.EndsWith(".sve", StringComparison.OrdinalIgnoreCase));
+            var backup = userFiles.Count == 0
+                ? "セーブデータ（.sve）を置いていた場合は、消す前に別の場所へコピーしてください。"
+                : $"このフォルダには、ランチャーが入れたもの以外のファイルが {userFiles.Count} 個あります" +
+                  (saves > 0 ? $"（セーブデータ .sve が {saves} 個）" : "") +
+                  "。これらは消しませんが、念のため別の場所へコピーしてバックアップしてください。";
             var delete = Directory.Exists(previous) && await Dialogs.ConfirmAsync(this, "前のダウンロード先",
                 $"ダウンロード先を変えました。前のフォルダはもう使いません。\n{previous}\n\n" +
-                "このフォルダにある、ランチャーが入れたファイル（simutrans 本体と pakset）を消しますか？\n" +
-                "自分で置いたファイル（セーブデータやスクリーンショットなど）は消しません。", "消す");
+                "このフォルダにある、ランチャーが入れたファイル（simutrans 本体と pakset）を消しますか？\n\n" + backup, "消す");
             if (_service.Sync.ForgetInstall(previous, delete) && delete)
             {
                 StatusText.Text = $"前のフォルダに、ランチャーが入れたもの以外のファイルが残っています。要らなければ消してください: {previous}";
@@ -468,10 +518,11 @@ public partial class MainWindow : Window
 
     private async void OnSettings(object? sender, RoutedEventArgs e)
     {
-        var window = new SettingsWindow(_settings.SimutransExe, _settings.InstallRoot, _service.Layout.DefaultInstallRoot);
+        var window = new SettingsWindow(_settings.SimutransExe, _settings.InstallRoot, _service.Layout.DefaultInstallRoot, _settings.Nickname);
         if (await window.ShowDialog<bool>(this))
         {
             _settings.SimutransExe = window.Result;
+            _settings.Nickname = window.NicknameResult;
             _settings.InstallRoot = window.InstallRootResult;
             _settings.Save(_service.Layout);
             await RefreshAsync();

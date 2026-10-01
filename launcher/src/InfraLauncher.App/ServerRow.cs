@@ -195,6 +195,28 @@ public sealed class ServerRow : INotifyPropertyChanged
         OnPropertyChanged(nameof(CanSync));
     }
 
+    /// <summary>アップデートチェックの結果を反映する。</summary>
+    public void SetCheckResult(IReadOnlyList<CheckResult> results)
+    {
+        var updates = results.Where(r => !r.UpToDate).ToList();
+        if (updates.Count == 0)
+        {
+            (SyncLabel, SyncBrush, SyncDetail) = ("✔ 最新です", Green, "本体と pakset はサーバーと同じです。「起動」で遊べます");
+            return;
+        }
+        var parts = updates.Select(r =>
+        {
+            var what = r.Item.Kind == SyncItemKind.Engine ? "simutrans 本体" : "pakset";
+            var size = r.Bytes > 0 ? $"・{FormatSize(r.Bytes)}" : "";
+            var files = r.Files > 0 ? $"{r.Files} ファイル{size}" : "ファイルの入れ替えなし";
+            return r.Removals > 0 ? $"{what}（{files}、片付け {r.Removals} ファイル）" : $"{what}（{files}）";
+        });
+        (SyncLabel, SyncBrush, SyncDetail) = ("更新あり", Orange, $"{string.Join("、", parts)}。「同期」を押すと反映します");
+    }
+
+    private static string FormatSize(long bytes) =>
+        bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024:0.#} MB" : $"{Math.Max(1, bytes / 1024)} KB";
+
     public event PropertyChangedEventHandler? PropertyChanged;
 
     private void OnPropertyChanged([CallerMemberName] string? name = null) =>

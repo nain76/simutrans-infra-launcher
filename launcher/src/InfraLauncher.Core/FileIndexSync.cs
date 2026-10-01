@@ -19,7 +19,33 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
     /// <summary>やり直す前に待つ時間（回数に応じて伸ばす）。</summary>
     internal static TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(2);
 
-    public async Task<SyncSummary> SyncAsync(SyncItem item, IProgress<SyncProgress>? progress, CancellationToken ct)
+    /// <summary>
+    /// 本体と pakset のうち、サーバーと同じにするために落とし直す必要がある設定ファイル以外のもの。
+    /// config/simuconf.tab はユーザーが自分で書き換えたり、ランチャーがプレイヤー名を書き込んだりするので、
+    /// 手元になければ入れるが、あれば書き換えない（サーバー側で変わっても上書きしない）。
+    /// </summary>
+    internal static readonly HashSet<string> PreservedFiles = new(StringComparer.OrdinalIgnoreCase) { "config/simuconf.tab" };
+
+    /// <summary>手元のフォルダと一覧を照合した結果。</summary>
+    private sealed record Comparison(string Target, Uri IndexUri, List<PaksetFile> Wanted, InstalledState State, InstalledRecord? Record,
+        Dictionary<string, FileStamp> Stamps, Dictionary<string, FileStamp> NewStamps, List<PaksetFile> Missing, List<string> Extras)
+    {
+        public bool Managed => Record is not null;
+    }
+
+    /// <summary>
+    /// 同期が必要かを確かめるだけで、何も書き換えない（「アップデートチェック」用）。
+    /// 落とすファイルの数と大きさ、片付けるファイルの数を返す。
+    /// </summary>
+    public async Task<CheckResult> CheckAsync(SyncItem item, IProgress<SyncProgress>? progress, CancellationToken ct)
+    {
+        var c = await CompareAsync(item, progress, ct);
+        var upToDate = c.Missing.Count == 0 && c.Extras.Count == 0 && c.Managed
+            && SameSha(c.Record!.Sha256, item.Sha256) && c.Record.Selection == item.Selection;
+        return new CheckResult(item, upToDate, c.Missing.Count, c.Missing.Sum(f => f.Size), c.Extras.Count);
+    }
+
+    private async Task<Comparison> CompareAsync(SyncItem item, IProgress<SyncProgress>? progress, CancellationToken ct)
     {
         var target = Path.GetFullPath(item.TargetDir);
         var exeRel = item.ExePath is null ? null : Path.GetRelativePath(target, item.ExePath).Replace('\\', '/');
@@ -40,6 +66,11 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         {
             var local = LocalPath(target, f.Path);
             var info = new FileInfo(local);
+            if (PreservedFiles.Contains(f.Path) && info.Exists)
+            {
+                // 手元で書き換えてよい設定ファイル。あればそのまま使い、照合の記録にも入れない
+                continue;
+            }
             if (info.Exists && info.Length == f.Size)
             {
                 if (stamps.TryGetValue(f.Path, out var st) && st.Matches(info) && SameSha(st.Sha256, f.Sha256))
@@ -75,6 +106,15 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             // 本体: フォルダの中には pakset やユーザーのファイルもあるので、ランチャーが入れたファイルだけを片付ける
             extras = stamps.Keys.Where(rel => !keep.Contains(rel) && File.Exists(LocalPath(target, rel))).ToList();
         }
+
+        return new Comparison(target, indexUri, wanted, state, record, stamps, newStamps, missing, extras);
+    }
+
+    public async Task<SyncSummary> SyncAsync(SyncItem item, IProgress<SyncProgress>? progress, CancellationToken ct)
+    {
+        var c = await CompareAsync(item, progress, ct);
+        var (target, indexUri, state, record, stamps, newStamps, missing, extras, managed) =
+            (c.Target, c.IndexUri, c.State, c.Record, c.Stamps, c.NewStamps, c.Missing, c.Extras, c.Managed);
 
         if (missing.Count == 0 && extras.Count == 0 && managed && SameSha(record!.Sha256, item.Sha256) && record.Selection == item.Selection)
         {

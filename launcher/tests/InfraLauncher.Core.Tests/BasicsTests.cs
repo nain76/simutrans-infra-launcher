@@ -101,3 +101,39 @@ public class ServerProbeTests
         Assert.False(await ServerProbe.IsReachableAsync(new ServerAddress("127.0.0.1", port), TimeSpan.FromSeconds(3)));
     }
 }
+
+public class NicknameConfigTests : IDisposable
+{
+    private readonly string _dir = Directory.CreateTempSubdirectory("infralauncher-nick-").FullName;
+
+    public void Dispose() => Directory.Delete(_dir, recursive: true);
+
+    [Fact]
+    public void WritesNameAtTopAndReplacesIt()
+    {
+        Directory.CreateDirectory(Path.Combine(_dir, "config"));
+        var conf = Path.Combine(_dir, "config", "simuconf.tab");
+        File.WriteAllText(conf, "# simuconf\r\nnickname = old\r\nfps = 25\r\n");
+
+        Assert.True(NicknameConfig.Apply(_dir, "たろう"));
+        var lines = File.ReadAllLines(conf);
+        // simutrans は最初に出てきた行を使うので、先頭に書く
+        Assert.Equal("nickname = たろう", lines[1]);
+        Assert.Contains("fps = 25", lines);
+
+        Assert.True(NicknameConfig.Apply(_dir, "じろう"));
+        Assert.Single(File.ReadAllLines(conf), l => l.StartsWith("nickname = じ"));
+        Assert.DoesNotContain(File.ReadAllLines(conf), l => l.Contains("たろう"));
+        Assert.False(NicknameConfig.Apply(_dir, "じろう"));
+
+        // 空にすると、ランチャーが書いた行だけを消して元に戻す
+        Assert.True(NicknameConfig.Apply(_dir, null));
+        Assert.Equal("# simuconf\r\nnickname = old\r\nfps = 25\r\n", File.ReadAllText(conf));
+    }
+
+    [Theory]
+    [InlineData("a\nb")]
+    [InlineData("#name")]
+    [InlineData("123456789012345678901234567890123")]
+    public void RejectsUnsafeNames(string name) => Assert.NotNull(NicknameConfig.Validate(name));
+}

@@ -30,6 +30,9 @@ public sealed record SyncPlan(ServerEntry Server, string ExePath, string PaksetF
 public sealed record SyncProgress(SyncItem Item, string Stage, long BytesDone, long? BytesTotal);
 
 /// <summary>同期の結果。Downloads はダウンロードしたファイル（zip）の数、Removed は片付けたファイルの数。</summary>
+/// <summary>アップデートチェックの結果。UpToDate でなければ、落とすファイルの数と大きさ（zip 方式なら大きさは 0）と片付けるファイルの数。</summary>
+public sealed record CheckResult(SyncItem Item, bool UpToDate, int Files, long Bytes, int Removals);
+
 public sealed record SyncSummary(int Downloads, long Bytes, int Removed)
 {
     public SyncSummary Add(SyncSummary o) => new(Downloads + o.Downloads, Bytes + o.Bytes, Removed + o.Removed);
@@ -71,6 +74,37 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
+    /// フォルダの中にある、ランチャーが入れたもの以外のファイル（セーブデータやスクリーンショット、書き換えた設定ファイルなど）。
+    /// 片付ける前に、バックアップを取るよう案内するために使う。
+    /// </summary>
+    public IReadOnlyList<string> UserFilesIn(string dir)
+    {
+        if (!Directory.Exists(dir))
+        {
+            return [];
+        }
+        var full = Path.TrimEndingDirectorySeparator(Path.GetFullPath(dir));
+        var installed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (key, record) in InstalledState.Load(layout).Items.Where(kv => kv.Key.Equals(full, StringComparison.OrdinalIgnoreCase)
+                     || kv.Key.StartsWith(full + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)))
+        {
+            // config/simuconf.tab は照合の記録に入れていないが、ランチャーが入れたものとして扱う
+            foreach (var rel in (record.Files?.Keys ?? Enumerable.Empty<string>()).Concat(FileIndexSync.PreservedFiles))
+            {
+                installed.Add(Path.GetFullPath(Path.Combine(key, rel.Replace('/', Path.DirectorySeparatorChar))));
+            }
+        }
+        try
+        {
+            return Directory.EnumerateFiles(full, "*", SearchOption.AllDirectories).Where(f => !installed.Contains(f)).ToList();
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return [];
+        }
+    }
+
+    /// <summary>
     /// 使わなくなったフォルダ（前のダウンロード先）の記録と、ダウンロード途中の一時ファイルを捨てる。以後は使い回しにも使わない。
     /// <paramref name="deleteFiles"/> なら、ランチャーが入れたファイル（記録にあるもの）も消し、空になったフォルダを消す。
     /// 自分で置いたファイル（セーブデータなど）は記録にないので消さない。フォルダが残ったら true。
@@ -85,7 +119,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
             FileIndexSync.TryDeleteDir(FileIndexSync.StagingDirFor(layout, key));
             if (deleteFiles)
             {
-                foreach (var rel in record.Files?.Keys ?? Enumerable.Empty<string>())
+                foreach (var rel in (record.Files?.Keys ?? Enumerable.Empty<string>()).Concat(FileIndexSync.PreservedFiles))
                 {
                     Downloader.TryDelete(Path.Combine(key, rel.Replace('/', Path.DirectorySeparatorChar)));
                 }
@@ -213,6 +247,28 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         items.Add(new SyncItem(SyncItemKind.Pakset, label, url, sha, paksetDir, paksetNeeded, method));
 
         return new SyncPlan(server, exe, p.Folder, items);
+    }
+
+    /// <summary>
+    /// アップデートチェック。サーバーと同じにするのに何を落とす必要があるかを確かめるだけで、何も書き換えない。
+    /// ファイル一覧方式なら手元のファイルを1つずつ照合する（記録と違うファイルはハッシュを計算し直す）。
+    /// </summary>
+    public async Task<IReadOnlyList<CheckResult>> CheckAsync(SyncPlan plan, IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
+    {
+        var results = new List<CheckResult>();
+        var state = InstalledState.Load(layout);
+        foreach (var item in plan.Items.OrderBy(i => i.Kind))
+        {
+            if (item.Method == SyncMethod.FileIndex)
+            {
+                results.Add(await _fileIndex.CheckAsync(item, progress, ct));
+                continue;
+            }
+            var needed = item.Needed || !Directory.Exists(item.TargetDir) || !SameHash(state.Get(item.TargetDir), item.Sha256)
+                || item.ExePath is not null && !File.Exists(item.ExePath);
+            results.Add(new CheckResult(item, !needed, needed ? 1 : 0, 0, 0));
+        }
+        return results;
     }
 
     public async Task<SyncSummary> SyncAsync(SyncPlan plan, IProgress<SyncProgress>? progress = null, CancellationToken ct = default)
