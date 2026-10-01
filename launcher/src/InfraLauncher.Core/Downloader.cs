@@ -2,9 +2,18 @@ using System.Security.Cryptography;
 
 namespace InfraLauncher.Core;
 
+/// <summary>通信が途切れた・止まったなど、やり直せば成功するかもしれない失敗。</summary>
+internal sealed class DownloadInterruptedException(string message, Exception inner) : SyncException(message, inner);
+
 /// <summary>ダウンロードとハッシュ計算。http(s):// と file:// に対応。</summary>
 internal static class Downloader
 {
+    /// <summary>
+    /// この時間データが1バイトも届かなければ、通信が止まったとみなして打ち切る。
+    /// （HttpClient の Timeout は応答の頭までしか見ないので、途中で通信が途切れたまま待ち続けることがあるため）
+    /// </summary>
+    internal static TimeSpan IdleTimeout { get; set; } = TimeSpan.FromSeconds(30);
+
     /// <summary>
     /// <paramref name="url"/> を <paramref name="dest"/> に保存し、SHA256 が <paramref name="expectedSha256"/> と一致するか確かめる。
     /// 一致しなければファイルを消して <see cref="SyncException"/> を投げる。
@@ -13,6 +22,8 @@ internal static class Downloader
         Action<long>? onBytes, CancellationToken ct)
     {
         using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        idle.CancelAfter(IdleTimeout);
         try
         {
             var uri = new Uri(url);
@@ -30,9 +41,9 @@ internal static class Downloader
             }
             else
             {
-                response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, ct);
+                response = await http.GetAsync(uri, HttpCompletionOption.ResponseHeadersRead, idle.Token);
                 response.EnsureSuccessStatusCode();
-                source = await response.Content.ReadAsStreamAsync(ct);
+                source = await response.Content.ReadAsStreamAsync(idle.Token);
             }
 
             using (response)
@@ -41,18 +52,27 @@ internal static class Downloader
             {
                 var buffer = new byte[81920];
                 int n;
-                while ((n = await source.ReadAsync(buffer, ct)) > 0)
+                while ((n = await source.ReadAsync(buffer, idle.Token)) > 0)
                 {
+                    idle.CancelAfter(IdleTimeout);
                     hash.AppendData(buffer, 0, n);
                     await file.WriteAsync(buffer.AsMemory(0, n), ct);
                     onBytes?.Invoke(n);
                 }
             }
         }
-        catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException or TaskCanceledException && !ct.IsCancellationRequested)
+        catch (OperationCanceledException e) when (!ct.IsCancellationRequested)
         {
             TryDelete(dest);
-            throw new SyncException($"{what} をダウンロードできませんでした: {url} ({e.Message})", e);
+            throw new DownloadInterruptedException($"{what} のダウンロードが {IdleTimeout.TotalSeconds:0} 秒間止まったので打ち切りました: {url}", e);
+        }
+        catch (Exception e) when (e is HttpRequestException or IOException or UnauthorizedAccessException && !ct.IsCancellationRequested)
+        {
+            TryDelete(dest);
+            var message = $"{what} をダウンロードできませんでした: {url} ({e.Message})";
+            // 404 などサーバーがはっきり断った場合は、やり直しても同じなのでやり直さない
+            var interrupted = e is IOException || e is HttpRequestException { StatusCode: null or >= System.Net.HttpStatusCode.InternalServerError };
+            throw interrupted ? new DownloadInterruptedException(message, e) : new SyncException(message, e);
         }
         catch
         {

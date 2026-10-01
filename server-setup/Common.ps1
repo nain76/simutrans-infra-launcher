@@ -156,3 +156,27 @@ function Get-EngineSource([string] $paksetSource) {
 
 # サーバーリストへの署名
 . (Join-Path $PSScriptRoot 'Signing.ps1')
+
+# IIS で配信するフォルダの web.config を書く。
+# - 使っている拡張子を登録する（IIS は知らない拡張子のファイルを配らないため。.pak・.tab・.bdf など）
+# - ファイル名の「+」を通す（m+10r.bdf など。IIS は標準では「+」を含むアドレスを断る）。
+#   ファイルをそのまま配るだけのサイトなので、通しても危険はない
+function Write-DistWebConfig([string] $path, [string[]] $extensions, [string] $comment) {
+    $maps = (@($extensions | Where-Object { $_ -and $_ -ne '.json' } | Sort-Object -Unique) | ForEach-Object {
+        "      <remove fileExtension=`"$_`" />`n      <mimeMap fileExtension=`"$_`" mimeType=`"application/octet-stream`" />"
+    }) -join "`n"
+    Write-TextFile $path @"
+<?xml version="1.0" encoding="utf-8"?>
+<!-- $comment -->
+<configuration>
+  <system.webServer>
+    <staticContent>
+$maps
+    </staticContent>
+    <security>
+      <requestFiltering allowDoubleEscaping="true" />
+    </security>
+  </system.webServer>
+</configuration>
+"@
+}

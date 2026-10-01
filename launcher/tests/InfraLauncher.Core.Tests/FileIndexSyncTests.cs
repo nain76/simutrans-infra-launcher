@@ -212,10 +212,33 @@ public sealed class FileIndexSyncTests : IDisposable
         Assert.Equal("cccc", File.ReadAllText(Path.Combine(other, "pak128.japan", "c.pak")));
     }
 
+    [Fact]
+    public async Task RetriesWhenDownloadStalls()
+    {
+        Downloader.IdleTimeout = TimeSpan.FromMilliseconds(300);
+        FileIndexSync.RetryDelay = TimeSpan.Zero;
+        try
+        {
+            var s = Publish(new() { ["a.pak"] = "aaaa", ["big.pak"] = new string('b', 10_000) });
+            _server.StallOnce.Add(Base + "big.pak");
+            var r = await Sync(s);
+            Assert.Equal(2, r.Downloads);
+            Assert.Equal(new string('b', 10_000), File.ReadAllText(Path.Combine(PakDir, "big.pak")));
+            Assert.Equal(2, _server.Log.Count(u => u.EndsWith("big.pak")));
+        }
+        finally
+        {
+            Downloader.IdleTimeout = TimeSpan.FromSeconds(30);
+            FileIndexSync.RetryDelay = TimeSpan.FromSeconds(2);
+        }
+    }
+
     private sealed class FakeServer : HttpMessageHandler
     {
         public Dictionary<string, byte[]> Files { get; } = new();
         public List<string> Log { get; } = new();
+        /// <summary>最初の1回だけ、頭の数バイトを送ったあと止まる URL（通信が途切れたまま返事が来ない状態のまね）。</summary>
+        public HashSet<string> StallOnce { get; } = new();
 
         protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
         {
@@ -224,9 +247,42 @@ public sealed class FileIndexSyncTests : IDisposable
             {
                 Log.Add(url);
             }
+            if (Files.TryGetValue(url, out var stalled) && StallOnce.Remove(url))
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = new StreamContent(new StallingStream(stalled[..10])) });
+            }
             return Task.FromResult(Files.TryGetValue(url, out var data)
                 ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(data) }
                 : new HttpResponseMessage(HttpStatusCode.NotFound));
+        }
+    }
+
+    /// <summary>最初に渡したバイトを返したあと、取り消されるまで何も返さないストリーム。</summary>
+    private sealed class StallingStream(byte[] head) : Stream
+    {
+        private int _pos;
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position { get => _pos; set => throw new NotSupportedException(); }
+        public override void Flush() { }
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken ct = default)
+        {
+            if (_pos < head.Length)
+            {
+                var n = Math.Min(buffer.Length, head.Length - _pos);
+                head.AsMemory(_pos, n).CopyTo(buffer);
+                _pos += n;
+                return n;
+            }
+            await Task.Delay(Timeout.Infinite, ct);
+            return 0;
         }
     }
 }

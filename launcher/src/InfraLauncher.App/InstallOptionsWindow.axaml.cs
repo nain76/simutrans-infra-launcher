@@ -62,6 +62,7 @@ public partial class InstallOptionsWindow : Window
     private readonly List<ComponentChoice> _choices = new();
     private readonly PaksetIndex? _engineIndex;
     private readonly long? _paksetBytes;
+    private readonly string _paksetName = "";
     private readonly string _defaultRoot = "";
 
     public InstallOptionsWindow() => InitializeComponent();
@@ -75,8 +76,8 @@ public partial class InstallOptionsWindow : Window
         Heading.Text = $"「{serverName}」のインストール設定";
         RootBox.Watermark = $"既定: {defaultRoot}";
         RootBox.Text = current?.InstallRoot ?? "";
-        var paksetSize = paksetBytes is { } pb ? $"、{ComponentChoice.Format(pb)}" : "";
-        PaksetNote.Text = $"pakset（{paksetName}{paksetSize}）は、サーバーと完全に同じでないと接続できないため、すべてダウンロードします。";
+        _paksetName = paksetName;
+        PaksetNote.Text = "pakset はサーバーと完全に同じでないと接続できないため、すべてダウンロードします。手元にすでにあるファイルは落としません。";
 
         var sizes = ComponentSelection.SizeByComponent(engineIndex);
         foreach (var c in engineIndex.Components ?? new())
@@ -124,9 +125,9 @@ public partial class InstallOptionsWindow : Window
         }
         var selected = CustomRadio.IsChecked == true ? _choices.Where(c => c.IsChecked).Select(c => c.Component.Id).ToList() : null;
         var total = ComponentSelection.SelectFiles(_engineIndex, selected).Sum(f => f.Size);
-        TotalText.Text = _paksetBytes is { } pakset
-            ? $"ダウンロード量: 最大 {ComponentChoice.Format(total + pakset)}（本体 {ComponentChoice.Format(total)} ＋ pakset {ComponentChoice.Format(pakset)}。手元にすでにあるファイルは落としません）"
-            : $"本体のダウンロード量: {ComponentChoice.Format(total)}（手元にすでにあるファイルは落としません）";
+        TotalText.Text = _paksetBytes is { } pakset ? ComponentChoice.Format(total + pakset) : $"{ComponentChoice.Format(total)} ＋ pakset";
+        PaksetSizeText.Text = _paksetBytes is { } p ? $"{ComponentChoice.Format(p)}（{_paksetName}）" : $"サイズ不明（{_paksetName}・zip でまとめて配布）";
+        EngineSizeText.Text = $"{ComponentChoice.Format(total)}（上で選んだ部品）";
     }
 
     private void OnRootChanged(object? sender, TextChangedEventArgs e)

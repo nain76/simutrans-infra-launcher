@@ -194,22 +194,8 @@ Get-ChildItem -LiteralPath $dst -Recurse -Directory -Force |
 # --- 5. IIS 用の web.config（既存のものが自作なら触らない） ---
 $webConfig = Join-Path $dst 'web.config'
 if (-not (Test-Path -LiteralPath $webConfig) -or (Get-Content -LiteralPath $webConfig -Raw).Contains($WebConfigMarker)) {
-    $extensions = @($files | ForEach-Object { [System.IO.Path]::GetExtension($_.Rel).ToLowerInvariant() } |
-        Where-Object { $_ -and $_ -ne '.json' } | Sort-Object -Unique)
-    $maps = ($extensions | ForEach-Object {
-        "      <remove fileExtension=`"$_`" />`r`n      <mimeMap fileExtension=`"$_`" mimeType=`"application/octet-stream`" />"
-    }) -join "`r`n"
-    Write-TextFile $webConfig @"
-<?xml version="1.0" encoding="utf-8"?>
-<!-- $WebConfigMarker. pakset のファイルを IIS から配信できるようにする。 -->
-<configuration>
-  <system.webServer>
-    <staticContent>
-$maps
-    </staticContent>
-  </system.webServer>
-</configuration>
-"@
+    Write-DistWebConfig $webConfig @($files | ForEach-Object { [System.IO.Path]::GetExtension($_.Rel).ToLowerInvariant() }) `
+        "$WebConfigMarker. pakset のファイルを IIS から配信できるようにする。"
 }
 
 # --- 6. サーバーリストを書き換える ---

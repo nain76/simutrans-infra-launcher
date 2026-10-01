@@ -13,6 +13,10 @@ namespace InfraLauncher.Core;
 internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
 {
     private const int Parallelism = 4;
+    /// <summary>1つのファイルを何回まで試すか（通信が途切れたときにやり直す）。</summary>
+    private const int Attempts = 3;
+    /// <summary>やり直す前に待つ時間（回数に応じて伸ばす）。</summary>
+    internal static TimeSpan RetryDelay { get; set; } = TimeSpan.FromSeconds(2);
 
     public async Task<SyncSummary> SyncAsync(SyncItem item, IProgress<SyncProgress>? progress, CancellationToken ct)
     {
@@ -115,6 +119,10 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
 
         long total = unique.Sum(f => f.Size), done = 0;
         var finished = 0;
+        // 何ファイル目か・何 MB 届いたかを出す（大きいファイルが残っていても止まって見えないように）
+        void Report() => progress?.Report(new SyncProgress(item,
+            $"ダウンロード中 {Volatile.Read(ref finished)}/{unique.Count} ファイル（{FormatSize(Interlocked.Read(ref done))} / {FormatSize(total)}）",
+            Interlocked.Read(ref done), total));
         using (var gate = new SemaphoreSlim(Parallelism))
         {
             await Task.WhenAll(unique.Select(async f =>
@@ -131,11 +139,27 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
                     }
                     else
                     {
-                        await Downloader.DownloadAsync(http, FileUri(indexUri, f.Path), tmp, f.Sha256, $"{item.Label} の {f.Path}",
-                            n => progress?.Report(new SyncProgress(item, $"ダウンロード中 ({Volatile.Read(ref finished)}/{unique.Count})", Interlocked.Add(ref done, n), total)),
-                            ct);
+                        // 通信が途切れたり止まったりしたら、少し待ってやり直す
+                        for (var attempt = 1; ; attempt++)
+                        {
+                            long mine = 0;
+                            try
+                            {
+                                await Downloader.DownloadAsync(http, FileUri(indexUri, f.Path), tmp, f.Sha256, $"{item.Label} の {f.Path}",
+                                    n => { mine += n; Interlocked.Add(ref done, n); Report(); }, ct);
+                                break;
+                            }
+                            catch (DownloadInterruptedException) when (attempt < Attempts && !ct.IsCancellationRequested)
+                            {
+                                Interlocked.Add(ref done, -mine);
+                                progress?.Report(new SyncProgress(item, $"{f.Path} の通信が途切れたので、やり直しています（{attempt + 1}/{Attempts} 回目）",
+                                    Interlocked.Read(ref done), total));
+                                await Task.Delay(RetryDelay * attempt, ct);
+                            }
+                        }
                     }
                     Interlocked.Increment(ref finished);
+                    Report();
                 }
                 finally
                 {
@@ -277,6 +301,11 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
             }
         }
     }
+
+    internal static string FormatSize(long bytes) =>
+        bytes >= 1024L * 1024 * 1024 ? $"{bytes / 1024.0 / 1024 / 1024:0.0} GB"
+        : bytes >= 1024 * 1024 ? $"{bytes / 1024.0 / 1024:0.0} MB"
+        : $"{Math.Max(0, bytes) / 1024} KB";
 
     private static void TryDeleteDir(string path)
     {
