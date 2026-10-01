@@ -4,7 +4,7 @@ using InfraLauncher.Core.Models;
 
 namespace InfraLauncher.Core;
 
-/// <summary>サーバーリストの署名を確かめた結果。PublicKey は公開鍵（SubjectPublicKeyInfo の base64）、Code は人が見比べる確認コード。</summary>
+/// <summary>サーバーリストの署名を確かめた結果。PublicKey は公開鍵（SubjectPublicKeyInfo の base64）、Code は人が入力して確かめる確認コード。</summary>
 public sealed record SignatureInfo(string PublicKey, string Code);
 
 /// <summary>どう信用できなかったか。</summary>

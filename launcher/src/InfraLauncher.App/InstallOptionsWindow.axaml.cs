@@ -61,16 +61,22 @@ public partial class InstallOptionsWindow : Window
 {
     private readonly List<ComponentChoice> _choices = new();
     private readonly PaksetIndex? _engineIndex;
+    private readonly long? _paksetBytes;
+    private readonly string _defaultRoot = "";
 
     public InstallOptionsWindow() => InitializeComponent();
 
-    public InstallOptionsWindow(string serverName, string defaultRoot, InstallOptions? current, PaksetIndex engineIndex, string paksetName) : this()
+    /// <param name="paksetBytes">pakset 全体のサイズ（ファイル一覧方式のとき。zip 方式なら null）。</param>
+    public InstallOptionsWindow(string serverName, string defaultRoot, InstallOptions? current, PaksetIndex engineIndex, string paksetName, long? paksetBytes) : this()
     {
         _engineIndex = engineIndex;
+        _paksetBytes = paksetBytes;
+        _defaultRoot = defaultRoot;
         Heading.Text = $"「{serverName}」のインストール設定";
         RootBox.Watermark = $"既定: {defaultRoot}";
         RootBox.Text = current?.InstallRoot ?? "";
-        PaksetNote.Text = $"pakset（{paksetName}）は、サーバーと完全に同じでないと接続できないため、すべてダウンロードします。";
+        var paksetSize = paksetBytes is { } pb ? $"、{ComponentChoice.Format(pb)}" : "";
+        PaksetNote.Text = $"pakset（{paksetName}{paksetSize}）は、サーバーと完全に同じでないと接続できないため、すべてダウンロードします。";
 
         var sizes = ComponentSelection.SizeByComponent(engineIndex);
         foreach (var c in engineIndex.Components ?? new())
@@ -118,7 +124,17 @@ public partial class InstallOptionsWindow : Window
         }
         var selected = CustomRadio.IsChecked == true ? _choices.Where(c => c.IsChecked).Select(c => c.Component.Id).ToList() : null;
         var total = ComponentSelection.SelectFiles(_engineIndex, selected).Sum(f => f.Size);
-        TotalText.Text = $"本体のダウンロード量: {ComponentChoice.Format(total)}（手元にあるファイルは落としません）";
+        TotalText.Text = _paksetBytes is { } pakset
+            ? $"ダウンロード量: 最大 {ComponentChoice.Format(total + pakset)}（本体 {ComponentChoice.Format(total)} ＋ pakset {ComponentChoice.Format(pakset)}。手元にすでにあるファイルは落としません）"
+            : $"本体のダウンロード量: {ComponentChoice.Format(total)}（手元にすでにあるファイルは落としません）";
+    }
+
+    private void OnRootChanged(object? sender, TextChangedEventArgs e)
+    {
+        var root = RootBox.Text?.Trim();
+        var effective = string.IsNullOrEmpty(root) ? _defaultRoot : root;
+        if (OneDriveWarning is null) return;
+        OneDriveWarning.IsVisible = effective.Contains("OneDrive", StringComparison.OrdinalIgnoreCase);
     }
 
     private async void OnBrowse(object? sender, RoutedEventArgs e)

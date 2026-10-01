@@ -19,20 +19,21 @@
 
     <TextBlock x:Name="ResultText" TextWrapping="Wrap" IsVisible="False" Margin="0,6,0,0" />
 
-    <!-- 確認コードの見比べ。署名の仕組みを知らなくても、管理者から聞いた文字列と同じかどうかだけ答えればよいようにする -->
+    <!-- 確認コードの入力。画面にはコードを出さず、管理者から聞いたコードを自分で入れてもらう（見ずに「同じ」を押してしまわないように） -->
     <Border x:Name="CodePanel" IsVisible="False" Margin="0,10,0,0" Padding="12" CornerRadius="6"
             BorderThickness="1" BorderBrush="#808080">
       <StackPanel Spacing="8">
-        <TextBlock Text="確認コードを見比べてください" FontWeight="SemiBold" />
+        <TextBlock Text="確認コードを入力してください" FontWeight="SemiBold" />
         <TextBlock x:Name="CodeIntro" TextWrapping="Wrap" />
-        <SelectableTextBlock x:Name="CodeText" FontFamily="Consolas,Menlo,monospace" FontSize="22"
-                             FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,4" />
+        <TextBox x:Name="CodeBox" Watermark="例: A1B2-C3D4-E5F6-0718-293A" FontFamily="Consolas,Menlo,monospace" FontSize="18"
+                 MaxLength="40" KeyDown="OnCodeKeyDown" />
+        <TextBlock x:Name="CodeError" Foreground="#d13438" TextWrapping="Wrap" IsVisible="False" />
         <TextBlock TextWrapping="Wrap" Opacity="0.75"
-                   Text="同じなら、このサーバーリストが本当にサーバー管理者のものだと確かめられます。以後ランチャーは、誰かが配信しているファイルを書き換えても気づいて止めます。確認コードは秘密の情報ではありません。" />
+                   Text="確認コードが合えば、このサーバーリストが本当にサーバー管理者のものだと確かめられます。以後ランチャーは、誰かが配信しているファイルを書き換えても気づいて止めます。区切りの「-」や大文字・小文字は気にしなくてかまいません。" />
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,4,0,0">
-          <Button x:Name="LaterButton" Content="まだ聞いていない（あとで）" Click="OnCodeLater" />
-          <Button Content="違う" Click="OnCodeDifferent" />
-          <Button Content="同じ（登録する）" Classes="accent" Click="OnCodeSame" />
+          <Button Content="キャンセル" Click="OnCancel" />
+          <Button x:Name="LaterButton" Content="まだ聞いていない（あとで入力）" Click="OnCodeLater" />
+          <Button Content="確認して登録" Classes="accent" Click="OnCodeSubmit" />
         </StackPanel>
       </StackPanel>
     </Border>

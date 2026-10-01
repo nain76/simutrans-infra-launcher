@@ -11,9 +11,11 @@
     <TextBlock Text="simutrans 本体と pakset を入れるフォルダです。空欄なら「設定」の既定のフォルダを使います。本体は版ごとにこの中のフォルダに入ります。"
                TextWrapping="Wrap" Opacity="0.75" />
     <Grid ColumnDefinitions="*,Auto">
-      <TextBox x:Name="RootBox" />
+      <TextBox x:Name="RootBox" TextChanged="OnRootChanged" />
       <Button Grid.Column="1" Content="参照…" Margin="8,0,0,0" Click="OnBrowse" />
     </Grid>
+    <TextBlock x:Name="OneDriveWarning" Foreground="#c47a00" TextWrapping="Wrap" IsVisible="False"
+               Text="OneDrive のフォルダの中です。数百 MB のファイルがクラウドに同期されたり、「オンライン専用」になって simutrans が読み込めなくなったりすることがあります。OneDrive の外（例: C:\Games\simutrans）をおすすめします。" />
 
     <TextBlock Text="ファイル構成" FontWeight="SemiBold" Margin="0,10,0,0" />
     <RadioButton x:Name="RecommendedRadio" GroupName="mode" Content="推奨（サーバー管理者のおすすめどおり。おすすめが変わると追従します）" IsCheckedChanged="OnModeChanged" />
@@ -31,7 +33,7 @@
     </Border>
 
     <TextBlock x:Name="PaksetNote" TextWrapping="Wrap" Opacity="0.75" Margin="0,6,0,0" />
-    <TextBlock x:Name="TotalText" FontWeight="SemiBold" />
+    <TextBlock x:Name="TotalText" FontWeight="SemiBold" TextWrapping="Wrap" />
     <TextBlock x:Name="ErrorText" Foreground="#d13438" TextWrapping="Wrap" IsVisible="False" />
 
     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">

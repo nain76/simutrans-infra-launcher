@@ -61,6 +61,13 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         return await _fileIndex.LoadIndexAsync(build.IndexUrl!, build.IndexSha256!, $"simutrans {server.Engine!.Revision}", build.Exe, ct);
     }
 
+    /// <summary>pakset のファイル一覧（全体のサイズを画面に出すため）。zip 方式の pakset なら null。</summary>
+    public async Task<PaksetIndex?> LoadPaksetIndexAsync(ServerEntry server, CancellationToken ct = default)
+    {
+        var p = server.Pakset;
+        return p.UsesFileIndex ? await _fileIndex.LoadIndexAsync(p.IndexUrl!, p.IndexSha256!, $"pakset {p.DisplayName}", null, ct) : null;
+    }
+
     public SyncPlan Plan(ServerEntry server, LauncherSettings settings, InstallOptions? options = null)
     {
         var state = InstalledState.Load(layout);
@@ -105,7 +112,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         {
             throw new SyncException(
                 $"サーバー '{server.Name}' のサーバーリストの確認コードをまだ登録していないため、安全のため simutrans 本体は自動で入れません。" +
-                "「編集」でサーバー管理者から聞いた確認コードと見比べて登録するか、「設定」で手元の simutrans 本体を指定してください");
+                "「編集」でサーバー管理者から聞いた確認コードを入力するか、「設定」で手元の simutrans 本体を指定してください");
         }
         else
         {

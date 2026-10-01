@@ -4,7 +4,7 @@
 #   - 「秘密の鍵」はこの VPS の中だけに置く。これで manifest.json に「管理者が公開したもの」という印（署名）を付ける
 #   - 印は manifest.sig.json として manifest.json の隣に置く。友人のランチャーは毎回これを確かめる
 #   - 友人には最初に一度だけ「確認コード」（秘密の鍵と対になる公開鍵から作る短い文字列）を伝える。
-#     確認コードは秘密ではない。友人は画面に出たコードと見比べるだけでよい
+#     確認コードは秘密ではない。友人は聞いたコードをランチャーに入力するだけでよい
 #   - 配信フォルダを誰かに書き換えられても、秘密の鍵がなければ正しい印は作れないので、ランチャーが気づいて止める
 #   - pakset と本体のファイル一覧は manifest.json に SHA256 が書いてあるので、manifest.json の印だけで全部を守れる
 #
@@ -182,7 +182,7 @@ function Show-SigningCode([string] $code) {
     Write-Host "      確認コード:  $code" -ForegroundColor Yellow
     Write-Host '   └──────────────────────────────────────┘' -ForegroundColor Yellow
     Write-Host '   ・この確認コードを、Discord の DM などで友人に一度だけ伝えてください'
-    Write-Host '     友人はランチャーでサーバーリストを追加するとき、画面に出るコードと見比べます'
+    Write-Host '     友人はランチャーでサーバーリストを追加するとき、このコードを入力します（ランチャーにはコードは表示されません）'
     Write-Host '   ・確認コードは秘密ではありません。人に見られても問題ありません（パスワードではありません）'
     Write-Host '   ・サーバーリストのアドレスと一緒に伝えてかまいません。ただし配信サーバー（8080 / 8443）に置いて伝えるのはやめてください'
 }
@@ -267,7 +267,7 @@ function Import-SigningKeyBackup([string] $path, [string] $password) {
 function Invoke-BackupPrompt {
     Write-Host ''
     Write-Host '   VPS を作り直したときも同じ確認コードを使い続けられるよう、パスワード付きのバックアップを作れます。'
-    Write-Host '   作らない場合、VPS を作り直したら鍵を作り直すことになり、友人全員に新しい確認コードを見比べてもらうことになります。'
+    Write-Host '   作らない場合、VPS を作り直したら鍵を作り直すことになり、友人全員に新しい確認コードを入力し直してもらうことになります。'
     $answer = Read-Value 'バックアップを作りますか？（Y/n）' 'Y'
     if ($answer -notmatch '^[Yy]') { return }
     while ($true) {
@@ -310,7 +310,7 @@ function Initialize-SigningKey([string] $manifestPath) {
     Write-Host "   この Windows ユーザー（$([Environment]::UserName)）でしか開けないよう暗号化してあります。ほかの PC にコピーしても使えません"
     Show-SigningCode $key.Code
     if ($published) {
-        Write-Warning "確認コードが $published から変わりました。友人には新しい確認コードを伝えてください（ランチャーの「編集」で見比べ直してもらいます）"
+        Write-Warning "確認コードが $published から変わりました。友人には新しい確認コードを伝えてください（ランチャーの「編集」で入力し直してもらいます）"
     }
     Invoke-BackupPrompt
 }

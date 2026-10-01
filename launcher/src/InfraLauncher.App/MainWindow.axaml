@@ -38,26 +38,74 @@
 
     <Grid>
       <ListBox x:Name="ServerList" SelectionChanged="OnSelectionChanged" DoubleTapped="OnDoubleTapped">
+        <ListBox.Styles>
+          <!-- 選んだ行は、Windows のアクセントカラー（緑など）で塗りつぶさず、薄い背景と左の線で示す。札の色が読めるように -->
+          <Style Selector="ListBoxItem">
+            <Setter Property="Margin" Value="0,0,0,6" />
+            <Setter Property="Padding" Value="10,8" />
+            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="BorderThickness" Value="3,0,0,0" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="Background" Value="#14808080" />
+          </Style>
+          <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#24808080" />
+          </Style>
+          <Style Selector="ListBoxItem:selected /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#332f80ed" />
+            <Setter Property="BorderBrush" Value="#2f80ed" />
+          </Style>
+          <Style Selector="ListBoxItem:selected:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+            <Setter Property="Background" Value="#442f80ed" />
+            <Setter Property="BorderBrush" Value="#2f80ed" />
+          </Style>
+          <Style Selector="Border.badge">
+            <Setter Property="CornerRadius" Value="10" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+          </Style>
+          <Style Selector="Border.badge > TextBlock">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+          </Style>
+        </ListBox.Styles>
         <ListBox.ItemTemplate>
           <DataTemplate x:DataType="local:ServerRow">
-            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto" Margin="0,4">
-              <Button Grid.RowSpan="3" Content="{Binding FavoriteGlyph}" IsEnabled="{Binding CanFavorite}" Opacity="{Binding FavoriteOpacity}"
+            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto">
+              <Button Grid.RowSpan="4" Content="{Binding FavoriteGlyph}" IsEnabled="{Binding CanFavorite}" Opacity="{Binding FavoriteOpacity}"
                       Background="Transparent" BorderThickness="0" FontSize="20" Padding="4,0"
                       Margin="0,0,8,0" VerticalAlignment="Top"
                       ToolTip.Tip="お気に入りの印を付ける／外す" Click="OnToggleFavorite" />
-              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
-                <TextBlock Text="{Binding Name}" FontSize="16" FontWeight="SemiBold" />
-                <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" />
-                <TextBlock Text="{Binding PlayersText}" VerticalAlignment="Center" />
+
+              <!-- 1行目: 名前・稼働状況・人数 -->
+              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="10">
+                <TextBlock Text="{Binding Name}" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                <Border Classes="badge" Background="{Binding StatusBrush}" IsVisible="{Binding HasStatus}">
+                  <TextBlock Text="{Binding StatusText}" />
+                </Border>
+                <TextBlock Text="{Binding PlayersText}" IsVisible="{Binding HasPlayers}" VerticalAlignment="Center" />
               </StackPanel>
               <TextBlock Grid.Column="2" Text="{Binding AddressText}" Opacity="0.7" VerticalAlignment="Center" />
-              <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding Message}" IsVisible="{Binding HasMessage}"
-                         TextWrapping="Wrap" Margin="0,4,0,0" />
-              <WrapPanel Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Margin="0,4,0,0" Opacity="0.7">
-                <TextBlock Text="{Binding SourceText}" Margin="0,0,16,0" />
-                <TextBlock Text="{Binding PaksetText}" Margin="0,0,16,0" />
-                <TextBlock Text="{Binding SyncText}" TextWrapping="Wrap" />
-              </WrapPanel>
+
+              <!-- 2行目: お知らせ -->
+              <TextBlock Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" IsVisible="{Binding HasMessage}"
+                         TextWrapping="Wrap" Margin="0,6,0,0">
+                <Run Text="お知らせ: " FontWeight="SemiBold" /><Run Text="{Binding Message}" />
+              </TextBlock>
+
+              <!-- 3行目: 同期の状態 -->
+              <Grid Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" ColumnDefinitions="Auto,*" Margin="0,8,0,0"
+                    IsVisible="{Binding HasSyncLabel}">
+                <Border Classes="badge" Background="{Binding SyncBrush}">
+                  <TextBlock Text="{Binding SyncLabel}" />
+                </Border>
+                <TextBlock Grid.Column="1" Text="{Binding SyncDetail}" TextWrapping="Wrap" VerticalAlignment="Center" Margin="10,0,0,0" />
+              </Grid>
+
+              <!-- 4行目: 細かい情報 -->
+              <TextBlock Grid.Row="3" Grid.Column="1" Grid.ColumnSpan="2" Text="{Binding DetailText}" FontSize="12"
+                         Opacity="0.65" TextWrapping="Wrap" Margin="0,6,0,0" />
             </Grid>
           </DataTemplate>
         </ListBox.ItemTemplate>

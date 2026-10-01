@@ -79,8 +79,14 @@ internal sealed class FileIndexSync(InstallLayout layout, HttpClient http)
         }
 
         // 2. ダウンロード（同じ中身のファイルは1回だけ落とす）
+        // 途中のファイルは中身の SHA256 を名前にして一時フォルダに置き、全部そろって確かめてから本来の名前で置く。
+        // 一時フォルダはユーザーが触らないよう、Windows では隠しフォルダにする（終われば消す）
         var staging = Path.Combine(Path.GetDirectoryName(target)!, $".{Path.GetFileName(target)}.partial");
-        Directory.CreateDirectory(staging);
+        var stagingDir = Directory.CreateDirectory(staging);
+        if (OperatingSystem.IsWindows())
+        {
+            stagingDir.Attributes |= FileAttributes.Hidden;
+        }
         var unique = missing.GroupBy(f => f.Sha256.ToLowerInvariant()).Select(g => g.First()).ToList();
 
         // 手元のほかの pakset（本体の別リビジョン用など）に同じ中身のファイルがあれば、コピーして使う

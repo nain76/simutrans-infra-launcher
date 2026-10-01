@@ -8,7 +8,8 @@ namespace InfraLauncher.App;
 
 /// <summary>
 /// 共有されたサーバーリストの追加・編集。保存の前に実際に読み込んで確かめる。
-/// 署名があれば確認コードを見せ、サーバー管理者から聞いたものと同じだと答えてもらえたら、その鍵を登録する。
+/// 署名があれば、サーバー管理者から聞いた確認コードを入力してもらい、合っていればその鍵を登録する。
+/// 画面には確認コードを出さない（出すと、見比べずに「同じ」を押したり、表示を写したりできてしまう）。
 /// </summary>
 public partial class ServerListWindow : Window
 {
@@ -77,11 +78,11 @@ public partial class ServerListWindow : Window
             }
             if (_existing?.PublicKey is { } known && ManifestSignature.SameCode(ManifestSignature.CodeFor(known), sig.Code))
             {
-                // 登録済みの鍵と同じなら、見比べ直す必要はない
+                // 登録済みの鍵と同じなら、入力し直す必要はない
                 Finish(known);
                 return;
             }
-            AskCode(sig.Code);
+            AskCode();
         }
         catch (Exception ex) when (ex is ManifestException or UriFormatException or ArgumentException)
         {
@@ -93,34 +94,51 @@ public partial class ServerListWindow : Window
         }
     }
 
-    private void AskCode(string code)
+    private int _failures;
+
+    private void AskCode()
     {
         ResultText.IsVisible = false;
-        CodeIntro.Text = _existing?.Code is { } old
-            ? $"このサーバーリストの確認コードが、以前登録したもの（{old}）から変わっています。サーバー管理者が鍵を作り直したときに変わります。" +
-              "新しい確認コードをサーバー管理者に聞いて、下と同じか見比べてください。"
-            : "サーバー管理者から聞いた確認コードと、下の文字列が同じか見比べてください（Discord などで教えてもらったもの）。";
-        CodeText.Text = code;
+        CodeIntro.Text = _existing?.PublicKey is not null
+            ? "このサーバーリストの確認コードが、以前登録したものから変わっています（サーバー管理者が鍵を作り直すと変わります）。" +
+              "新しい確認コードをサーバー管理者に聞いて入力してください。"
+            : "サーバー管理者から聞いた確認コード（Discord などで教えてもらったもの）を入力してください。";
         // 登録済みの鍵が変わった場合は「あとで」を出さない（書き換えられたリストを、登録を外して使い続けることにならないように）
         LaterButton.IsVisible = _existing?.PublicKey is null;
         CodePanel.IsVisible = true;
         SaveButtons.IsVisible = false;
         UrlBox.IsEnabled = false;
+        CodeBox.Focus();
     }
 
-    private void OnCodeSame(object? sender, RoutedEventArgs e) => Finish(_loaded!.Signature!.PublicKey);
+    private void OnCodeKeyDown(object? sender, Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == Avalonia.Input.Key.Enter)
+        {
+            OnCodeSubmit(sender, e);
+        }
+    }
+
+    private void OnCodeSubmit(object? sender, RoutedEventArgs e)
+    {
+        var input = CodeBox.Text?.Trim() ?? "";
+        var sig = _loaded!.Signature!;
+        if (input.Length > 0 && ManifestSignature.SameCode(input, sig.Code))
+        {
+            Finish(sig.PublicKey);
+            return;
+        }
+        _failures++;
+        // 正しいコードは出さない。何度も違うなら、アドレス違いか書き換えのおそれを伝える
+        CodeError.Text = input.Length == 0 ? "確認コードを入力してください"
+            : _failures < 3 ? "確認コードが一致しません。入力を見直してください（20文字の英数字です）"
+            : "確認コードが一致しません。アドレスが違うか、配信しているファイルが書き換えられているおそれがあります。" +
+              "サーバー管理者にアドレスと確認コードを確かめてください";
+        CodeError.IsVisible = true;
+    }
 
     /// <summary>まだ聞いていないなら登録せずに保存する（pakset だけ同期できる。あとで「編集」から登録できる）。</summary>
     private void OnCodeLater(object? sender, RoutedEventArgs e) => Finish(publicKey: null);
-
-    private void OnCodeDifferent(object? sender, RoutedEventArgs e)
-    {
-        CodePanel.IsVisible = false;
-        SaveButtons.IsVisible = true;
-        UrlBox.IsEnabled = true;
-        Show("保存しませんでした。確認コードが違う場合、アドレスの間違いか、配信しているファイルが書き換えられているおそれがあります。" +
-             "サーバー管理者にアドレスと確認コードを確かめてください", error: true);
-    }
 
     private void Finish(string? publicKey)
     {

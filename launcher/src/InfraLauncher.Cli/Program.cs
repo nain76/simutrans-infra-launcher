@@ -63,13 +63,16 @@ try
     {
         if (manifest.Signature is not { } sig || !ManifestSignature.SameCode(sig.Code, code))
         {
-            Console.Error.WriteLine($"エラー: 確認コードが一致しません（指定: {code}、サーバーリスト: {manifest.Signature?.Code ?? "署名なし"}）");
+            Console.Error.WriteLine(manifest.Signature is null
+                ? "エラー: このサーバーリストには署名がありません"
+                : $"エラー: 確認コードが一致しません（指定: {code}）。サーバー管理者に確かめてください");
             return 4;
         }
         manifest = await service.Manifests.LoadAsync(uri, sig.PublicKey);
     }
-    Console.WriteLine(manifest.Trusted ? $"確認コード: {manifest.Signature!.Code}（一致）"
-        : manifest.Signature is { } s0 ? $"確認コード: {s0.Code}（未確認。管理者から聞いたものと同じなら --code で指定すると本体も入れられます）"
+    // 未確認の確認コードは表示しない（表示すると、管理者に聞かずに写せてしまう）
+    Console.WriteLine(manifest.Trusted ? "確認コード: 一致しました"
+        : manifest.Signature is not null ? "署名あり・確認コード未確認（管理者から聞いた確認コードを --code で指定すると本体も入れられます）"
         : "このサーバーリストには署名がありません（本体は自動で入れません）");
     switch (positional[0])
     {

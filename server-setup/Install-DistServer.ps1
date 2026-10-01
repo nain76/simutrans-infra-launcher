@@ -244,7 +244,7 @@ Write-Host "     アドレス:   $shareUrl"
 $signingKey = Get-SigningKey
 if ($signingKey) { Write-Host "     確認コード: $($signingKey.Code)" -ForegroundColor Yellow }
 Write-Host '     友人はランチャーの「追加」→「サーバー管理者から共有されたリストを追加」にアドレスを入れ、'
-Write-Host '     画面に出る確認コードが同じか見比べる（確認コードは秘密ではない。見せても問題ない）'
+Write-Host '     続けて確認コードを入力する（確認コードは秘密ではない。見せても問題ない）'
 Write-Host '  4. 署名の鍵のバックアップを作っていなければ、Manage-SigningKey.bat で作って VPS の外に保管する'
 if (-not $https) {
     Write-Host '  ※ HTTPS ではありません。署名で書き換えは防げますが、HTTPS にするとより安全です（Enable-Https.bat をダブルクリック）'

@@ -66,7 +66,7 @@ while ($true) {
         }
         '5' {
             Write-Warning '鍵を作り直すと確認コードが変わり、友人のランチャーはサーバーリストを読み込めなくなります。'
-            Write-Warning '友人には新しい確認コードを伝え、ランチャーの「編集」で見比べ直してもらう必要があります。'
+            Write-Warning '友人には新しい確認コードを伝え、ランチャーの「編集」で入力し直してもらう必要があります。'
             if ((Read-Value '本当に作り直しますか？ 作り直す場合は yes と入力' 'no') -eq 'yes') {
                 $old = $key.Code
                 Save-SigningKey (New-KeyBytes)

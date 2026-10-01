@@ -82,8 +82,9 @@ public sealed partial class ManifestClient(HttpClient http)
         if (!Convert.FromBase64String(info.PublicKey).AsSpan().SequenceEqual(Convert.FromBase64String(pinnedKey)))
         {
             throw new ManifestSignatureException(SignatureProblem.KeyChanged,
-                $"サーバーリストの確認コードが変わりました（登録済み: {ManifestSignature.CodeFor(pinnedKey)}、今回: {info.Code}）。" +
-                "管理者が鍵を作り直したのなら、新しい確認コードを管理者に確かめてから「編集」で登録し直してください。" +
+                // 新しい確認コードは画面に出さない（出すと、ユーザーがそれを写して入力できてしまう）
+                "サーバーリストの確認コードが変わりました。" +
+                "管理者が鍵を作り直したのなら、新しい確認コードを管理者に聞いて「編集」で入力し直してください。" +
                 "心当たりがなければ、配信しているファイルが書き換えられたおそれがあります", info.Code);
         }
         return info;

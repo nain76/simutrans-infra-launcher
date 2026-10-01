@@ -266,7 +266,8 @@ public partial class MainWindow : Window
         {
             var progress = new Progress<SyncProgress>(p =>
             {
-                StatusText.Text = $"{p.Item.Label}: {p.Stage}";
+                var percent = p.BytesTotal is > 0 ? $"  {p.BytesDone * 100 / p.BytesTotal.Value}%" : "";
+                StatusText.Text = $"{p.Item.Label}: {p.Stage}{percent}";
                 Progress.IsIndeterminate = p.BytesTotal is not > 0;
                 if (p.BytesTotal is > 0)
                 {
@@ -377,7 +378,9 @@ public partial class MainWindow : Window
             // zip 方式の本体など、部品を選べないサーバーはダウンロード先だけ選べるようにする
             index = new InfraLauncher.Core.Models.PaksetIndex { SchemaVersion = 1 };
         }
-        var dialog = new InstallOptionsWindow(row.Name, _service.Sync.InstallRoot(_settings, null), OptionsFor(row), index, server.Pakset.DisplayName);
+        var pakset = await _service.Sync.LoadPaksetIndexAsync(server);
+        var dialog = new InstallOptionsWindow(row.Name, _service.Sync.InstallRoot(_settings, null), OptionsFor(row), index, server.Pakset.DisplayName,
+            pakset?.Files.Sum(f => f.Size));
         if (!await dialog.ShowDialog<bool>(this) || dialog.Result is null)
         {
             return false;
