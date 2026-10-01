@@ -63,7 +63,7 @@ dotnet publish src/InfraLauncher.App -c Release -r win-x64 --self-contained \
   -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=true -p:DebugType=none -o publish
 ```
 
-できあがるのは`publish/InfraLauncher.exe`（約21MB）の1ファイルです。`PublishTrimmed`で使わないコードを削って小さくしています。CoreのJSON処理はこの削り方に対応するためにソース生成を使っています。JSONで読み書きする型を増やしたときは、`Json.cs`の`JsonContext`にも追加してください。
+できあがるのは`publish/Simutrans_Launcher.exe`（約21MB）の1ファイルです。`PublishTrimmed`で使わないコードを削って小さくしています。CoreのJSON処理はこの削り方に対応するためにソース生成を使っています。JSONで読み書きする型を増やしたときは、`Json.cs`の`JsonContext`にも追加してください。
 
 ## 使い方
 
