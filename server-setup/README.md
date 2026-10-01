@@ -203,12 +203,11 @@ paksetを公開するときは、paksetフォルダの1つ上にある本体も�
 
 | 部品（推奨設定） | 中身 | 扱い |
 |---|---|---|
-| 本体と設定・スクリプト | 選んだ本体のexe、`.dll`、`ai` `config` `font` `scenario` `script` `text` | 必須（友人は外せない） |
+| 本体と設定・スクリプト・テーマ | 選んだ本体のexe、`.dll`、`ai` `config` `font` `scenario` `script` `skin` `text` `themes` | 必須（友人は外せない） |
 | 音楽 | `music` | 推奨 |
-| テーマ・スキン | `skin` `themes` | 推奨 |
 | ライセンス・説明書 | `license*.txt` `copyright*.txt` `readme*.txt` | 推奨 |
 
-必須の部品は、友人が外すことはできません。推奨の部品は、友人が「推奨」を選んだときに落とします。必須でも推奨でもない部品は、友人が「カスタム」で選んだときだけ落とします。上の表にないもの（`maps`、`generated-scripts`、`history.txt`など）は配りません。配りたいときは部品に足してください。
+必須の部品は、友人が外すことはできません。画面の見た目を決める`themes`がないとsimutransは起動しないので、テーマも必須に入れています。推奨の部品は、友人が「推奨」を選んだときに落とします。必須でも推奨でもない部品は、友人が「カスタム」で選んだときだけ落とします。上の表にないもの（`maps`、`generated-scripts`、`history.txt`など）は配りません。配りたいときは部品に足してください。
 
 設定にかかわらず、絶対に配らないものもあります。`.bat`や`.cmd`や`.ps1`や`.vbs`などのスクリプト、本体以外のexe（Nettool、makeobj、ほかの版）、`.sve`（セーブデータやパスワード）、`settings.xml`、ログ、`save`と`screenshot`と`addons`のフォルダ、paksetのフォルダです。
 

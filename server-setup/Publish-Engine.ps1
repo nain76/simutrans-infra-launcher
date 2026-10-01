@@ -108,10 +108,15 @@ $neverItems = @()
 foreach ($item in Get-ChildItem -LiteralPath $src -Force) {
     if (Test-SkipOsFile $item $src) { continue }
     if ($item.PSIsContainer) {
-        $isPakset = $null -ne (Get-ChildItem -LiteralPath $item.FullName -Filter '*.pak' -File -Force | Select-Object -First 1)
-        if ($isPakset -or ($NeverFolders -contains $item.Name.ToLowerInvariant())) { $neverItems += "$($item.Name)\"; continue }
+        if ($NeverFolders -contains $item.Name.ToLowerInvariant()) { $neverItems += "$($item.Name)\"; continue }
+        # 部品に書いてあるフォルダは配る。themes には見た目の画像として .pak が入っているので、
+        # .pak の有無で pakset と決めつけるのは、部品に書いていないフォルダだけにする
         $owner = @($components | Where-Object { $_.Folders -contains $item.Name.ToLowerInvariant() })[0]
-        if (-not $owner) { $skippedFolders += $item.Name; continue }
+        if (-not $owner) {
+            $isPakset = $null -ne (Get-ChildItem -LiteralPath $item.FullName -Filter '*.pak' -File -Force | Select-Object -First 1)
+            if ($isPakset) { $neverItems += "$($item.Name)\" } else { $skippedFolders += $item.Name }
+            continue
+        }
         foreach ($f in Get-ChildItem -LiteralPath $item.FullName -Recurse -File -Force) {
             if (Test-SkipOsFile $f $src) { continue }
             # フォルダの中でも、スクリプトやexeなどは配らない
