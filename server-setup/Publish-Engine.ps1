@@ -118,6 +118,8 @@ $skippedFiles = @()
 $skippedInside = @()
 $neverFolderItems = @()
 $neverFileItems = @()
+# pakset のフォルダは本体には入れない（Publish-Pakset.ps1 が別に公開し、友人の PC では本体のフォルダの中に置かれる）
+$paksetFolders = @()
 foreach ($item in Get-ChildItem -LiteralPath $src -Force) {
     if (Test-SkipOsFile $item $src) { continue }
     if ($item.PSIsContainer) {
@@ -141,7 +143,7 @@ foreach ($item in Get-ChildItem -LiteralPath $src -Force) {
         $owner = @($components | Where-Object { $_.Folders -contains $item.Name.ToLowerInvariant() })[0]
         if (-not $owner) {
             $isPakset = $null -ne (Get-ChildItem -LiteralPath $item.FullName -Filter '*.pak' -File -Force | Select-Object -First 1)
-            if ($isPakset) { $neverFolderItems += "$($item.Name)（pakset）" } else { $skippedFolders += $item.Name }
+            if ($isPakset) { $paksetFolders += $item.Name } else { $skippedFolders += $item.Name }
             continue
         }
         foreach ($f in Get-ChildItem -LiteralPath $item.FullName -Recurse -File -Force) {
@@ -178,6 +180,9 @@ foreach ($c in $components) {
     foreach ($f in $mine) { $size += $f.File.Length }
     Write-Host ("     部品「{0}」（{1}）: {2} ファイル、{3:N0} バイト" -f $c.Name, $kind, $mine.Count, [long]$size)
 }
+if ($paksetFolders.Count -gt 0) {
+    Write-Host ("   paksetとして別に配るもの（本体には含めず、友人のPCでは本体のフォルダの中に置かれる）: {0}" -f ($paksetFolders -join ', '))
+}
 if ($skippedFolders.Count + $skippedFiles.Count + $skippedInside.Count -gt 0) {
     Write-Host "   配らないもの（設定に書いていないため。配りたいときはengine-files.jsonの部品に足す）"
     Write-NameList 'フォルダ' $skippedFolders
@@ -185,7 +190,7 @@ if ($skippedFolders.Count + $skippedFiles.Count + $skippedInside.Count -gt 0) {
     foreach ($inside in $skippedInside) { Write-Host "     $inside" }
 }
 if ($neverFolderItems.Count + $neverFileItems.Count -gt 0) {
-    Write-Host "   絶対に配らないもの（設定にかかわらず。セーブデータ、スクリプト、ほかのexe、paksetなど）"
+    Write-Host "   絶対に配らないもの（設定にかかわらず。セーブデータ、スクリプト、ほかのexeなど）"
     Write-NameList 'フォルダ' $neverFolderItems
     Write-NameList 'ファイル' $neverFileItems
 }

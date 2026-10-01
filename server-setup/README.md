@@ -209,7 +209,7 @@ paksetを公開するときは、paksetフォルダの1つ上にある本体も�
 
 必須の部品は、友人が外すことはできません。画面の見た目を決める`themes`がないとsimutransは起動しないので、テーマも必須に入れています。`themes`からは、テーマとして使う直下の`.tab`と`.pak`だけを配ります。中にほかのフォルダやセーブデータが混ざっていても配りません。推奨の部品は、友人が「推奨」を選んだときに落とします。必須でも推奨でもない部品は、友人が「カスタム」で選んだときだけ落とします。上の表にないもの（`maps`、`generated-scripts`、`history.txt`など）は配りません。配りたいときは部品に足してください。
 
-設定にかかわらず、絶対に配らないものもあります。`.bat`や`.cmd`や`.ps1`や`.vbs`などのスクリプト、本体以外のexe（Nettool、makeobj、ほかの版）、`.sve`（セーブデータやパスワード）、`settings.xml`、ログ、`save`と`screenshot`と`addons`のフォルダ、paksetのフォルダです。
+設定にかかわらず、絶対に配らないものもあります。`.bat`や`.cmd`や`.ps1`や`.vbs`などのスクリプト、本体以外のexe（Nettool、makeobj、ほかの版）、`.sve`と`.sv_`（セーブデータやパスワード）、`settings.xml`、ログ、`save`と`screenshot`と`addons`のフォルダです。paksetのフォルダも本体には入れませんが、これはpaksetの公開で別に配るためです。友人のPCでは、ランチャーが本体のフォルダの中にpaksetを置くので、サーバーと同じ並びになります。
 
 部品の設定を変えるときは、[engine-files.default.json](engine-files.default.json)を`engine-files.json`という名前でコピーして編集します。部品（`components`）ごとに`folders`と`files`（`*`が使える）、`required`と`recommended`を書き換えてください。`folders`に`themes/*.tab`のように「フォルダ/名前」と書くと、そのフォルダの直下にある名前の合うファイルだけを配ります。`engine-files.json`があれば、ツールはそちらを使います。公開のたびに、部品ごとのファイル数とサイズ、配らなかったフォルダ、絶対に配らないものを表示するので、確かめてください。
 
