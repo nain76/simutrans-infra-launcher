@@ -33,6 +33,7 @@ function Invoke-Resign {
 
 Write-Step 'サーバーリストの署名の鍵'
 Write-SigningExplanation
+Remove-StrayCngKey
 if (-not (Get-SigningKey)) {
     Initialize-SigningKey $manifestPath
     if ($manifestPath) { Invoke-Resign }

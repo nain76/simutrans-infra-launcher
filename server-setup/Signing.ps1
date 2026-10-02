@@ -72,14 +72,28 @@ function Unprotect-KeyBytes([string] $text) {
 
 function Get-P256Curve { return [System.Security.Cryptography.ECCurve+NamedCurves]::nistP256 }
 
+# 以前の版が名前の空の鍵としてWindowsに残してしまった鍵を消す（秘密の鍵の写しを残さないため）
+function Remove-StrayCngKey {
+    try {
+        if ([System.Security.Cryptography.CngKey]::Exists('')) {
+            [System.Security.Cryptography.CngKey]::Open('').Delete()
+            Write-Host '   以前の版がWindowsの鍵の保管場所に残した鍵の写しを消しました'
+        }
+    }
+    catch { }
+}
+
 # 鍵を新しく作り、秘密の値（D・X・Yを並べた96バイト）を返す
 function New-KeyBytes {
     if ($PSVersionTable.PSEdition -eq 'Desktop') {
         # .NET Frameworkでは、取り出しを許した鍵として作る必要がある
         $params = New-Object System.Security.Cryptography.CngKeyCreationParameters
         $params.ExportPolicy = [System.Security.Cryptography.CngExportPolicies]::AllowPlaintextExport
-        $cng = [System.Security.Cryptography.CngKey]::Create([System.Security.Cryptography.CngAlgorithm]::ECDsaP256, $null, $params)
+        # 名前に$nullを渡すとPowerShellが空文字に変え、名前付きの鍵としてWindowsに残ってしまう。
+        # [NullString]::Valueで本当のnullを渡し、その場限りの鍵として作る
+        $cng = [System.Security.Cryptography.CngKey]::Create([System.Security.Cryptography.CngAlgorithm]::ECDsaP256, [NullString]::Value, $params)
         $ec = New-Object System.Security.Cryptography.ECDsaCng($cng)
+        Remove-StrayCngKey
     }
     else {
         $ec = [System.Security.Cryptography.ECDsa]::Create((Get-P256Curve))
