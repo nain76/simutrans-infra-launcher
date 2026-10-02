@@ -45,7 +45,7 @@ $site = Get-Website -Name $SiteName
 if (-not $site) { throw "IISのサイト $SiteName がありません。先にSetup-Server.batを実行してください" }
 
 if (-not $HostName) {
-    $manifestPath = Join-Path $DistDir 'manifest.json'
+    $manifestPath = Resolve-ManifestPath $DistDir
     if (Test-Path -LiteralPath $manifestPath) {
         $first = @((Read-JsonFile $manifestPath).servers)[0]
         if ($first) { $HostName = ($first.address -split ':')[0] }
@@ -119,7 +119,12 @@ $binding = @(Get-WebBinding -Name $SiteName -Protocol https | Where-Object { ($_
 if ($binding.Count -eq 0) {
     Write-Warning "IISのサイト $SiteName にHTTPS（$HttpsPort）の設定が見つかりません"
 }
-$shareUrl = "https://${HostName}:$HttpsPort/manifest.json"
+$shareUrl = Get-ShareUrl "https://${HostName}:$HttpsPort" (Resolve-ManifestPath $DistDir)
+$saved = Get-PublishSettings
+if ($saved.manifest) {
+    $saved.share_url = $shareUrl
+    Save-PublishSettings $saved
+}
 try {
     $response = Invoke-WebRequest -Uri $shareUrl -UseBasicParsing -TimeoutSec 15
     Write-Ok "$shareUrl を取得できました（$($response.RawContentLength)バイト）"

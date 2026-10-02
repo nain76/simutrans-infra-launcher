@@ -3,6 +3,7 @@
     <Project Path="src/InfraLauncher.App/InfraLauncher.App.csproj" />
     <Project Path="src/InfraLauncher.Cli/InfraLauncher.Cli.csproj" />
     <Project Path="src/InfraLauncher.Core/InfraLauncher.Core.csproj" />
+    <Project Path="src/InfraLauncher.ServerManager/InfraLauncher.ServerManager.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/InfraLauncher.Core.Tests/InfraLauncher.Core.Tests.csproj" />

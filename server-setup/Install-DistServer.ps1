@@ -7,7 +7,7 @@
     2. 公開フォルダ（既定: C:\simutrans-dist）を作り、指定ポート（既定: 8080）で公開するサイトを作る
     3. Windowsファイアウォールでそのポートを開ける
     4. 読み出し（GET / HEAD）以外の要求を断る設定を入れる
-    5. サーバーリスト（manifest.json）がなければ、1台目のサーバーを登録してpaksetを公開する（Add-Server.ps1）
+    5. サーバーリスト（新しく作るときは list-ランダム.json）がなければ、1台目のサーバーを登録してpaksetを公開する（Add-Server.ps1）
        あれば、登録済みのpaksetを公開し直す（Publish-Pakset.ps1）
     6. サーバーリストに署名する（署名の鍵がなければ作る。Signing.ps1を参照）
     7. サーバーリストを取得できること、書き込み要求が断られることを確かめ、友人に伝えるアドレスと確認コードを表示する
@@ -133,7 +133,7 @@ if (-not (Get-NetFirewallRule -DisplayName $ruleName -ErrorAction SilentlyContin
 Write-Ok "ルール「$ruleName」があります"
 
 # --- 4. サーバーの登録とpaksetの公開---
-$manifestPath = Join-Path $DistDir 'manifest.json'
+$manifestPath = Resolve-ManifestPath $DistDir
 $servers = @(if (Test-Path -LiteralPath $manifestPath) { (Read-JsonFile $manifestPath).servers })
 if ($servers.Count -eq 0) {
     # 1台目のサーバーを登録する（足りない情報はAdd-Server.ps1が質問する）
@@ -147,7 +147,7 @@ if ($servers.Count -eq 0) {
     if (-not $PublicHost) { $PublicHost = ($servers[0].address -split ':')[0] }
 }
 else {
-    Write-Step 'サーバーリスト（manifest.json）を確認しています'
+    Write-Step "サーバーリスト（$(Split-Path -Leaf $manifestPath)）を確認しています"
     Write-Ok "既存のサーバーリストをそのまま使います（$($servers.Count)台）"
     if (-not $PublicHost) { $PublicHost = ($servers[0].address -split ':')[0] }
 
@@ -184,7 +184,7 @@ if (Test-Path -LiteralPath $manifestPath) {
 
 # --- 5. 確認---
 Write-Step '配信できるか確かめています'
-foreach ($name in @('manifest.json', 'manifest.sig.json')) {
+foreach ($name in @((Split-Path -Leaf $manifestPath), (Split-Path -Leaf (Get-SignaturePath $manifestPath)))) {
     $localUrl = "http://localhost:$Port/$name"
     try {
         $response = Invoke-WebRequest -Uri $localUrl -UseBasicParsing -TimeoutSec 10
@@ -230,14 +230,20 @@ if (-not $https -and -not $SkipHttps) {
 
 # ---まとめ---
 $hostText = if ($PublicHost) { $PublicHost } else { '<ドメイン>' }
-$shareUrl = if ($https) { "https://${hostText}:$HttpsPort/manifest.json" } else { "http://${hostText}:$Port/manifest.json" }
+$shareUrl = if ($https) { Get-ShareUrl "https://${hostText}:$HttpsPort" $manifestPath } else { Get-ShareUrl "http://${hostText}:$Port" $manifestPath }
+if ($PublicHost -and (Test-Path -LiteralPath $manifestPath)) {
+    # サーバー管理ツール（Simutrans_ServerManager.exe）が公開アドレスを表示できるように残す
+    $saved = Get-PublishSettings
+    $saved.share_url = $shareUrl
+    Save-PublishSettings $saved
+}
 $ports = if ($https) { "TCP 80・$HttpsPort・simutransサーバーのポート" } else { "TCP $Port・simutransサーバーのポート" }
 Write-Host ''
 Write-Host '============================================================' -ForegroundColor Cyan
 Write-Host ' 構築が終わりました。残りの作業:' -ForegroundColor Cyan
 Write-Host "  1. 外から $ports に届くようにする（Windowsのファイアウォールはこのツールで開けました）"
 Write-Host '     - VPSの場合: 事業者の管理画面のパケットフィルター/セキュリティグループで許可する（その仕組みがなければ不要）'
-Write-Host '     -自宅の場合: ルーターのポート転送でこのサーバーへ転送する'
+Write-Host '     - 自宅の場合: ルーターのポート転送でこのサーバーへ転送する'
 Write-Host "  2. 自分のPCのブラウザで $shareUrl が開けるか確かめる"
 Write-Host "  3. 友人にこのアドレスと確認コードを伝える（DiscordのDMなど）"
 Write-Host "     アドレス:   $shareUrl"

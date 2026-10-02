@@ -38,7 +38,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Common.ps1')
 
 New-Item -ItemType Directory -Force -Path $DistDir | Out-Null
-$manifestPath = Join-Path $DistDir 'manifest.json'
+$manifestPath = Resolve-ManifestPath $DistDir
 $data = if (Test-Path -LiteralPath $manifestPath) { Read-JsonFile $manifestPath } else { $null }
 $servers = @(if ($data) { $data.servers })
 $settings = Get-PublishSettings
@@ -80,8 +80,10 @@ $PaksetSource = Get-FullPath $PaksetSource
 # ---公開用のフォルダ名を決める---
 $shared = @($settings.paksets | Where-Object { $_.pakset_source -eq $PaksetSource })
 if ($shared.Count -gt 0) {
-    # 同じpaksetフォルダを使うサーバーがあれば、公開済みのpaksetを共有する
-    $PaksetFolder = Split-Path -Leaf $shared[0].destination
+    # 同じpaksetフォルダを使うサーバーがあれば、公開済みのpaksetを共有する（友人のPCでのフォルダ名も同じにする）
+    $destination = $shared[0].destination
+    $sharing = @($servers | Where-Object { $shared[0].server_ids -contains $_.id })
+    $PaksetFolder = if ($sharing.Count -gt 0) { $sharing[0].pakset.folder } else { Split-Path -Leaf $destination }
     Write-Ok "このpaksetは公開済みのものを共有します（$PaksetFolder）"
 }
 elseif (-not $PaksetFolder) {
@@ -93,6 +95,10 @@ elseif (-not $PaksetFolder) {
     if ($PaksetFolder -ne $base) {
         Write-Ok "別のサーバーが $base を使っているので、公開用のフォルダ名を $PaksetFolder にします"
     }
+}
+if (-not $shared.Count) {
+    # 公開フォルダの名前には、推測されにくいランダムな文字を足す（友人のPCでのフォルダ名は $PaksetFolder のまま）
+    $destination = Join-Path $DistDir "$PaksetFolder-$(New-RandomName 8)"
 }
 if ($PaksetFolder -notmatch '^[A-Za-z0-9_.+-]+$') {
     throw "公開用のフォルダ名に使えない文字があります: $PaksetFolder（英数字と_ . + -だけ使えます）"
@@ -127,7 +133,6 @@ Write-Ok "サーバーリストに「$ServerName」（$PublicHost`:$GamePort）�
 
 # ---公開---
 $settings.manifest = $manifestPath
-$destination = Join-Path $DistDir $PaksetFolder
 Add-PublishEntry $settings $PaksetSource $destination $ServerId
 Save-PublishSettings $settings
 $entryIds = @($settings.paksets | Where-Object { $_.destination -eq $destination })[0].server_ids

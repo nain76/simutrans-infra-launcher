@@ -1,0 +1,156 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:admin="using:InfraLauncher.Core.Admin"
+        x:Class="InfraLauncher.ServerManager.MainWindow"
+        Title="Simutransサーバー管理"
+        Width="980" Height="860" MinWidth="760" MinHeight="560">
+  <Window.Styles>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="#14808080" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="14,10" />
+    </Style>
+    <Style Selector="TextBlock.heading">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Opacity" Value="0.75" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="0,0,12,0" />
+    </Style>
+    <Style Selector="Border.badge">
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="8,2" />
+      <Setter Property="HorizontalAlignment" Value="Left" />
+    </Style>
+    <Style Selector="Border.badge > TextBlock">
+      <Setter Property="Foreground" Value="White" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+  </Window.Styles>
+
+  <DockPanel Margin="16">
+    <!-- 上: タイトル -->
+    <Grid DockPanel.Dock="Top" ColumnDefinitions="*,Auto" Margin="0,0,0,12">
+      <StackPanel>
+        <TextBlock Text="サーバー管理" FontSize="20" FontWeight="SemiBold" />
+        <TextBlock x:Name="FolderText" Opacity="0.65" FontSize="12" TextWrapping="Wrap" />
+      </StackPanel>
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+        <Button Content="フォルダを選ぶ…" Click="OnPickFolder" />
+        <Button Content="読み込み直す" Click="OnReload" />
+      </StackPanel>
+    </Grid>
+
+    <!-- 下: 結果の表示 -->
+    <Border DockPanel.Dock="Bottom" Classes="card" Margin="0,12,0,0">
+      <ScrollViewer MaxHeight="120">
+        <SelectableTextBlock x:Name="LogText" TextWrapping="Wrap" FontSize="12" />
+      </ScrollViewer>
+    </Border>
+
+    <ScrollViewer>
+      <StackPanel Spacing="12">
+        <!-- 公開の状態 -->
+        <Border Classes="card">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="heading" Text="公開の状態" />
+            <Grid ColumnDefinitions="Auto,*,Auto" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="6">
+              <TextBlock Classes="label" Text="公開アドレス" />
+              <SelectableTextBlock Grid.Column="1" x:Name="ShareUrlText" TextWrapping="Wrap" VerticalAlignment="Center" />
+              <Button Grid.Column="2" Content="コピー" Click="OnCopyShareUrl" AutomationProperties.Name="公開アドレスをコピーする" />
+
+              <TextBlock Grid.Row="1" Classes="label" Text="確認コード" />
+              <SelectableTextBlock Grid.Row="1" Grid.Column="1" x:Name="CodeText" FontFamily="Consolas,Menlo,monospace" FontSize="16" VerticalAlignment="Center" />
+              <Button Grid.Row="1" Grid.Column="2" Content="コピー" Click="OnCopyCode" AutomationProperties.Name="確認コードをコピーする" />
+
+              <TextBlock Grid.Row="2" Classes="label" Text="署名" />
+              <Border Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" x:Name="SignatureBadge" Classes="badge">
+                <TextBlock x:Name="SignatureText" />
+              </Border>
+
+              <TextBlock Grid.Row="3" Classes="label" Text="サーバーリスト" />
+              <SelectableTextBlock Grid.Row="3" Grid.Column="1" x:Name="ManifestText" TextWrapping="Wrap" VerticalAlignment="Center" />
+              <Button Grid.Row="3" Grid.Column="2" Content="配信を確かめる" Click="OnCheckDistribution"
+                      ToolTip.Tip="公開アドレスからサーバーリストを取り、署名が正しいかを確かめる（友人のランチャーと同じ確かめ方）" />
+            </Grid>
+            <Border x:Name="GuessableWarning" IsVisible="False" Background="#33c47a00" BorderBrush="#c47a00" BorderThickness="1" CornerRadius="4" Padding="10,6">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock TextWrapping="Wrap" VerticalAlignment="Center"
+                           Text="サーバーリストの名前が manifest.json のままです。ドメインとポートを知っている人に中身を見つけられやすいので、推測されにくい名前に変えるのがおすすめです。" />
+                <Button Grid.Column="1" Content="名前を変える…" Margin="12,0,0,0" Click="OnRename" />
+              </Grid>
+            </Border>
+          </StackPanel>
+        </Border>
+
+        <!-- サーバーの情報 -->
+        <Border Classes="card">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="heading" Text="サーバーの情報（お知らせ・メンテナンス中）" />
+            <Grid ColumnDefinitions="260,*" ColumnSpacing="16">
+              <ListBox x:Name="ServerList" MinHeight="180" SelectionChanged="OnServerSelected">
+                <ListBox.ItemTemplate>
+                  <DataTemplate x:DataType="admin:AdminServer">
+                    <StackPanel>
+                      <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding Id}" Opacity="0.6" FontSize="12" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <StackPanel Grid.Column="1" Spacing="6" x:Name="Editor" IsEnabled="False">
+                <TextBlock Text="表示名" FontWeight="SemiBold" />
+                <TextBox x:Name="NameBox" />
+                <TextBlock Text="お知らせ（友人のランチャーの一覧に出ます。空欄なら出しません）" FontWeight="SemiBold" Margin="0,6,0,0" />
+                <TextBox x:Name="MessageBox" Watermark="例: 今日は20時から再開します" />
+                <CheckBox x:Name="MaintenanceBox" Content="メンテナンス中にする（友人のランチャーに「メンテナンス中」と出ます）" Margin="0,6,0,0" />
+                <TextBlock x:Name="ServerInfoText" Opacity="0.7" FontSize="12" TextWrapping="Wrap" Margin="0,6,0,0" />
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,6,0,0">
+                  <Button Content="元に戻す" Click="OnRevert" />
+                  <Button x:Name="SaveButton" Content="保存して署名" Classes="accent" Click="OnSave"
+                          ToolTip.Tip="サーバーリストを書き換えて、自動で署名し直す（Edit-ServerList.ps1を使う）" />
+                </StackPanel>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+        </Border>
+
+        <!-- 作業 -->
+        <Border Classes="card">
+          <StackPanel Spacing="8">
+            <TextBlock Classes="heading" Text="作業" />
+            <TextBlock Opacity="0.75" TextWrapping="Wrap"
+                       Text="ボタンを押すと、今までと同じスクリプトがPowerShellの画面で開きます。質問に答えて終わったら、上の「読み込み直す」を押してください。" />
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="12">
+              <Button Grid.Row="0" Content="paksetと本体を公開" Click="OnPublish" MinWidth="210" />
+              <TextBlock Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
+                         Text="アドオンを足した・外した、本体を入れ替えたとき（Publish-Pakset.bat）。先にsimutransサーバーを再起動しておく" />
+              <Button Grid.Row="1" Content="サーバーを追加" Click="OnAddServer" MinWidth="210" />
+              <TextBlock Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
+                         Text="simutransサーバーを増やすとき（Add-Server.bat）" />
+              <Button Grid.Row="2" Content="署名の鍵の管理" Click="OnManageKey" MinWidth="210" />
+              <TextBlock Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
+                         Text="バックアップ、バックアップから戻す、署名し直す、鍵の作り直し（Manage-SigningKey.bat）" />
+              <Button Grid.Row="3" Content="名前を推測されにくくする" Click="OnRename" MinWidth="210" />
+              <TextBlock Grid.Row="3" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
+                         Text="サーバーリストとpaksetの公開フォルダの名前をランダムにする（Rename-ServerList.bat）。友人はアドレスを変える必要がある" />
+              <Button Grid.Row="4" Content="HTTPSの設定" Click="OnHttps" MinWidth="210" />
+              <TextBlock Grid.Row="4" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
+                         Text="証明書を取ってHTTPSにする（Enable-Https.bat）" />
+              <Button Grid.Row="5" Content="構築をやり直す・確かめる" Click="OnSetup" MinWidth="210" />
+              <TextBlock Grid.Row="5" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
+                         Text="IISやファイアウォールの設定を確かめ直す（Setup-Server.bat）。何度実行しても同じ状態になる" />
+              <Button Grid.Row="6" Content="server-setupフォルダを開く" Click="OnOpenFolder" MinWidth="210" />
+              <TextBlock Grid.Row="6" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
+                         Text="スクリプトや説明書（README.md、docs）があるフォルダ" />
+            </Grid>
+          </StackPanel>
+        </Border>
+      </StackPanel>
+    </ScrollViewer>
+  </DockPanel>
+</Window>

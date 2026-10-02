@@ -46,12 +46,13 @@ function Get-FullPath([string] $path) {
   以前の版ではフォルダを入れていたので、フォルダが入っていたら中のexeを探す。
 #>
 function Get-PublishSettings {
-    $result = [ordered]@{ manifest = $null; paksets = @() }
+    $result = [ordered]@{ manifest = $null; share_url = $null; paksets = @() }
     if (-not (Test-Path -LiteralPath $PublishSettingsPath)) {
         return $result
     }
     $saved = Read-JsonFile $PublishSettingsPath
     $result.manifest = $saved.manifest
+    if ($saved.PSObject.Properties['share_url']) { $result.share_url = $saved.share_url }
     if ($saved.PSObject.Properties['paksets']) {
         $result.paksets = @($saved.paksets | ForEach-Object {
             $engine = if ($_.PSObject.Properties['engine_source']) { $_.engine_source } else { $null }
@@ -66,7 +67,41 @@ function Get-PublishSettings {
 }
 
 function Save-PublishSettings($settings) {
-    Write-JsonFile $PublishSettingsPath ([ordered]@{ manifest = $settings.manifest; paksets = @($settings.paksets) })
+    Write-JsonFile $PublishSettingsPath ([ordered]@{ manifest = $settings.manifest; share_url = $settings.share_url; paksets = @($settings.paksets) })
+}
+
+# 推測されにくい名前に使う、英小文字と数字のランダムな文字列
+function New-RandomName([int] $length = 10) {
+    $chars = 'abcdefghijkmnpqrstuvwxyz23456789'
+    $bytes = New-RandomBytes $length
+    return -join ($bytes | ForEach-Object { $chars[$_ % $chars.Length] })
+}
+
+<#
+  サーバーリストのファイルの場所。
+  1. publish-settings.json に登録してあり、そのファイルが公開フォルダにあれば、それを使う
+  2. 以前の版で作った manifest.json があれば、それを使う（今動いている環境はそのまま）
+  3. どちらもなければ、推測されにくい名前（list-ランダム.json）で新しく作る
+  名前を変えたいときは Rename-ServerList.bat を使う。
+#>
+function Resolve-ManifestPath([string] $distDir) {
+    $dist = Get-FullPath $distDir
+    $settings = Get-PublishSettings
+    if ($settings.manifest -and (Test-Path -LiteralPath $settings.manifest) -and
+        (Split-Path -Parent (Get-FullPath $settings.manifest)) -eq $dist) {
+        return (Get-FullPath $settings.manifest)
+    }
+    $legacy = Join-Path $dist 'manifest.json'
+    if (Test-Path -LiteralPath $legacy) { return $legacy }
+    $existing = @(Get-ChildItem -LiteralPath $dist -Filter 'list-*.json' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notlike '*.sig.json' })
+    if ($existing.Count -gt 0) { return $existing[0].FullName }
+    return (Join-Path $dist "list-$(New-RandomName 10).json")
+}
+
+# 公開アドレス（友人に伝えるURL）を、サーバーリストのファイル名に合わせて作る
+function Get-ShareUrl([string] $baseUrl, [string] $manifestPath) {
+    return ($baseUrl.TrimEnd('/') + '/' + (Split-Path -Leaf $manifestPath))
 }
 
 # paksetを登録する。同じpaksetフォルダが登録済みなら、そこにサーバーのidを足す。

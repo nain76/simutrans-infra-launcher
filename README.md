@@ -16,7 +16,7 @@ Simutrans本体とは独立しており、本体のソースやビルド（Makef
 | 読む人 | ガイド |
 |---|---|
 | 遊ぶ人 | [クイックスタート](docs/quickstart-client.md)、[Q&A](docs/faq-client.md) |
-| サーバー管理者 | [クイックスタート](docs/quickstart-server.md)、[Q&A](docs/faq-server.md)、[サーバー側でやること](server-setup/README.md) |
+| サーバー管理者 | [クイックスタート](docs/quickstart-server.md)、[Q&A](docs/faq-server.md)、[サーバー側でやること](server-setup/README.md)（サーバー管理ツールの説明もここ） |
 | 仕組みを知りたい人 | [安全性の設計](docs/security.md)、[サーバーリストの形式](manifest/README.md) |
 
 ## フォルダ構成
@@ -28,13 +28,14 @@ Simutrans本体とは独立しており、本体のソースやビルド（Makef
 | `launcher/` | ランチャー本体（C#、.NET 10、Avalonia） |
 | `server-setup/` | サーバー側のPowerShellスクリプト（配信サーバーの構築、HTTPS化、paksetと本体の公開）。[説明](server-setup/README.md) |
 
-`launcher/`の中は次の4つのプロジェクトに分かれています。
+`launcher/`の中は次の5つのプロジェクトに分かれています。
 
 | プロジェクト | 役割 |
 |---|---|
 | `src/InfraLauncher.Core` | マニフェストの読み込み、同期、起動コマンドの組み立て（画面に依存しない） |
 | `src/InfraLauncher.App` | 画面（Avalonia） |
 | `src/InfraLauncher.Cli` | コマンドライン版（動作確認とトラブル調査用） |
+| `src/InfraLauncher.ServerManager` | サーバー管理ツール（`Simutrans_ServerManager.exe`）。書き換えは`server-setup`のスクリプトに任せる |
 | `tests/InfraLauncher.Core.Tests` | Coreのテスト（xUnit） |
 
 ## ビルドと実行
@@ -50,9 +51,9 @@ dotnet test
 dotnet run --project src/InfraLauncher.App
 
 # コマンドライン版
-dotnet run --project src/InfraLauncher.Cli -- list   https://example.ddns.net/manifest.json
-dotnet run --project src/InfraLauncher.Cli -- sync   https://example.ddns.net/manifest.json friends-a
-dotnet run --project src/InfraLauncher.Cli -- launch https://example.ddns.net/manifest.json friends-a --print-only --code A1B2-C3D4-E5F6-0718-293A
+dotnet run --project src/InfraLauncher.Cli -- list   https://example.ddns.net/list-7k3qf9x2m4.json
+dotnet run --project src/InfraLauncher.Cli -- sync   https://example.ddns.net/list-7k3qf9x2m4.json friends-a
+dotnet run --project src/InfraLauncher.Cli -- launch https://example.ddns.net/list-7k3qf9x2m4.json friends-a --print-only --code A1B2-C3D4-E5F6-0718-293A
 ```
 
 友人に配る実行ファイルは、次のコマンドで作ります。.NETを入れていないPCでも動きます。
@@ -63,7 +64,7 @@ dotnet publish src/InfraLauncher.App -c Release -r win-x64 --self-contained \
   -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=true -p:DebugType=none -o publish
 ```
 
-できあがるのは`publish/Simutrans_Launcher.exe`（約21MB）の1ファイルです。`PublishTrimmed`で使わないコードを削って小さくしています。CoreのJSON処理はこの削り方に対応するためにソース生成を使っています。JSONで読み書きする型を増やしたときは、`Json.cs`の`JsonContext`にも追加してください。
+できあがるのは`publish/Simutrans_Launcher.exe`（約21MB）の1ファイルです。サーバー管理ツールは、`src/InfraLauncher.App`を`src/InfraLauncher.ServerManager`に変えて同じコマンドで作ります（`Simutrans_ServerManager.exe`）。`PublishTrimmed`で使わないコードを削って小さくしています。CoreのJSON処理はこの削り方に対応するためにソース生成を使っています。JSONで読み書きする型を増やしたときは、`Json.cs`の`JsonContext`にも追加してください。
 
 ## 使い方
 
