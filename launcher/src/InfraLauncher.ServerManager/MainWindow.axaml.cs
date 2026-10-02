@@ -47,7 +47,8 @@ public partial class MainWindow : Window
 
         ShareUrlText.Text = _setup.ShareUrl ?? "まだ記録がありません（Setup-Server.batかEnable-Https.batを実行すると記録されます）";
         CodeText.Text = _setup.KeyCode ?? "署名の鍵がありません（「署名の鍵の管理」で作れます）";
-        ManifestText.Text = _setup.ManifestPath ?? "まだありません（「構築をやり直す・確かめる」で作れます）";
+        ManifestText.Text = _setup.ManifestPath ?? "まだありません（「新規構築を始める」で作れます）";
+        FirstSetupPanel.IsVisible = _setup.ManifestPath is null;
         GuessableWarning.IsVisible = _setup.HasGuessableName;
         (SignatureText.Text, SignatureBadge.Background) = _setup.Signature switch
         {

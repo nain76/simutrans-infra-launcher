@@ -77,6 +77,14 @@
               <Button Grid.Row="3" Grid.Column="2" Content="配信を確かめる" Click="OnCheckDistribution"
                       ToolTip.Tip="公開アドレスからサーバーリストを取り、署名が正しいかを確かめる（友人のランチャーと同じ確かめ方）" />
             </Grid>
+            <Border x:Name="FirstSetupPanel" IsVisible="False" Background="#332f6fd0" BorderBrush="#2f6fd0" BorderThickness="1" CornerRadius="4" Padding="10,8">
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock TextWrapping="Wrap" VerticalAlignment="Center"
+                           Text="まだ構築していません。「新規構築を始める」を押すと、IISとファイアウォールの設定、サーバーリストの作成、paksetと本体の公開、署名までをSetup-Server.batが順に行います。" />
+                <Button Grid.Column="1" Content="新規構築を始める" Classes="accent" Margin="12,0,0,0" Click="OnSetup"
+                        ToolTip.Tip="Setup-Server.batを開く" />
+              </Grid>
+            </Border>
             <Border x:Name="GuessableWarning" IsVisible="False" Background="#33c47a00" BorderBrush="#c47a00" BorderThickness="1" CornerRadius="4" Padding="10,6">
               <Grid ColumnDefinitions="*,Auto">
                 <TextBlock TextWrapping="Wrap" VerticalAlignment="Center"
@@ -126,24 +134,24 @@
             <TextBlock Opacity="0.75" TextWrapping="Wrap"
                        Text="ボタンを押すと、今までと同じスクリプトがPowerShellの画面で開きます。質問に答えて終わったら、上の「読み込み直す」を押してください。" />
             <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="6" ColumnSpacing="12">
-              <Button Grid.Row="0" Content="paksetと本体を公開" Click="OnPublish" MinWidth="210" />
+              <Button Grid.Row="0" Content="新規構築・やり直し" Click="OnSetup" MinWidth="210" />
               <TextBlock Grid.Row="0" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
-                         Text="アドオンを足した・外した、本体を入れ替えたとき（Publish-Pakset.bat）。先にsimutransサーバーを再起動しておく" />
-              <Button Grid.Row="1" Content="サーバーを追加" Click="OnAddServer" MinWidth="210" />
+                         Text="初めての構築と、IISやファイアウォールの設定の確かめ直し（Setup-Server.bat）。何度実行しても同じ状態になる" />
+              <Button Grid.Row="1" Content="paksetと本体を公開" Click="OnPublish" MinWidth="210" />
               <TextBlock Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
-                         Text="simutransサーバーを増やすとき（Add-Server.bat）" />
-              <Button Grid.Row="2" Content="署名の鍵の管理" Click="OnManageKey" MinWidth="210" />
+                         Text="アドオンを足した・外した、本体を入れ替えたとき（Publish-Pakset.bat）。先にsimutransサーバーを再起動しておく" />
+              <Button Grid.Row="2" Content="サーバーを追加" Click="OnAddServer" MinWidth="210" />
               <TextBlock Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
-                         Text="バックアップ、バックアップから戻す、署名し直す、鍵の作り直し（Manage-SigningKey.bat）" />
-              <Button Grid.Row="3" Content="名前を推測されにくくする" Click="OnRename" MinWidth="210" />
+                         Text="simutransサーバーを増やすとき（Add-Server.bat）" />
+              <Button Grid.Row="3" Content="署名の鍵の管理" Click="OnManageKey" MinWidth="210" />
               <TextBlock Grid.Row="3" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
-                         Text="サーバーリストとpaksetの公開フォルダの名前をランダムにする（Rename-ServerList.bat）。友人はアドレスを変える必要がある" />
-              <Button Grid.Row="4" Content="HTTPSの設定" Click="OnHttps" MinWidth="210" />
+                         Text="バックアップ、バックアップから戻す、署名し直す、鍵の作り直し（Manage-SigningKey.bat）" />
+              <Button Grid.Row="4" Content="名前を推測されにくくする" Click="OnRename" MinWidth="210" />
               <TextBlock Grid.Row="4" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
-                         Text="証明書を取ってHTTPSにする（Enable-Https.bat）" />
-              <Button Grid.Row="5" Content="構築をやり直す・確かめる" Click="OnSetup" MinWidth="210" />
+                         Text="サーバーリストとpaksetの公開フォルダの名前をランダムにする（Rename-ServerList.bat）。友人はアドレスを変える必要がある" />
+              <Button Grid.Row="5" Content="HTTPSの設定" Click="OnHttps" MinWidth="210" />
               <TextBlock Grid.Row="5" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
-                         Text="IISやファイアウォールの設定を確かめ直す（Setup-Server.bat）。何度実行しても同じ状態になる" />
+                         Text="証明書を取ってHTTPSにする（Enable-Https.bat）" />
               <Button Grid.Row="6" Content="server-setupフォルダを開く" Click="OnOpenFolder" MinWidth="210" />
               <TextBlock Grid.Row="6" Grid.Column="1" TextWrapping="Wrap" VerticalAlignment="Center" Opacity="0.8"
                          Text="スクリプトや説明書（README.md、docs）があるフォルダ" />
