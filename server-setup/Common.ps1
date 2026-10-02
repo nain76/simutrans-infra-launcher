@@ -81,22 +81,29 @@ function New-RandomName([int] $length = 10) {
   サーバーリストのファイルの場所。
   1. publish-settings.json に登録してあり、そのファイルが公開フォルダにあれば、それを使う
   2. 以前の版で作った manifest.json があれば、それを使う（今動いている環境はそのまま）
-  3. どちらもなければ、推測されにくい名前（list-ランダム.json）で新しく作る
+  3. どちらもなければ、推測されにくい名前（list-ランダム.json）を決めて設定に残す。
+     新規構築では、続けて呼ばれるスクリプトもこの名前を使う
   名前を変えたいときは Rename-ServerList.bat を使う。
 #>
 function Resolve-ManifestPath([string] $distDir) {
     $dist = Get-FullPath $distDir
     $settings = Get-PublishSettings
-    if ($settings.manifest -and (Test-Path -LiteralPath $settings.manifest) -and
-        (Split-Path -Parent (Get-FullPath $settings.manifest)) -eq $dist) {
-        return (Get-FullPath $settings.manifest)
+    $saved = if ($settings.manifest -and (Split-Path -Parent (Get-FullPath $settings.manifest)) -eq $dist) {
+        Get-FullPath $settings.manifest
     }
+    if ($saved -and (Test-Path -LiteralPath $saved)) { return $saved }
     $legacy = Join-Path $dist 'manifest.json'
     if (Test-Path -LiteralPath $legacy) { return $legacy }
     $existing = @(Get-ChildItem -LiteralPath $dist -Filter 'list-*.json' -File -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -notlike '*.sig.json' })
     if ($existing.Count -gt 0) { return $existing[0].FullName }
-    return (Join-Path $dist "list-$(New-RandomName 10).json")
+    # 名前を決めたあと、まだファイルを作る前（新規構築の途中）
+    if ($saved) { return $saved }
+    # 新しい名前は設定に残し、このあと呼ばれたときも同じ名前を返す
+    $path = Join-Path $dist "list-$(New-RandomName 10).json"
+    $settings.manifest = $path
+    Save-PublishSettings $settings
+    return $path
 }
 
 # 公開アドレス（友人に伝えるURL）を、サーバーリストのファイル名に合わせて作る
