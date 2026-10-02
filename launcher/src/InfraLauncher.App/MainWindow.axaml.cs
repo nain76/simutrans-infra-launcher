@@ -313,19 +313,6 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnDoubleTapped(object? sender, RoutedEventArgs e)
-    {
-        // ダブルクリックは、起動できるなら起動、まだなら同期（同期だけでは何も実行しない）
-        if (Selected is { IsReady: true })
-        {
-            OnLaunch(sender, e);
-        }
-        else if (Selected is { CanSync: true })
-        {
-            OnSync(sender, e);
-        }
-    }
-
     /// <summary>本体とpaksetをサーバーと同じ状態にする。起動はしない。</summary>
     private async void OnSync(object? sender, RoutedEventArgs e)
     {

@@ -39,7 +39,8 @@
     </StackPanel>
 
     <Grid>
-      <ListBox x:Name="ServerList" SelectionChanged="OnSelectionChanged" DoubleTapped="OnDoubleTapped">
+      <!-- ダブルクリックでは何もしない（接続先の表示やコピーを押したときに、誤って起動や同期をしないように） -->
+      <ListBox x:Name="ServerList" SelectionChanged="OnSelectionChanged">
         <ListBox.Styles>
           <!--選んだ行は、Windowsのアクセントカラー（緑など）で塗りつぶさず、薄い背景と左の線で示す。札の色が読めるように-->
           <Style Selector="ListBoxItem">
