@@ -72,6 +72,10 @@ VPSが今のままなら、鍵はそのまま使えます。`Manage-SigningKey.b
 
 配信フォルダに、IISが配らないファイルが載っている可能性があります。友人に`%LOCALAPPDATA%\InfraLauncher\logs\sync.log`を送ってもらうと、どのファイルかが分かります。たいていは`Publish-Pakset.bat`を最新のスクリプトで実行し直すと直ります。
 
+### HTTPSにするときに英語でメールアドレスを聞かれました
+
+「Enter email(s) for notifications about problems and abuse」は、証明書を出しているLet's Encryptが、証明書に問題が見つかったときなどに連絡する宛先です。自分が受け取れるメールアドレスを入れてください。複数ならカンマで区切ります。アドレスは証明書には書かれず、友人やサイトを見た人には見えません。
+
 ### 証明書の期限が心配です
 
 証明書はwin-acmeが自動で更新します。更新のたびにLet's Encryptが80番にアクセスするので、80番は開けたままにしてください。更新に失敗したときは、`Enable-Https.bat`を実行し直します。

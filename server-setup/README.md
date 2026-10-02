@@ -75,7 +75,7 @@ Set-ExecutionPolicy -Scope Process Bypass
 | `-PaksetSource` | （質問する） | simutransサーバーが使っているpaksetフォルダのフルパス |
 | `-HttpsPort` | `8443` | HTTPSのポート |
 | `-SkipHttps` | なし | HTTPSにしない（署名があるので本体も配れるが、通信は暗号化されない） |
-| `-Email` | なし | 証明書の期限切れなどの連絡先（任意） |
+| `-Email` | なし | Let's Encryptからの連絡先。省略すると、win-acmeが英語で「Enter email(s)」と聞いてくる |
 
 ### ポートを外から届くようにする
 
