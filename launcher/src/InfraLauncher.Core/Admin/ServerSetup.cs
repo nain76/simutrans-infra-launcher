@@ -190,6 +190,16 @@ public static class PowerShellCommand
         return sb.ToString();
     }
 
+    /// <summary>
+    /// 質問をするスクリプトを、別の画面で対話しながら動かすためのコマンド。
+    /// 終わったら（エラーで止まっても）最後に <paramref name="finishMessage"/> を出す。
+    /// </summary>
+    public static string BuildInteractive(string scriptPath, string finishMessage)
+    {
+        return "try { & " + Quote(scriptPath) + " } catch { Write-Host ($_ | Out-String) -ForegroundColor Red } "
+            + "finally { Write-Host ''; Write-Host " + Quote(finishMessage) + " -ForegroundColor Cyan }";
+    }
+
     /// <summary>-EncodedCommand に渡す形（UTF-16LE を base64 にしたもの）。</summary>
     public static string Encode(string command) => Convert.ToBase64String(Encoding.Unicode.GetBytes(command));
 

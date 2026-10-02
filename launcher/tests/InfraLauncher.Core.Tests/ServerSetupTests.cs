@@ -99,4 +99,12 @@ public sealed class ServerSetupTests : IDisposable
         Assert.Contains("exit 1", cmd);
         Assert.Equal(cmd, Encoding.Unicode.GetString(Convert.FromBase64String(PowerShellCommand.Encode(cmd))));
     }
+
+    [Fact]
+    public void InteractiveCommandAlwaysShowsFinishMessage()
+    {
+        var cmd = PowerShellCommand.BuildInteractive(@"C:\it's\Add-Server.ps1", "終わりました");
+        Assert.StartsWith(@"try { & 'C:\it''s\Add-Server.ps1' }", cmd);
+        Assert.Contains("finally { Write-Host ''; Write-Host '終わりました'", cmd);
+    }
 }

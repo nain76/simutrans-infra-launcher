@@ -47,23 +47,38 @@ internal static class Scripts
     }
 
     /// <summary>
-    /// 質問をするスクリプトは、今までどおりバッチファイルをダブルクリックしたのと同じように、別の画面で開く。
+    /// 質問をするスクリプトを、別のPowerShellの画面で開く。バッチファイルが動かすのと同じスクリプトを、
+    /// 同じ PowerShell 5.1 で動かす（このツールは管理者として動いているので、そのまま管理者で動く）。
+    /// 画面が閉じられたら <paramref name="exited"/> を呼ぶ。
     /// </summary>
-    public static string? OpenBatch(string folder, string batch)
+    public static string? OpenInteractive(string folder, string script, Action exited)
     {
-        var path = Path.Combine(folder, batch);
+        var path = Path.Combine(folder, script);
         if (!File.Exists(path))
         {
-            return $"{batch} が見つかりません: {path}";
+            return $"{script} が見つかりません: {path}";
+        }
+        var command = PowerShellCommand.BuildInteractive(path,
+            "終わりました。この画面を閉じると、サーバー管理ツールの表示が新しくなります。");
+        var start = new ProcessStartInfo("powershell.exe") { WorkingDirectory = folder, UseShellExecute = false };
+        foreach (var arg in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-OutputFormat", "Text", "-EncodedCommand", PowerShellCommand.Encode(command) })
+        {
+            start.ArgumentList.Add(arg);
         }
         try
         {
-            Process.Start(new ProcessStartInfo(path) { UseShellExecute = true, WorkingDirectory = folder });
+            var process = Process.Start(start)!;
+            process.EnableRaisingEvents = true;
+            process.Exited += (_, _) =>
+            {
+                process.Dispose();
+                exited();
+            };
             return null;
         }
         catch (System.ComponentModel.Win32Exception e)
         {
-            return $"{batch} を開けませんでした: {e.Message}";
+            return $"PowerShell を起動できませんでした: {e.Message}";
         }
     }
 

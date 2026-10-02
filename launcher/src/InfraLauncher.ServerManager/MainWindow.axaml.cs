@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Platform.Storage;
+using Avalonia.Threading;
 using InfraLauncher.Core;
 using InfraLauncher.Core.Admin;
 
@@ -33,7 +34,7 @@ public partial class MainWindow : Window
 
     private AdminServer? SelectedServer => ServerList.SelectedItem as AdminServer;
 
-    private void Reload(string? selectId = null)
+    private void Reload(string? selectId = null, bool keepSelection = true)
     {
         if (_folder is null)
         {
@@ -41,7 +42,10 @@ public partial class MainWindow : Window
             Editor.IsEnabled = false;
             return;
         }
-        selectId ??= SelectedServer?.Id;
+        if (keepSelection)
+        {
+            selectId ??= SelectedServer?.Id;
+        }
         _setup = ServerSetup.Load(_folder);
         FolderText.Text = $"server-setupフォルダ: {_folder}";
 
@@ -65,7 +69,7 @@ public partial class MainWindow : Window
         }
 
         ServerList.ItemsSource = _setup.Servers;
-        ServerList.SelectedItem = _setup.Servers.FirstOrDefault(s => s.Id == selectId) ?? _setup.Servers.FirstOrDefault();
+        ServerList.SelectedItem = _setup.Servers.FirstOrDefault(s => s.Id == selectId);
         ShowSelected();
     }
 
@@ -76,7 +80,7 @@ public partial class MainWindow : Window
         NameBox.Text = s?.Name ?? "";
         MessageBox.Text = s?.Message ?? "";
         MaintenanceBox.IsChecked = s?.Maintenance == true;
-        ServerInfoText.Text = s is null ? ""
+        ServerInfoText.Text = s is null ? (_setup?.Servers.Count > 0 ? "左の一覧から、書き換えるサーバーを選んでください" : "")
             : $"id: {s.Id}　｜　接続先: {s.Address}　｜　pakset: {s.PaksetFolder ?? "-"}　｜　本体: {s.EngineRevision ?? "配っていない"}";
         if (s is not null && _setup?.KeyCode is null)
         {
@@ -121,7 +125,8 @@ public partial class MainWindow : Window
         var (ok, output) = await Scripts.RunAsync(_folder, "Edit-ServerList.ps1", args);
         SaveButton.IsEnabled = true;
         Log(ok ? $"保存して署名しました。友人のランチャーには、次に一覧を更新したときに出ます。\n{output}" : $"保存できませんでした。\n{output}");
-        Reload(s.Id);
+        // 保存できたら選択を外し、続けて書き換えてしまわないようにする。失敗したときは直せるように残す
+        Reload(ok ? null : s.Id, keepSelection: !ok);
     }
 
     /// <summary>公開アドレスから取ったサーバーリストを、友人のランチャーと同じ方法で確かめる。</summary>
@@ -146,12 +151,13 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnPublish(object? sender, RoutedEventArgs e) => OpenBatch("Publish-Pakset.bat");
-    private void OnAddServer(object? sender, RoutedEventArgs e) => OpenBatch("Add-Server.bat");
-    private void OnManageKey(object? sender, RoutedEventArgs e) => OpenBatch("Manage-SigningKey.bat");
-    private void OnRename(object? sender, RoutedEventArgs e) => OpenBatch("Rename-ServerList.bat");
-    private void OnHttps(object? sender, RoutedEventArgs e) => OpenBatch("Enable-Https.bat");
-    private void OnSetup(object? sender, RoutedEventArgs e) => OpenBatch("Setup-Server.bat");
+    // バッチファイルと、それが動かすスクリプト。ツールからはスクリプトを直接開き、画面が閉じたら読み込み直す
+    private void OnPublish(object? sender, RoutedEventArgs e) => OpenBatch("Publish-Pakset.bat", "Publish-Pakset.ps1");
+    private void OnAddServer(object? sender, RoutedEventArgs e) => OpenBatch("Add-Server.bat", "Add-Server.ps1");
+    private void OnManageKey(object? sender, RoutedEventArgs e) => OpenBatch("Manage-SigningKey.bat", "Manage-SigningKey.ps1");
+    private void OnRename(object? sender, RoutedEventArgs e) => OpenBatch("Rename-ServerList.bat", "Rename-ServerList.ps1");
+    private void OnHttps(object? sender, RoutedEventArgs e) => OpenBatch("Enable-Https.bat", "Enable-Https.ps1");
+    private void OnSetup(object? sender, RoutedEventArgs e) => OpenBatch("Setup-Server.bat", "Install-DistServer.ps1");
 
     private void OnOpenFolder(object? sender, RoutedEventArgs e)
     {
@@ -161,14 +167,19 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OpenBatch(string batch)
+    private void OpenBatch(string batch, string script)
     {
         if (_folder is null)
         {
             Log("server-setupフォルダを選んでください");
             return;
         }
-        Log(Scripts.OpenBatch(_folder, batch) ?? $"{batch}を開きました。PowerShellの画面で質問に答え、終わったら「読み込み直す」を押してください");
+        var error = Scripts.OpenInteractive(_folder, script, () => Dispatcher.UIThread.Post(() =>
+        {
+            Reload();
+            Log($"{batch}（{script}）の画面が閉じられたので、読み込み直しました");
+        }));
+        Log(error ?? $"{batch}（{script}）をPowerShellの画面で開きました。質問に答えて、終わったらその画面を閉じてください。閉じると表示が新しくなります");
     }
 
     private async void OnCopyShareUrl(object? sender, RoutedEventArgs e)

@@ -1,12 +1,13 @@
 ﻿<#
 .SYNOPSIS
-    サーバーリストのファイル名と、paksetの公開フォルダの名前を、推測されにくいランダムな名前に変える。
+    サーバーリストのファイル名と、paksetの公開フォルダの名前に付けるランダムな文字を、新しいものに変える。
 
 .DESCRIPTION
     manifest.json のような決まった名前だと、ドメインとポートを知っている人に中身を見つけられやすくなる。
+    アドレスが関係ない人に知られたときも、ランダムな文字を変えれば、古いアドレスでは見つけられなくなる。
     このスクリプトは次のことをする。
-      1. サーバーリストを list-ランダム.json という名前に変える（署名も作り直す）
-      2. paksetの公開フォルダ（例: pak.NSOTRP32）を pak.NSOTRP32-ランダム に変える
+      1. サーバーリストを新しい list-ランダム.json という名前に変える（署名も作り直す）
+      2. paksetの公開フォルダ（例: pak.NSOTRP32 や pak.NSOTRP32-古いランダム）を pak.NSOTRP32-新しいランダム に変える
          （友人のPCでのフォルダ名は変わらないので、友人が pakset を落とし直すことはない）
       3. publish-settings.json を新しい名前に合わせる
     名前を変えると、友人に伝えたアドレスは使えなくなる。確認コードは変わらないので、
@@ -34,15 +35,23 @@ $oldManifest = Get-FullPath $settings.manifest
 $distDir = Split-Path -Parent $oldManifest
 $newManifest = Join-Path $distDir "list-$(New-RandomName 10).json"
 
-# 名前を変える pakset の公開フォルダ（すでにランダムな文字が付いているものは変えない）
+# pakset の公開フォルダは「元のフォルダ名-新しいランダムな文字」にする。
+# 元のフォルダ名は、サーバーリストの pakset.folder（友人のPCでのフォルダ名）から取る。
+# 同じフォルダを複数のサーバーで使っているときは1回だけ変える
+$data = Read-JsonFile $oldManifest
 $moves = @()
 foreach ($p in $settings.paksets) {
-    $leaf = Split-Path -Leaf $p.destination
-    if ($leaf -match '-[a-z2-9]{8}$') { continue }
-    $moves += [pscustomobject]@{ Entry = $p; Old = (Get-FullPath $p.destination); New = (Join-Path (Split-Path -Parent (Get-FullPath $p.destination)) "$leaf-$(New-RandomName 8)") }
+    $old = Get-FullPath $p.destination
+    $done = @($moves | Where-Object { $_.Old -eq $old })
+    if ($done.Count -gt 0) { $moves += [pscustomobject]@{ Entry = $p; Old = $old; New = $done[0].New }; continue }
+    $base = Split-Path -Leaf $old
+    foreach ($s in @($data.servers)) {
+        if ($p.server_ids -contains $s.id -and $s.pakset -and $s.pakset.folder) { $base = $s.pakset.folder; break }
+    }
+    $moves += [pscustomobject]@{ Entry = $p; Old = $old; New = (Join-Path (Split-Path -Parent $old) "$base-$(New-RandomName 8)") }
 }
 
-Write-Step 'サーバーリストと公開フォルダの名前を、推測されにくい名前に変えます'
+Write-Step 'サーバーリストとpaksetの公開フォルダの、名前のランダムな部分を変えます'
 Write-Host "   サーバーリスト: $(Split-Path -Leaf $oldManifest) → $(Split-Path -Leaf $newManifest)"
 foreach ($m in $moves) { Write-Host "   paksetの公開フォルダ: $(Split-Path -Leaf $m.Old) → $(Split-Path -Leaf $m.New)" }
 Write-Host '   名前を変えると、友人に伝えたアドレスは使えなくなります。'
@@ -52,7 +61,6 @@ if (-not $Yes -and (Read-Value '名前を変えますか？（y/N）' 'N') -notm
     return
 }
 
-$data = Read-JsonFile $oldManifest
 foreach ($m in $moves) {
     if (Test-Path -LiteralPath $m.Old) { Move-Item -LiteralPath $m.Old -Destination $m.New }
     $oldLeaf = Split-Path -Leaf $m.Old
