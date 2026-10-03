@@ -99,7 +99,7 @@
 
 ## 追記: ソースコードで確認した起動引数（2026-09-26）
 
-このリポジトリ（TID_simutrans）のソースを読んで、上の「未決事項」にあった直接接続の起動引数を確認した。
+Simutrans本体のリポジトリ（[TID_simutrans](https://github.com/nain76/TID_simutrans)）のソースを読んで、上の「未決事項」にあった直接接続の起動引数を確認した。
 
 - **特定サーバーへの直接接続**: `simutrans -load net:<host>:<port>`
   - `simmain.cc` の `-load` 処理で、値が `net:` で始まる場合はセーブファイルではなくネットワーク接続先として扱われる。

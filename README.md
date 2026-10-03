@@ -1,7 +1,7 @@
 # Simutransインフラ整備ランチャー
 
 Simutransのマルチプレイ運用を楽にするための外部ツールです。
-Simutrans本体とは独立しており、本体のソースやビルド（Makefile、CMakeLists.txt、Visual Studioのプロジェクト）には含まれません。本体のコードも変更しません。
+Simutrans本体とは別のリポジトリで、本体のコードは変更しません。以前は本体のリポジトリ（[TID_simutrans](https://github.com/nain76/TID_simutrans)）の`tools/infra-launcher`にあり、履歴ごとここへ移しました。
 
 ![ランチャーの画面](docs/screenshot.png)
 
@@ -43,7 +43,7 @@ Simutrans本体とは独立しており、本体のソースやビルド（Makef
 ビルドには[.NET 10 SDK](https://dotnet.microsoft.com/download)が必要です。
 
 ```sh
-cd tools/infra-launcher/launcher
+cd launcher
 dotnet build
 dotnet test
 
