@@ -219,3 +219,47 @@ public static class PowerShellCommand
         return sb.Append('\'').ToString();
     }
 }
+
+/// <summary>本体の公開で、許可リストの部品のほかに配れるもの1つ（本体フォルダの直下のフォルダかファイル）。</summary>
+public sealed class EngineExtraItem(string name, bool isFolder, bool selected)
+{
+    public string Name { get; } = name;
+    public bool IsFolder { get; } = isFolder;
+    public bool Selected { get; set; } = selected;
+    public string Label => IsFolder ? $"{Name}（フォルダ）" : Name;
+}
+
+/// <summary>Edit-EngineFiles.ps1 -List の結果。</summary>
+public sealed record EngineExtras(IReadOnlyList<string> Sources, bool Required, IReadOnlyList<EngineExtraItem> Items)
+{
+    /// <summary>
+    /// 出力を読む。1行に1つ、タブ区切りで「SOURCE 場所」「REQUIRED 0か1」「ITEM folderかfile 0か1 名前」。
+    /// 知らない行は飛ばす（PowerShellがほかに何か出しても困らないように）。
+    /// </summary>
+    public static EngineExtras Parse(string output)
+    {
+        var sources = new List<string>();
+        var items = new List<EngineExtraItem>();
+        var required = true;
+        foreach (var line in output.Split('\n'))
+        {
+            var parts = line.TrimEnd('\r').Split('\t');
+            switch (parts)
+            {
+                case ["SOURCE", var source]:
+                    sources.Add(source);
+                    break;
+                case ["REQUIRED", var flag]:
+                    required = flag == "1";
+                    break;
+                case ["ITEM", var kind and ("folder" or "file"), var selected, var name] when name.Length > 0:
+                    items.Add(new EngineExtraItem(name, kind == "folder", selected == "1"));
+                    break;
+            }
+        }
+        return new EngineExtras(sources, required, items);
+    }
+
+    /// <summary>Edit-EngineFiles.ps1 の -Items に渡す形（選んだ名前を「|」でつなぐ。Windowsのファイル名に「|」は使えない）。</summary>
+    public string SelectedItemsArgument() => string.Join('|', Items.Where(i => i.Selected).Select(i => i.Name));
+}

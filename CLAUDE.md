@@ -43,6 +43,7 @@ server-setup のバッチファイルと、中で動くスクリプトの対応�
 | Manage-SigningKey.bat | Manage-SigningKey.ps1 | 確認コードの表示、バックアップ、復元、署名し直し、鍵の作り直し |
 | Rename-ServerList.bat | Rename-ServerList.ps1 | サーバーリストとpaksetの公開フォルダの名前のランダムな部分を変える |
 | （なし） | Edit-ServerList.ps1 | 表示名、お知らせ、メンテナンス中を書き換えて署名。管理ツールから呼ぶ |
+| （なし） | Edit-EngineFiles.ps1 | 本体フォルダから追加で配るもの（連動盤のデータなど）を選び、engine-files.json の部品 extra に書く。管理ツールの「追加で配るもの」から呼ぶ |
 
 共通の処理は Common.ps1 と Signing.ps1。
 
@@ -52,7 +53,7 @@ server-setup のバッチファイルと、中で動くスクリプトの対応�
 - 確認コードは公開鍵（SPKI）のSHA256の先頭10バイトを16進20文字にしたもの。ランチャーは画面に出さず、友人が手で入力する。登録時の公開鍵を settings.json に覚える。
 - 署名の鍵は `%LOCALAPPDATA%\InfraLauncherServer\signing-key.dat`（DPAPI CurrentUser）。バックアップは PBKDF2-SHA256 30万回、AES-256-CBC、HMAC-SHA256。
 - 公開の設定は `server-setup/publish-settings.json`（manifest、share_url、paksets）。サーバーリストの場所は `Resolve-ManifestPath` で決める。新しく決めたランダムな名前はすぐ設定に保存し、続けて呼ばれたスクリプトも同じ名前を使う。
-- 本体は許可リスト（`engine-files.default.json`、上書きは `engine-files.json`）の部品だけ配る。`themes/*.tab` のような「フォルダ/名前」は直下のファイルだけ。paksetのフォルダは本体と別に公開する。
+- 本体は許可リスト（`engine-files.default.json`、上書きは `engine-files.json`）の部品だけ配る。追加分は管理ツールで選ぶと部品 extra になる。絶対に配らないものの一覧は Common.ps1 の `$EngineNeverFolders` と `$EngineNeverFiles`。`themes/*.tab` のような「フォルダ/名前」は直下のファイルだけ。paksetのフォルダは本体と別に公開する。
 - ランチャーの同期は差分ダウンロード。30秒データが来なければ打ち切り、途切れたら3回まで再試行。途中のファイルは `%LOCALAPPDATA%\InfraLauncher\downloads\partial`、記録は `logs/sync.log`。
 - `config/simuconf.tab` は同期で上書きしない。プレイヤー名は起動のたびにこのファイルの先頭に印付きで書く（simutransに名前の起動オプションがなく、tabファイルは最初に出たキーを使うため）。
 

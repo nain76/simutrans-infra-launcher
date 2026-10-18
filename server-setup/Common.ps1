@@ -196,6 +196,11 @@ function Get-EngineSource([string] $paksetSource) {
     return Find-SimutransExe (Split-Path -Parent $paksetSource)
 }
 
+# 本体の公開で絶対に配らないもの（engine-files.jsonに書いても、サーバー管理ツールで選んでも変わらない）
+$EngineNeverFolders = @('save', 'screenshot', 'addons')
+$EngineNeverFiles = @('*.bat', '*.cmd', '*.ps1', '*.psm1', '*.vbs', '*.vbe', '*.js', '*.jse', '*.wsf', '*.hta', '*.lnk', '*.url', '*.reg',
+    '*.exe', '*.com', '*.scr', '*.msi', '*.sve', '*.sv_', '*.log', 'settings.xml', '*pwdhash*', 'index.json', 'web.config')
+
 # サーバーリストへの署名
 . (Join-Path $PSScriptRoot 'Signing.ps1')
 

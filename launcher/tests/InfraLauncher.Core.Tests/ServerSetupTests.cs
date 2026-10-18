@@ -107,4 +107,19 @@ public sealed class ServerSetupTests : IDisposable
         Assert.StartsWith(@"try { & 'C:\it''s\Add-Server.ps1' }", cmd);
         Assert.Contains("finally { Write-Host ''; Write-Host '終わりました'", cmd);
     }
+
+    [Fact]
+    public void ParsesEngineExtrasListing()
+    {
+        var extras = EngineExtras.Parse(
+            "SOURCE\tC:\\NANSSC3FP2\r\nREQUIRED\t0\r\nITEM\tfolder\t1\tgenerated-scripts\r\n" +
+            "ITEM\tfile\t0\tstation_data.json\r\nITEM\tfile\t1\todd[1].txt\r\nなにか別の出力\r\nITEM\tbad\t1\tx\r\n");
+        Assert.Equal(["C:\\NANSSC3FP2"], extras.Sources);
+        Assert.False(extras.Required);
+        Assert.Equal(["generated-scripts", "station_data.json", "odd[1].txt"], extras.Items.Select(i => i.Name));
+        Assert.True(extras.Items[0].IsFolder);
+        Assert.Equal("generated-scripts|odd[1].txt", extras.SelectedItemsArgument());
+        extras.Items[1].Selected = true;
+        Assert.Equal("generated-scripts|station_data.json|odd[1].txt", extras.SelectedItemsArgument());
+    }
 }

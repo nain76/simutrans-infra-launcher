@@ -68,6 +68,7 @@ public partial class MainWindow : Window
             Log($"読み込めないファイルがありました: {error}");
         }
 
+        _ = LoadExtrasAsync();
         ServerList.ItemsSource = _setup.Servers;
         ServerList.SelectedItem = _setup.Servers.FirstOrDefault(s => s.Id == selectId);
         ShowSelected();
@@ -127,6 +128,63 @@ public partial class MainWindow : Window
         Log(ok ? $"保存して署名しました。友人のランチャーには、次に一覧を更新したときに出ます。\n{output}" : $"保存できませんでした。\n{output}");
         // 保存できたら選択を外し、続けて書き換えてしまわないようにする。失敗したときは直せるように残す
         Reload(ok ? null : s.Id, keepSelection: !ok);
+    }
+
+    private EngineExtras? _extras;
+    private int _extrasLoad;
+
+    /// <summary>追加で配れるものの一覧を、Edit-EngineFiles.ps1 -List で読む。</summary>
+    private async Task LoadExtrasAsync()
+    {
+        if (_folder is null || _setup?.ManifestPath is null)
+        {
+            ExtrasSourceText.Text = "構築が終わると、ここで選べるようになります";
+            ExtrasList.ItemsSource = null;
+            SaveExtrasButton.IsEnabled = false;
+            return;
+        }
+        var load = ++_extrasLoad;
+        ExtrasSourceText.Text = "読み込んでいます…";
+        SaveExtrasButton.IsEnabled = false;
+        var (ok, output) = await Scripts.RunAsync(_folder, "Edit-EngineFiles.ps1", [new("List", null)]);
+        if (load != _extrasLoad)
+        {
+            return; // あとから読み直した結果を優先する
+        }
+        if (!ok)
+        {
+            _extras = null;
+            ExtrasList.ItemsSource = null;
+            ExtrasSourceText.Text = $"読み込めませんでした。{output}";
+            return;
+        }
+        _extras = EngineExtras.Parse(output);
+        ExtrasList.ItemsSource = _extras.Items;
+        ExtrasRequiredBox.IsChecked = _extras.Required;
+        var where = string.Join("、", _extras.Sources);
+        ExtrasSourceText.Text = _extras.Items.Count == 0
+            ? $"追加で配れるものはありません（本体フォルダ: {where}）"
+            : $"本体フォルダ: {where}";
+        SaveExtrasButton.IsEnabled = _extras.Items.Count > 0;
+    }
+
+    private async void OnReloadExtras(object? sender, RoutedEventArgs e) => await LoadExtrasAsync();
+
+    /// <summary>選んだものを Edit-EngineFiles.ps1 で engine-files.json に書く。</summary>
+    private async void OnSaveExtras(object? sender, RoutedEventArgs e)
+    {
+        if (_folder is null || _extras is null)
+        {
+            return;
+        }
+        SaveExtrasButton.IsEnabled = false;
+        var (ok, output) = await Scripts.RunAsync(_folder, "Edit-EngineFiles.ps1",
+        [
+            new("Items", _extras.SelectedItemsArgument()),
+            new("Required", ExtrasRequiredBox.IsChecked == true),
+        ]);
+        Log(ok ? output : $"保存できませんでした。\n{output}");
+        await LoadExtrasAsync();
     }
 
     /// <summary>公開アドレスから取ったサーバーリストを、友人のランチャーと同じ方法で確かめる。</summary>

@@ -36,10 +36,9 @@ Set-StrictMode -Version 2.0
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Common.ps1')
 
-# 絶対に配らないもの（engine-files.jsonに書いても変わらない）
-$NeverFolders = @('save', 'screenshot', 'addons')
-$NeverFiles = @('*.bat', '*.cmd', '*.ps1', '*.psm1', '*.vbs', '*.vbe', '*.js', '*.jse', '*.wsf', '*.hta', '*.lnk', '*.url', '*.reg',
-    '*.exe', '*.com', '*.scr', '*.msi', '*.sve', '*.sv_', '*.log', 'settings.xml', '*pwdhash*', 'index.json', 'web.config')
+# 絶対に配らないもの（engine-files.jsonに書いても変わらない。Common.ps1で決めている）
+$NeverFolders = $EngineNeverFolders
+$NeverFiles = $EngineNeverFiles
 
 # 配るもの（推奨設定。engine-files.jsonがあればそちらを使う）
 $rulesPath = Join-Path $PSScriptRoot 'engine-files.json'
@@ -184,7 +183,7 @@ if ($paksetFolders.Count -gt 0) {
     Write-Host ("   paksetとして別に配るもの（本体には含めず、友人のPCでは本体のフォルダの中に置かれる）: {0}" -f ($paksetFolders -join ', '))
 }
 if ($skippedFolders.Count + $skippedFiles.Count + $skippedInside.Count -gt 0) {
-    Write-Host "   配らないもの（設定に書いていないため。配りたいときはengine-files.jsonの部品に足す）"
+    Write-Host "   配らないもの（設定に書いていないため。配りたいときはサーバー管理ツールの「追加で配るもの」で選ぶ）"
     Write-NameList 'フォルダ' $skippedFolders
     Write-NameList 'ファイル' $skippedFiles
     foreach ($inside in $skippedInside) { Write-Host "     $inside" }

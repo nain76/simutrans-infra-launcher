@@ -127,6 +127,29 @@
           </StackPanel>
         </Border>
 
+        <!-- 追加で配るもの -->
+        <Border Classes="card">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="heading" Text="追加で配るもの（サーバーの本体フォルダから）" />
+            <TextBlock Opacity="0.75" TextWrapping="Wrap"
+                       Text="simutrans本体は、決められた部品（設定、テーマ、音楽など）だけを配ります。連動盤のデータなど、ほかにも友人に配りたいフォルダやファイルがあれば、ここで選んで保存してください。保存したあと「paksetと本体を公開」を押すと友人に届きます。バッチファイル、exe、スクリプト（.js、.ps1など）、セーブデータ、ログは、選んだフォルダの中にあっても配りません。" />
+            <TextBlock x:Name="ExtrasSourceText" Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
+            <ItemsControl x:Name="ExtrasList">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="admin:EngineExtraItem">
+                  <CheckBox Content="{Binding Label}" IsChecked="{Binding Selected}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <CheckBox x:Name="ExtrasRequiredBox" Content="必須にする（友人のランチャーで外せないようにする。外すと「推奨」になる）" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+              <Button Content="一覧を読み込み直す" Click="OnReloadExtras" />
+              <Button x:Name="SaveExtrasButton" Content="保存" Classes="accent" Click="OnSaveExtras"
+                      ToolTip.Tip="engine-files.jsonに書く（Edit-EngineFiles.ps1を使う）" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
         <!-- 作業 -->
         <Border Classes="card">
           <StackPanel Spacing="8">
