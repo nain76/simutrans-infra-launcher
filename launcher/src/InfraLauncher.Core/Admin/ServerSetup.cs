@@ -229,37 +229,48 @@ public sealed class EngineExtraItem(string name, bool isFolder, bool selected)
     public string Label => IsFolder ? $"{Name}（フォルダ）" : Name;
 }
 
-/// <summary>Edit-EngineFiles.ps1 -List の結果。</summary>
-public sealed record EngineExtras(IReadOnlyList<string> Sources, bool Required, IReadOnlyList<EngineExtraItem> Items)
+/// <summary>本体フォルダ1つ分の、追加で配るものの設定（Edit-EngineFiles.ps1 -List の結果）。</summary>
+public sealed class EngineExtraSource(string folder, string servers)
+{
+    /// <summary>本体フォルダ（本体のexeがあるフォルダ）。</summary>
+    public string Folder { get; } = folder;
+    /// <summary>この本体フォルダを使うサーバーの名前。</summary>
+    public string Servers { get; } = servers;
+    public bool Required { get; set; } = true;
+    public List<EngineExtraItem> Items { get; } = new();
+    public string Label => Servers.Length > 0 ? $"{Servers}　{Folder}" : Folder;
+
+    /// <summary>Edit-EngineFiles.ps1 の -Items に渡す形（選んだ名前を「|」でつなぐ。Windowsのファイル名に「|」は使えない）。</summary>
+    public string SelectedItemsArgument() => string.Join('|', Items.Where(i => i.Selected).Select(i => i.Name));
+}
+
+public static class EngineExtras
 {
     /// <summary>
-    /// 出力を読む。1行に1つ、タブ区切りで「SOURCE 場所」「REQUIRED 0か1」「ITEM folderかfile 0か1 名前」。
+    /// Edit-EngineFiles.ps1 -List の出力を読む。1行に1つ、タブ区切りで
+    /// 「SOURCE 本体フォルダ サーバー名」「REQUIRED 本体フォルダ 0か1」「ITEM 本体フォルダ folderかfile 0か1 名前」。
     /// 知らない行は飛ばす（PowerShellがほかに何か出しても困らないように）。
     /// </summary>
-    public static EngineExtras Parse(string output)
+    public static IReadOnlyList<EngineExtraSource> Parse(string output)
     {
-        var sources = new List<string>();
-        var items = new List<EngineExtraItem>();
-        var required = true;
+        var sources = new List<EngineExtraSource>();
+        EngineExtraSource? Find(string folder) => sources.FirstOrDefault(s => s.Folder == folder);
         foreach (var line in output.Split('\n'))
         {
             var parts = line.TrimEnd('\r').Split('\t');
             switch (parts)
             {
-                case ["SOURCE", var source]:
-                    sources.Add(source);
+                case ["SOURCE", var folder, var servers] when Find(folder) is null:
+                    sources.Add(new EngineExtraSource(folder, servers));
                     break;
-                case ["REQUIRED", var flag]:
-                    required = flag == "1";
+                case ["REQUIRED", var folder, var flag] when Find(folder) is { } source:
+                    source.Required = flag == "1";
                     break;
-                case ["ITEM", var kind and ("folder" or "file"), var selected, var name] when name.Length > 0:
-                    items.Add(new EngineExtraItem(name, kind == "folder", selected == "1"));
+                case ["ITEM", var folder, var kind and ("folder" or "file"), var selected, var name] when name.Length > 0 && Find(folder) is { } source:
+                    source.Items.Add(new EngineExtraItem(name, kind == "folder", selected == "1"));
                     break;
             }
         }
-        return new EngineExtras(sources, required, items);
+        return sources;
     }
-
-    /// <summary>Edit-EngineFiles.ps1 の -Items に渡す形（選んだ名前を「|」でつなぐ。Windowsのファイル名に「|」は使えない）。</summary>
-    public string SelectedItemsArgument() => string.Join('|', Items.Where(i => i.Selected).Select(i => i.Name));
 }

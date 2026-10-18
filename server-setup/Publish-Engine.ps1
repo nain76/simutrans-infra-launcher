@@ -40,6 +40,8 @@ $ErrorActionPreference = 'Stop'
 $NeverFolders = $EngineNeverFolders
 $NeverFiles = $EngineNeverFiles
 
+Move-LegacyEngineExtra
+
 # 配るもの（推奨設定。engine-files.jsonがあればそちらを使う）
 $rulesPath = Join-Path $PSScriptRoot 'engine-files.json'
 $rulesName = 'engine-files.json（カスタム）'
@@ -52,6 +54,8 @@ $rules = Read-JsonFile $rulesPath
 $components = @()
 if ($rules.PSObject.Properties['components']) {
     foreach ($c in $rules.components) {
+        # 追加で配るもの（extra）は本体フォルダごとに engine-extras.json に書く。下で、この本体フォルダの分だけを足す
+        if ($c.id -eq $EngineExtraId) { continue }
         # "themes/*.tab" のように書いたフォルダは、直下にある、名前が合うファイルだけを配る（中のフォルダは配らない）
         $entries = if ($c.PSObject.Properties['folders']) { @($c.folders | ForEach-Object { $_.ToLowerInvariant() }) } else { @() }
         $folders = @($entries | Where-Object { $_ -notmatch '/' })
@@ -106,6 +110,20 @@ else {
 $manifestDir = Split-Path -Parent $manifestPath
 if (-not $dst.StartsWith($manifestDir + [System.IO.Path]::DirectorySeparatorChar, [System.StringComparison]::OrdinalIgnoreCase)) {
     throw "-Destinationはサーバーリストと同じフォルダの下にしてください: $dst"
+}
+
+# この本体フォルダで追加で配るもの（サーバー管理ツールの「追加で配るもの」で選んだもの）
+$extra = Find-EngineExtra (Get-EngineExtras) $src
+if ($extra) {
+    $components += [pscustomobject]@{
+        Id          = $EngineExtraId
+        Name        = $EngineExtraName
+        Required    = [bool]$extra.required
+        Recommended = -not [bool]$extra.required
+        Folders     = @($extra.folders | ForEach-Object { $_.ToLowerInvariant() })
+        FlatFolders = @{}
+        Files       = @($extra.files)
+    }
 }
 
 # --- 1. 配るファイルを部品ごとに集める---

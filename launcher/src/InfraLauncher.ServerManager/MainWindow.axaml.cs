@@ -130,19 +130,20 @@ public partial class MainWindow : Window
         Reload(ok ? null : s.Id, keepSelection: !ok);
     }
 
-    private EngineExtras? _extras;
+    private IReadOnlyList<EngineExtraSource> _extraSources = [];
     private int _extrasLoad;
 
-    /// <summary>追加で配れるものの一覧を、Edit-EngineFiles.ps1 -List で読む。</summary>
+    private EngineExtraSource? SelectedExtraSource => ExtrasSourceBox.SelectedItem as EngineExtraSource;
+
+    /// <summary>追加で配れるものの一覧を、Edit-EngineFiles.ps1 -List で本体フォルダごとに読む。</summary>
     private async Task LoadExtrasAsync()
     {
         if (_folder is null || _setup?.ManifestPath is null)
         {
-            ExtrasSourceText.Text = "構築が終わると、ここで選べるようになります";
-            ExtrasList.ItemsSource = null;
-            SaveExtrasButton.IsEnabled = false;
+            ShowExtrasMessage("構築が終わると、ここで選べるようになります");
             return;
         }
+        var keep = SelectedExtraSource?.Folder;
         var load = ++_extrasLoad;
         ExtrasSourceText.Text = "読み込んでいます…";
         SaveExtrasButton.IsEnabled = false;
@@ -153,34 +154,53 @@ public partial class MainWindow : Window
         }
         if (!ok)
         {
-            _extras = null;
-            ExtrasList.ItemsSource = null;
-            ExtrasSourceText.Text = $"読み込めませんでした。{output}";
+            ShowExtrasMessage($"読み込めませんでした。{output}");
             return;
         }
-        _extras = EngineExtras.Parse(output);
-        ExtrasList.ItemsSource = _extras.Items;
-        ExtrasRequiredBox.IsChecked = _extras.Required;
-        var where = string.Join("、", _extras.Sources);
-        ExtrasSourceText.Text = _extras.Items.Count == 0
-            ? $"追加で配れるものはありません（本体フォルダ: {where}）"
-            : $"本体フォルダ: {where}";
-        SaveExtrasButton.IsEnabled = _extras.Items.Count > 0;
+        _extraSources = EngineExtras.Parse(output);
+        ExtrasSourceBox.ItemsSource = _extraSources;
+        // 前に選んでいたサーバーを選び直す（初めてなら最初のサーバー）
+        ExtrasSourceBox.SelectedItem = _extraSources.FirstOrDefault(s => s.Folder == keep) ?? _extraSources.FirstOrDefault();
+        ShowExtraSource();
     }
+
+    private void ShowExtrasMessage(string message)
+    {
+        _extraSources = [];
+        ExtrasSourceBox.ItemsSource = null;
+        ExtrasList.ItemsSource = null;
+        ExtrasSourceText.Text = message;
+        SaveExtrasButton.IsEnabled = false;
+    }
+
+    /// <summary>選んだサーバー（本体フォルダ）の、選べるものと今の設定を出す。</summary>
+    private void ShowExtraSource()
+    {
+        var source = SelectedExtraSource;
+        ExtrasList.ItemsSource = source?.Items;
+        ExtrasRequiredBox.IsChecked = source?.Required ?? true;
+        ExtrasSourceText.Text = source is null ? "本体を公開しているサーバーがありません"
+            : source.Items.Count == 0 ? $"このサーバーの本体フォルダ（{source.Folder}）には、追加で配れるものがありません"
+            : $"このサーバーの本体フォルダ: {source.Folder}";
+        SaveExtrasButton.IsEnabled = source is { Items.Count: > 0 };
+    }
+
+    private void OnExtrasSourceChanged(object? sender, SelectionChangedEventArgs e) => ShowExtraSource();
 
     private async void OnReloadExtras(object? sender, RoutedEventArgs e) => await LoadExtrasAsync();
 
-    /// <summary>選んだものを Edit-EngineFiles.ps1 で engine-files.json に書く。</summary>
+    /// <summary>選んだサーバーの本体フォルダについて、選んだものを Edit-EngineFiles.ps1 で engine-extras.json に書く。</summary>
     private async void OnSaveExtras(object? sender, RoutedEventArgs e)
     {
-        if (_folder is null || _extras is null)
+        if (_folder is null || SelectedExtraSource is not { } source)
         {
             return;
         }
         SaveExtrasButton.IsEnabled = false;
         var (ok, output) = await Scripts.RunAsync(_folder, "Edit-EngineFiles.ps1",
         [
-            new("Items", _extras.SelectedItemsArgument()),
+            new("Source", source.Folder),
+            new("Items", source.SelectedItemsArgument()),
             new("Required", ExtrasRequiredBox.IsChecked == true),
         ]);
         Log(ok ? output : $"保存できませんでした。\n{output}");

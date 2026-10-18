@@ -132,7 +132,17 @@
           <StackPanel Spacing="6">
             <TextBlock Classes="heading" Text="追加で配るもの（サーバーの本体フォルダから）" />
             <TextBlock Opacity="0.75" TextWrapping="Wrap"
-                       Text="simutrans本体は、決められた部品（設定、テーマ、音楽など）だけを配ります。連動盤のデータなど、ほかにも友人に配りたいフォルダやファイルがあれば、ここで選んで保存してください。保存したあと「paksetと本体を公開」を押すと友人に届きます。バッチファイル、exe、スクリプト（.js、.ps1など）、セーブデータ、ログは、選んだフォルダの中にあっても配りません。" />
+                       Text="simutrans本体は、決められた部品（設定、テーマ、音楽など）だけを配ります。連動盤のデータなど、ほかにも友人に配りたいフォルダやファイルがあれば、サーバーを選んでから、ここで選んで保存してください。設定はサーバーの本体フォルダごとに分かれていて、選んだサーバーの友人にだけ届きます。保存したあと「paksetと本体を公開」を押すと友人に届きます。バッチファイル、exe、スクリプト（.js、.ps1など）、セーブデータ、ログは、選んだフォルダの中にあっても配りません。" />
+            <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">
+              <TextBlock Classes="label" Text="どのサーバーの設定か" />
+              <ComboBox Grid.Column="1" x:Name="ExtrasSourceBox" HorizontalAlignment="Stretch" SelectionChanged="OnExtrasSourceChanged">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="admin:EngineExtraSource">
+                    <TextBlock Text="{Binding Label}" TextTrimming="CharacterEllipsis" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+            </Grid>
             <TextBlock x:Name="ExtrasSourceText" Opacity="0.6" FontSize="12" TextWrapping="Wrap" />
             <ItemsControl x:Name="ExtrasList">
               <ItemsControl.ItemTemplate>

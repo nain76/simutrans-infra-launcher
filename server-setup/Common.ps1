@@ -201,6 +201,85 @@ $EngineNeverFolders = @('save', 'screenshot', 'addons')
 $EngineNeverFiles = @('*.bat', '*.cmd', '*.ps1', '*.psm1', '*.vbs', '*.vbe', '*.js', '*.jse', '*.wsf', '*.hta', '*.lnk', '*.url', '*.reg',
     '*.exe', '*.com', '*.scr', '*.msi', '*.sve', '*.sv_', '*.log', 'settings.xml', '*pwdhash*', 'index.json', 'web.config')
 
+<#
+  本体フォルダごとに追加で配るもの（連動盤のデータなど）。サーバー管理ツールの「追加で配るもの」で選ぶ。
+  engine-extras.json に、本体フォルダ（本体のexeがあるフォルダ）ごとに書く:
+    { "sources": [ { "folder": "C:\\NANSSC3FP2", "required": true, "folders": ["interlockingpanel"], "files": ["station_data.json"] } ] }
+  files は -like で比べるので、[ ] などは WildcardPattern::Escape したものを書く。
+  公開のとき、その本体フォルダの分だけを「サーバーが追加したもの」（id: extra）という部品として足す。
+#>
+$EngineExtrasPath = Join-Path $PSScriptRoot 'engine-extras.json'
+$EngineExtraId = 'extra'
+$EngineExtraName = 'サーバーが追加したもの'
+
+function Get-EngineExtras {
+    $sources = @()
+    if (Test-Path -LiteralPath $EngineExtrasPath) {
+        $saved = Read-JsonFile $EngineExtrasPath
+        if ($saved -and $saved.PSObject.Properties['sources']) {
+            foreach ($s in @($saved.sources)) {
+                $sources += [pscustomobject]@{
+                    folder   = (Get-FullPath $s.folder)
+                    required = [bool]($s.PSObject.Properties['required'] -and $s.required)
+                    folders  = @(if ($s.PSObject.Properties['folders']) { $s.folders })
+                    files    = @(if ($s.PSObject.Properties['files']) { $s.files })
+                }
+            }
+        }
+    }
+    return , $sources
+}
+
+function Save-EngineExtras($sources) {
+    $list = @($sources | Where-Object { @($_.folders).Count + @($_.files).Count -gt 0 } | ForEach-Object {
+        [ordered]@{ folder = $_.folder; required = [bool]$_.required; folders = @($_.folders); files = @($_.files) }
+    })
+    Write-JsonFile $EngineExtrasPath ([ordered]@{ sources = $list })
+}
+
+function Find-EngineExtra($sources, [string] $folder) {
+    $full = (Get-FullPath $folder).TrimEnd('\', '/')
+    return @($sources | Where-Object { $_.folder.TrimEnd('\', '/') -ieq $full })[0]
+}
+
+# 公開の設定に登録してある本体フォルダ（本体のexeがあるフォルダ）
+function Get-EngineSourceFolders($settings) {
+    return , @($settings.paksets | ForEach-Object { $_.engine_source } |
+        Where-Object { $_ -and $_ -ne 'none' -and (Test-Path -LiteralPath $_ -PathType Leaf) } |
+        ForEach-Object { Split-Path -Parent (Get-FullPath $_) } | Sort-Object -Unique)
+}
+
+# 以前の版は追加分を engine-files.json の部品 extra に書き、すべての本体フォルダに効いていた。
+# 本体フォルダごとの engine-extras.json に移す（そのフォルダに実際にあるものだけ）
+function Move-LegacyEngineExtra {
+    $customPath = Join-Path $PSScriptRoot 'engine-files.json'
+    if (-not (Test-Path -LiteralPath $customPath)) { return }
+    $rules = Read-JsonFile $customPath
+    if (-not $rules.PSObject.Properties['components']) { return }
+    $legacy = @($rules.components | Where-Object { $_.id -eq $EngineExtraId })[0]
+    if (-not $legacy) { return }
+    $sources = Get-EngineExtras
+    $required = [bool]($legacy.PSObject.Properties['required'] -and $legacy.required)
+    $legacyFolders = @(if ($legacy.PSObject.Properties['folders']) { $legacy.folders })
+    $legacyFiles = @(if ($legacy.PSObject.Properties['files']) { $legacy.files })
+    foreach ($folder in (Get-EngineSourceFolders (Get-PublishSettings))) {
+        if (Find-EngineExtra $sources $folder) { continue }
+        $folders = @($legacyFolders | Where-Object { Test-Path -LiteralPath (Join-Path $folder $_) -PathType Container })
+        $files = @($legacyFiles | Where-Object {
+            $pattern = $_
+            @(Get-ChildItem -LiteralPath $folder -File -Force | Where-Object { $_.Name -like $pattern }).Count -gt 0 })
+        if ($folders.Count + $files.Count -gt 0) {
+            $sources += [pscustomobject]@{ folder = $folder; required = $required; folders = $folders; files = $files }
+        }
+    }
+    Save-EngineExtras $sources
+    $output = [ordered]@{}
+    if ($rules.PSObject.Properties['_comment']) { $output._comment = $rules._comment }
+    $output.components = @($rules.components | Where-Object { $_.id -ne $EngineExtraId })
+    Write-JsonFile $customPath $output
+    Write-Host '   追加で配るものの設定を、本体フォルダごとの engine-extras.json に移しました'
+}
+
 # サーバーリストへの署名
 . (Join-Path $PSScriptRoot 'Signing.ps1')
 
