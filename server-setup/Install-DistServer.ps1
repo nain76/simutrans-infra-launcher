@@ -170,7 +170,7 @@ else {
     }
     Save-PublishSettings $settings
     if (@($settings.paksets).Count -gt 0) {
-        & (Join-Path $PSScriptRoot 'Publish-Pakset.ps1')
+        & (Join-Path $PSScriptRoot 'Publish-Pakset.ps1') -Target All
     }
     else {
         Write-Warning 'paksetは公開していません。もう一度Setup-Server.batを実行して、paksetフォルダのフルパスを答えてください'

@@ -13,9 +13,12 @@
     アドオンを足すときは、-Sourceのpaksetフォルダにpakをコピーしてからこのスクリプトを実行する。
     ランチャーは次に接続するとき、足したファイルだけを落とす。
 
-    -Sourceと-Destinationを省略すると、publish-settings.jsonに登録されたすべてのpaksetを公開する
+    -Sourceと-Destinationを省略すると、publish-settings.jsonに登録されたpaksetを公開する
     （Setup-Server.bat / Add-Server.batが登録する。Publish-Pakset.batをダブルクリックすると、この形で実行される）。
     このとき、paksetフォルダの1つ上にあるsimutrans本体もPublish-Engine.ps1で公開する。
+    -ServerIdで公開し直すサーバーを、-Targetで公開し直すもの（All: 両方、Pakset: paksetだけ、Engine: 本体だけ）を選べる。
+    どちらも指定せずに画面から実行したときは、サーバーが複数あれば番号で聞く。
+    同じpaksetや本体を使うサーバーが複数あるときは、それらのサーバーもまとめて書き換わる（配るファイルが同じため）。
 
     Windows PowerShell 5.1とPowerShell 7のどちらでも動く。
 
@@ -32,8 +35,11 @@ param(
     [string] $Destination,
     # 書き換えるサーバーリスト（manifest.json）。省略するとファイル一覧だけ作る
     [string] $Manifest,
-    # サーバーリストの中で書き換えるサーバーのid（同じpaksetを使うサーバーが複数あれば、カンマ区切りで並べる）
+    # サーバーリストの中で書き換えるサーバーのid（同じpaksetを使うサーバーが複数あれば、カンマ区切りで並べる）。
+    # -Sourceを省略したときは、公開し直すサーバーの絞り込みに使う
     [string[]] $ServerId,
+    # -Sourceを省略したときに公開し直すもの。All: paksetと本体、Pakset: paksetだけ、Engine: 本体だけ
+    [ValidateSet('All', 'Pakset', 'Engine')] [string] $Target,
     # サーバーリストに書くpaksetのバージョン。省略すると日時
     [string] $Version,
     # サーバーリストに書くindex.jsonのアドレス。
@@ -75,17 +81,57 @@ if (-not $Source -and -not $Destination) {
     if (@($settings.paksets).Count -eq 0) {
         throw "公開するpaksetが登録されていません。Setup-Server.batかAdd-Server.batで登録するか、-Sourceと-Destinationを指定してください"
     }
-    foreach ($p in $settings.paksets) {
-        Write-Step "$($p.pakset_source)を公開します（サーバー: $($p.server_ids -join ', ')）"
-        & $PSCommandPath -Source $p.pakset_source -Destination $p.destination -Manifest $settings.manifest -ServerId $p.server_ids -Version $Version
+    $servers = @((Read-JsonFile $settings.manifest).servers)
+    $serverName = @{}
+    foreach ($s in $servers) { $serverName[$s.id] = $s.name }
+    function Format-Servers([string[]] $ids) { return (@($ids | ForEach-Object { if ($serverName.ContainsKey($_)) { "$($serverName[$_])（$_）" } else { $_ } }) -join '、') }
+
+    # 画面から引数なしで実行したときは、公開し直すサーバーと、何を公開し直すかを聞く
+    $registered = @($settings.paksets | ForEach-Object { $_.server_ids } | Sort-Object -Unique)
+    $ask = -not $PSBoundParameters.ContainsKey('ServerId') -and -not $PSBoundParameters.ContainsKey('Target') -and [Environment]::UserInteractive
+    if ($ask -and $registered.Count -gt 1) {
+        Write-Step '公開し直すサーバーを選んでください'
+        for ($i = 0; $i -lt $registered.Count; $i++) { Write-Host ("     {0}. {1}" -f ($i + 1), (Format-Servers $registered[$i])) }
+        while ($true) {
+            $answer = (Read-Host '番号（複数ならカンマ区切り、空欄ならすべて）').Trim()
+            if (-not $answer) { break }
+            $picked = @($answer -split '[,、\s]+' | Where-Object { $_ } | ForEach-Object { $n = 0; if ([int]::TryParse($_, [ref]$n) -and $n -ge 1 -and $n -le $registered.Count) { $registered[$n - 1] } else { $null } })
+            if ($picked.Count -gt 0 -and -not ($picked -contains $null)) { $ServerId = @($picked | Sort-Object -Unique); break }
+            Write-Warning "1〜$($registered.Count)の番号で答えてください"
+        }
     }
+    if ($ask) {
+        Write-Step '何を公開し直しますか'
+        Write-Host '     1. paksetと本体の両方'
+        Write-Host '     2. paksetだけ（アドオンを足した・外したとき）'
+        Write-Host '     3. 本体だけ（本体を入れ替えたとき、追加で配るものを変えたとき）'
+        $Target = switch (Read-Value '番号' '1') { '2' { 'Pakset' } '3' { 'Engine' } default { 'All' } }
+    }
+    if (-not $Target) { $Target = 'All' }
+    if ($ServerId) {
+        $unknown = @($ServerId | Where-Object { $registered -notcontains $_ })
+        if ($unknown.Count -gt 0) { throw "公開の設定に登録していないサーバーです: $($unknown -join ', ')" }
+    }
+    # 選んだサーバーを含む登録だけを公開し直す
+    $selected = @($settings.paksets | Where-Object { -not $ServerId -or @($_.server_ids | Where-Object { $ServerId -contains $_ }).Count -gt 0 })
+    $what = switch ($Target) { 'Pakset' { 'paksetだけ' } 'Engine' { '本体だけ' } default { 'paksetと本体' } }
+    $whom = if ($ServerId) { Format-Servers $ServerId } else { 'すべてのサーバー' }
+    Write-Ok "公開し直すもの: $what（$whom）"
+
+    if ($Target -ne 'Engine') {
+        foreach ($p in $selected) {
+            Write-Step "$($p.pakset_source)を公開します（サーバー: $(Format-Servers $p.server_ids)）"
+            & $PSCommandPath -Source $p.pakset_source -Destination $p.destination -Manifest $settings.manifest -ServerId $p.server_ids -Version $Version
+        }
+    }
+    if ($Target -eq 'Pakset') { return }
 
     # simutrans本体も公開する（同じ本体を使うサーバーをまとめる）。
     # 動いているサーバーのexeが分かればそれを使う（本体を入れ替えたときに追従する）。
     # 決まっていなければ探し、見つからなければ選んでもらう（空欄と答えたら 'none' を残し、次からは聞かない）
     $servers = @((Read-JsonFile $settings.manifest).servers)
     $changed = $false
-    foreach ($p in $settings.paksets) {
+    foreach ($p in $selected) {
         if ($p.engine_source -and $p.engine_source -ne 'none' -and (Test-Path -LiteralPath $p.engine_source -PathType Container)) {
             # 以前の版はフォルダを入れていた
             $p.engine_source = Find-SimutransExe $p.engine_source
@@ -107,9 +153,11 @@ if (-not $Source -and -not $Destination) {
     }
     if ($changed) { Save-PublishSettings $settings }
     $engineDest = Join-Path (Split-Path -Parent $settings.manifest) 'engine'
-    foreach ($group in @($settings.paksets | Where-Object { $_.engine_source -and $_.engine_source -ne 'none' } | Group-Object { $_.engine_source })) {
+    $engines = @($selected | Where-Object { $_.engine_source -and $_.engine_source -ne 'none' } | ForEach-Object { $_.engine_source } | Sort-Object -Unique)
+    foreach ($group in @($settings.paksets | Where-Object { $engines -contains $_.engine_source } | Group-Object { $_.engine_source })) {
+        # 同じ本体を使うサーバーは、選んでいなくてもまとめて書き換える（配るファイルが同じため）
         $ids = @($group.Group | ForEach-Object { $_.server_ids })
-        Write-Step "simutrans本体 $($group.Name)を公開します（サーバー: $($ids -join ', ')）"
+        Write-Step "simutrans本体 $($group.Name)を公開します（サーバー: $(Format-Servers $ids)）"
         & (Join-Path $PSScriptRoot 'Publish-Engine.ps1') -Source $group.Name -Destination $engineDest -Manifest $settings.manifest -ServerId $ids
     }
     return
@@ -203,7 +251,7 @@ Get-ChildItem -LiteralPath $dst -Recurse -Directory -Force |
 $webConfig = Join-Path $dst 'web.config'
 if (-not (Test-Path -LiteralPath $webConfig) -or (Get-Content -LiteralPath $webConfig -Raw).Contains($WebConfigMarker)) {
     Write-DistWebConfig $webConfig @($files | ForEach-Object { [System.IO.Path]::GetExtension($_.Rel).ToLowerInvariant() }) `
-        "$WebConfigMarker. paksetのファイルをIISから配信できるようにする。"
+        "$WebConfigMarker. paksetのファイルをIISから配信できるようにする。" (Get-FolderSegments @($files | ForEach-Object { $_.Rel }))
 }
 
 # --- 6. サーバーリストを書き換える---

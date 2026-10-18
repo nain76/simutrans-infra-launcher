@@ -109,6 +109,14 @@ public sealed class ServerSetupTests : IDisposable
     }
 
     [Fact]
+    public void InteractiveCommandPassesArguments()
+    {
+        var cmd = PowerShellCommand.BuildInteractive(@"C:\s\Publish-Pakset.ps1", "終わりました",
+            [new("ServerId", new[] { "test", "it's" }), new("Target", "Engine")]);
+        Assert.StartsWith(@"try { & 'C:\s\Publish-Pakset.ps1' -ServerId 'test','it''s' -Target 'Engine' }", cmd);
+    }
+
+    [Fact]
     public void ParsesEngineExtrasListingPerSource()
     {
         var sources = EngineExtras.Parse(

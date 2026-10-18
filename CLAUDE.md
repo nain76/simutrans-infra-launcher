@@ -38,7 +38,7 @@ server-setup のバッチファイルと、中で動くスクリプトの対応�
 |---|---|---|
 | Setup-Server.bat | Install-DistServer.ps1 | 初回構築と設定の点検。サーバーリストがなければ Add-Server.ps1 を呼ぶ |
 | Add-Server.bat | Add-Server.ps1 | サーバーを足す。paksetと本体の公開、署名まで行う |
-| Publish-Pakset.bat | Publish-Pakset.ps1 | 登録済みのpaksetと本体（Publish-Engine.ps1）を公開し直して署名 |
+| Publish-Pakset.bat | Publish-Pakset.ps1 | 登録済みのpaksetと本体（Publish-Engine.ps1）を公開し直して署名。-ServerId で絞り込み、-Target All/Pakset/Engine。引数なしで画面から動かすとサーバーと対象を番号で聞く（Install-DistServer は -Target All で呼ぶ） |
 | Enable-Https.bat | Enable-Https.ps1 | win-acmeでLet's Encryptの証明書を取り、8443でHTTPS |
 | Manage-SigningKey.bat | Manage-SigningKey.ps1 | 確認コードの表示、バックアップ、復元、署名し直し、鍵の作り直し |
 | Rename-ServerList.bat | Rename-ServerList.ps1 | サーバーリストとpaksetの公開フォルダの名前のランダムな部分を変える |

@@ -69,6 +69,12 @@ public partial class MainWindow : Window
         }
 
         _ = LoadExtrasAsync();
+        // 公開し直すサーバーの選択は、読み込み直しても残す（初めてはすべて選ぶ）
+        var picked = _publishServers.Where(p => p.Selected).Select(p => p.Id).ToHashSet();
+        _publishServers = _setup.Servers.Select(s => new PublishServer(s.Id, $"{s.Name}（{s.Id}）",
+            _publishServers.Count == 0 || picked.Contains(s.Id))).ToList();
+        PublishServerList.ItemsSource = _publishServers;
+        PublishButton.IsEnabled = _publishServers.Count > 0;
         ServerList.ItemsSource = _setup.Servers;
         ServerList.SelectedItem = _setup.Servers.FirstOrDefault(s => s.Id == selectId);
         ShowSelected();
@@ -130,6 +136,7 @@ public partial class MainWindow : Window
         Reload(ok ? null : s.Id, keepSelection: !ok);
     }
 
+    private List<PublishServer> _publishServers = [];
     private IReadOnlyList<EngineExtraSource> _extraSources = [];
     private int _extrasLoad;
 
@@ -230,7 +237,18 @@ public partial class MainWindow : Window
     }
 
     // バッチファイルと、それが動かすスクリプト。ツールからはスクリプトを直接開き、画面が閉じたら読み込み直す
-    private void OnPublish(object? sender, RoutedEventArgs e) => OpenBatch("Publish-Pakset.bat", "Publish-Pakset.ps1");
+    /// <summary>選んだサーバーと、公開し直すもの（両方・paksetだけ・本体だけ）で Publish-Pakset.ps1 を開く。</summary>
+    private void OnPublish(object? sender, RoutedEventArgs e)
+    {
+        var ids = _publishServers.Where(s => s.Selected).Select(s => s.Id).ToArray();
+        if (ids.Length == 0)
+        {
+            Log("公開し直すサーバーを選んでください");
+            return;
+        }
+        var target = PublishPaksetRadio.IsChecked == true ? "Pakset" : PublishEngineRadio.IsChecked == true ? "Engine" : "All";
+        OpenBatch("Publish-Pakset.bat", "Publish-Pakset.ps1", [new("ServerId", ids), new("Target", target)]);
+    }
     private void OnAddServer(object? sender, RoutedEventArgs e) => OpenBatch("Add-Server.bat", "Add-Server.ps1");
     private void OnManageKey(object? sender, RoutedEventArgs e) => OpenBatch("Manage-SigningKey.bat", "Manage-SigningKey.ps1");
     private void OnRename(object? sender, RoutedEventArgs e) => OpenBatch("Rename-ServerList.bat", "Rename-ServerList.ps1");
@@ -245,7 +263,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OpenBatch(string batch, string script)
+    private void OpenBatch(string batch, string script, IEnumerable<KeyValuePair<string, object?>>? arguments = null)
     {
         if (_folder is null)
         {
@@ -256,7 +274,7 @@ public partial class MainWindow : Window
         {
             Reload();
             Log($"{batch}（{script}）の画面が閉じられたので、読み込み直しました");
-        }));
+        }), arguments);
         Log(error ?? $"{batch}（{script}）をPowerShellの画面で開きました。質問に答えて、終わったらその画面を閉じてください。閉じると表示が新しくなります");
     }
 
@@ -332,4 +350,12 @@ public partial class MainWindow : Window
         {
         }
     }
+}
+
+/// <summary>「公開し直す」で選ぶサーバー1台分。</summary>
+public sealed class PublishServer(string id, string label, bool selected)
+{
+    public string Id { get; } = id;
+    public string Label { get; } = label;
+    public bool Selected { get; set; } = selected;
 }

@@ -171,7 +171,15 @@ public static class PowerShellCommand
         // エラーは「エラー: 理由」の1行にして、終了コード 1 で終わる（呼んだ側が成功か失敗かを見分けられるように）
         sb.Append("[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; $ErrorActionPreference = 'Stop'; try { & ");
         sb.Append(Quote(scriptPath));
-        foreach (var (name, value) in arguments)
+        AppendArguments(sb, arguments);
+        sb.Append(" } catch { Write-Output ('エラー: ' + $_.Exception.Message); exit 1 }");
+        return sb.ToString();
+    }
+
+    /// <summary>引数を「 -名前 値」の形で足す。値は文字列、文字列の並び（'a','b'）、真偽値、スイッチ（null）。</summary>
+    private static void AppendArguments(StringBuilder sb, IEnumerable<KeyValuePair<string, object?>>? arguments)
+    {
+        foreach (var (name, value) in arguments ?? [])
         {
             sb.Append(" -").Append(name);
             switch (value)
@@ -181,23 +189,26 @@ public static class PowerShellCommand
                 case bool b:
                     sb.Append(':').Append(b ? "$true" : "$false");
                     break;
+                case IEnumerable<string> list:
+                    sb.Append(' ').Append(string.Join(',', list.Select(Quote)));
+                    break;
                 default:
                     sb.Append(' ').Append(Quote(value.ToString() ?? ""));
                     break;
             }
         }
-        sb.Append(" } catch { Write-Output ('エラー: ' + $_.Exception.Message); exit 1 }");
-        return sb.ToString();
     }
 
     /// <summary>
     /// 質問をするスクリプトを、別の画面で対話しながら動かすためのコマンド。
     /// 終わったら（エラーで止まっても）最後に <paramref name="finishMessage"/> を出す。
     /// </summary>
-    public static string BuildInteractive(string scriptPath, string finishMessage)
+    public static string BuildInteractive(string scriptPath, string finishMessage, IEnumerable<KeyValuePair<string, object?>>? arguments = null)
     {
-        return "try { & " + Quote(scriptPath) + " } catch { Write-Host ($_ | Out-String) -ForegroundColor Red } "
-            + "finally { Write-Host ''; Write-Host " + Quote(finishMessage) + " -ForegroundColor Cyan }";
+        var sb = new StringBuilder("try { & ").Append(Quote(scriptPath));
+        AppendArguments(sb, arguments);
+        return sb.Append(" } catch { Write-Host ($_ | Out-String) -ForegroundColor Red } ")
+            .Append("finally { Write-Host ''; Write-Host ").Append(Quote(finishMessage)).Append(" -ForegroundColor Cyan }").ToString();
     }
 
     /// <summary>-EncodedCommand に渡す形（UTF-16LE を base64 にしたもの）。</summary>

@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:admin="using:InfraLauncher.Core.Admin"
+        xmlns:local="using:InfraLauncher.ServerManager"
         x:Class="InfraLauncher.ServerManager.MainWindow"
         Title="Simutransサーバー管理"
         Width="980" Height="860" MinWidth="760" MinHeight="560">
@@ -132,7 +133,7 @@
           <StackPanel Spacing="6">
             <TextBlock Classes="heading" Text="追加で配るもの（サーバーの本体フォルダから）" />
             <TextBlock Opacity="0.75" TextWrapping="Wrap"
-                       Text="simutrans本体は、決められた部品（設定、テーマ、音楽など）だけを配ります。連動盤のデータなど、ほかにも友人に配りたいフォルダやファイルがあれば、サーバーを選んでから、ここで選んで保存してください。設定はサーバーの本体フォルダごとに分かれていて、選んだサーバーの友人にだけ届きます。保存したあと「paksetと本体を公開」を押すと友人に届きます。バッチファイル、exe、スクリプト（.js、.ps1など）、セーブデータ、ログは、選んだフォルダの中にあっても配りません。" />
+                       Text="simutrans本体は、決められた部品（設定、テーマ、音楽など）だけを配ります。連動盤のデータなど、ほかにも友人に配りたいフォルダやファイルがあれば、サーバーを選んでから、ここで選んで保存してください。設定はサーバーの本体フォルダごとに分かれていて、選んだサーバーの友人にだけ届きます。保存したあと、下の「公開し直す」で、このサーバーの本体を公開し直すと友人に届きます。バッチファイル、exe、スクリプト（.js、.ps1など）、セーブデータ、ログは、選んだフォルダの中にあっても配りません。" />
             <Grid ColumnDefinitions="Auto,*" Margin="0,4,0,0">
               <TextBlock Classes="label" Text="どのサーバーの設定か" />
               <ComboBox Grid.Column="1" x:Name="ExtrasSourceBox" HorizontalAlignment="Stretch" SelectionChanged="OnExtrasSourceChanged">
@@ -160,45 +161,66 @@
           </StackPanel>
         </Border>
 
+        <!-- 公開し直す -->
+        <Border Classes="card">
+          <StackPanel Spacing="6">
+            <TextBlock Classes="heading" Text="公開し直す" />
+            <TextBlock Opacity="0.75" TextWrapping="Wrap"
+                       Text="アドオンを足した・外したとき、本体を入れ替えたとき、追加で配るものを変えたときに使います。先にsimutransサーバーを再起動してください。変わったファイルを公開フォルダにコピーし、サーバーリストに署名し直します。同じpaksetや本体を使うサーバーは、選んでいなくてもまとめて書き換わります。" />
+            <TextBlock Text="公開し直すサーバー" FontWeight="SemiBold" Margin="0,4,0,0" />
+            <ItemsControl x:Name="PublishServerList">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="local:PublishServer">
+                  <CheckBox Content="{Binding Label}" IsChecked="{Binding Selected}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <TextBlock Text="公開し直すもの" FontWeight="SemiBold" Margin="0,4,0,0" />
+            <RadioButton x:Name="PublishAllRadio" GroupName="PublishTarget" IsChecked="True" Content="paksetと本体の両方" />
+            <RadioButton x:Name="PublishPaksetRadio" GroupName="PublishTarget" Content="paksetだけ（アドオンを足した・外したとき）" />
+            <RadioButton x:Name="PublishEngineRadio" GroupName="PublishTarget" Content="本体だけ（本体を入れ替えたとき、追加で配るものを変えたとき）" />
+            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+              <TextBlock FontFamily="Consolas,Menlo,monospace" FontSize="12" Opacity="0.6" VerticalAlignment="Center" TextWrapping="Wrap"
+                         Text="実行するもの: Publish-Pakset.bat と同じ Publish-Pakset.ps1（-ServerId と -Target を付ける）" />
+              <Button Grid.Column="1" x:Name="PublishButton" Content="公開し直す" Classes="accent" Click="OnPublish" Margin="12,0,0,0" />
+            </Grid>
+          </StackPanel>
+        </Border>
+
         <!-- 作業 -->
         <Border Classes="card">
           <StackPanel Spacing="8">
             <TextBlock Classes="heading" Text="作業" />
             <TextBlock Opacity="0.75" TextWrapping="Wrap"
                        Text="ボタンを押すと、server-setupフォルダのバッチファイルと同じスクリプトがPowerShellの画面で開きます。質問に答え、終わったらその画面を閉じてください。閉じると、この画面の表示が自動で新しくなります。" />
-            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
+            <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="10" ColumnSpacing="12">
               <Button Grid.Row="0" Content="構築（初回・点検）" Click="OnSetup" MinWidth="230" VerticalAlignment="Top" />
               <StackPanel Grid.Row="0" Grid.Column="1" Spacing="2">
                 <TextBlock TextWrapping="Wrap" Opacity="0.85" Text="初めて構築するときに使います。構築したあとに実行すると、IIS、ファイアウォール、署名の設定を点検し、崩れていれば直します。公開中のサーバーリストやpaksetはそのまま使います。" />
                 <TextBlock FontFamily="Consolas,Menlo,monospace" FontSize="12" Opacity="0.6" Text="実行するもの: Setup-Server.bat → Install-DistServer.ps1" />
               </StackPanel>
-              <Button Grid.Row="1" Content="paksetと本体を公開" Click="OnPublish" MinWidth="230" VerticalAlignment="Top" />
+              <Button Grid.Row="1" Content="サーバーを追加" Click="OnAddServer" MinWidth="230" VerticalAlignment="Top" />
               <StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
-                <TextBlock TextWrapping="Wrap" Opacity="0.85" Text="アドオンを足した・外したときや、本体を入れ替えたときに使います。先にsimutransサーバーを再起動してください。変わったファイルを公開フォルダにコピーし、サーバーリストに署名し直します。" />
-                <TextBlock FontFamily="Consolas,Menlo,monospace" FontSize="12" Opacity="0.6" Text="実行するもの: Publish-Pakset.bat → Publish-Pakset.ps1" />
-              </StackPanel>
-              <Button Grid.Row="2" Content="サーバーを追加" Click="OnAddServer" MinWidth="230" VerticalAlignment="Top" />
-              <StackPanel Grid.Row="2" Grid.Column="1" Spacing="2">
                 <TextBlock TextWrapping="Wrap" Opacity="0.85" Text="simutransサーバーを増やすときに使います。サーバー名、ポート、paksetフォルダを聞かれます。" />
                 <TextBlock FontFamily="Consolas,Menlo,monospace" FontSize="12" Opacity="0.6" Text="実行するもの: Add-Server.bat → Add-Server.ps1" />
               </StackPanel>
-              <Button Grid.Row="3" Content="署名の鍵の管理" Click="OnManageKey" MinWidth="230" VerticalAlignment="Top" />
-              <StackPanel Grid.Row="3" Grid.Column="1" Spacing="2">
+              <Button Grid.Row="2" Content="署名の鍵の管理" Click="OnManageKey" MinWidth="230" VerticalAlignment="Top" />
+              <StackPanel Grid.Row="2" Grid.Column="1" Spacing="2">
                 <TextBlock TextWrapping="Wrap" Opacity="0.85" Text="確認コードの表示、鍵のバックアップと復元、サーバーリストの署名し直し、鍵の作り直しを行います。" />
                 <TextBlock FontFamily="Consolas,Menlo,monospace" FontSize="12" Opacity="0.6" Text="実行するもの: Manage-SigningKey.bat → Manage-SigningKey.ps1" />
               </StackPanel>
-              <Button Grid.Row="4" Content="公開名のランダム部分を変える" Click="OnRename" MinWidth="230" VerticalAlignment="Top" />
-              <StackPanel Grid.Row="4" Grid.Column="1" Spacing="2">
+              <Button Grid.Row="3" Content="公開名のランダム部分を変える" Click="OnRename" MinWidth="230" VerticalAlignment="Top" />
+              <StackPanel Grid.Row="3" Grid.Column="1" Spacing="2">
                 <TextBlock TextWrapping="Wrap" Opacity="0.85" Text="サーバーリスト（list-○○.json）とpaksetの公開フォルダの名前に付いているランダムな文字を、新しいものに変えます。アドレスが関係ない人に知られたときなどに使います。確認コードは変わりませんが、友人には新しいアドレスを伝え直します。" />
                 <TextBlock FontFamily="Consolas,Menlo,monospace" FontSize="12" Opacity="0.6" Text="実行するもの: Rename-ServerList.bat → Rename-ServerList.ps1" />
               </StackPanel>
-              <Button Grid.Row="5" Content="HTTPSの設定" Click="OnHttps" MinWidth="230" VerticalAlignment="Top" />
-              <StackPanel Grid.Row="5" Grid.Column="1" Spacing="2">
+              <Button Grid.Row="4" Content="HTTPSの設定" Click="OnHttps" MinWidth="230" VerticalAlignment="Top" />
+              <StackPanel Grid.Row="4" Grid.Column="1" Spacing="2">
                 <TextBlock TextWrapping="Wrap" Opacity="0.85" Text="Let's Encryptの証明書を取り、8443番でHTTPSの配信を始めます。証明書の更新は自動です。うまくいかなかったときは、もう一度実行します。" />
                 <TextBlock FontFamily="Consolas,Menlo,monospace" FontSize="12" Opacity="0.6" Text="実行するもの: Enable-Https.bat → Enable-Https.ps1" />
               </StackPanel>
-              <Button Grid.Row="6" Content="server-setupフォルダを開く" Click="OnOpenFolder" MinWidth="230" VerticalAlignment="Top" />
-              <StackPanel Grid.Row="6" Grid.Column="1" Spacing="2">
+              <Button Grid.Row="5" Content="server-setupフォルダを開く" Click="OnOpenFolder" MinWidth="230" VerticalAlignment="Top" />
+              <StackPanel Grid.Row="5" Grid.Column="1" Spacing="2">
                 <TextBlock TextWrapping="Wrap" Opacity="0.85" Text="スクリプトと説明書（README.md、docs）があるフォルダを、エクスプローラーで開きます。" />
               </StackPanel>
             </Grid>

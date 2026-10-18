@@ -287,10 +287,34 @@ function Move-LegacyEngineExtra {
 # -使っている拡張子を登録する（IISは知らない拡張子のファイルを配らないため。.pak・.tab・.bdfなど）
 # -ファイル名の「+」を通す（m+10r.bdfなど。IISは標準では「+」を含むアドレスを断る）。
 #   ファイルをそのまま配るだけのサイトなので、通しても危険はない
-function Write-DistWebConfig([string] $path, [string[]] $extensions, [string] $comment) {
-    $maps = (@($extensions | Where-Object { $_ -and $_ -ne '.json' } | Sort-Object -Unique) | ForEach-Object {
+# -拡張子のないファイル（LICENSEなど）も配る（fileExtension="." で登録する）。
+# -IISが標準で断るフォルダ名（bin など）と拡張子（.config など）のうち、実際に配るものだけ通す。
+#   web.config は公開のスクリプトが配るファイルに入れないので、断ったまま。
+#   $segments には配るファイルのフォルダ名を渡す
+$IisHiddenSegments = @('bin', 'App_Browsers', 'App_code', 'App_Data', 'App_GlobalResources', 'App_LocalResources', 'App_WebReferences')
+$IisDeniedExtensions = @('.asa', '.asax', '.ascx', '.master', '.skin', '.browser', '.sitemap', '.config', '.cs', '.csproj', '.vb', '.vbproj',
+    '.webinfo', '.licx', '.resx', '.resources', '.mdb', '.vjsproj', '.java', '.jsl', '.ldb', '.dsdgm', '.ssdgm', '.lsad', '.ssmap', '.cd',
+    '.dsprototype', '.lsaprototype', '.sdm', '.sdmDocument', '.mdf', '.ldf', '.ad', '.dd', '.ldd', '.sd', '.adprototype', '.lddprototype',
+    '.exclude', '.refresh', '.compiled', '.msgx', '.vsdisco', '.rules')
+# "a/bin/c.txt" のような相対パスから、フォルダ名（a、bin）を集める
+function Get-FolderSegments([string[]] $rels) {
+    return , @($rels | ForEach-Object { $parts = @($_ -split '/'); if ($parts.Count -gt 1) { $parts[0..($parts.Count - 2)] } } | Sort-Object -Unique)
+}
+
+function Write-DistWebConfig([string] $path, [string[]] $extensions, [string] $comment, [string[]] $segments = @()) {
+    $exts = @($extensions | ForEach-Object { if ($_) { $_.ToLowerInvariant() } else { '.' } } | Where-Object { $_ -ne '.json' } | Sort-Object -Unique)
+    $maps = ($exts | ForEach-Object {
         "      <remove fileExtension=`"$_`" />`n      <mimeMap fileExtension=`"$_`" mimeType=`"application/octet-stream`" />"
     }) -join "`n"
+    $allowExt = @($IisDeniedExtensions | Where-Object { $exts -contains $_.ToLowerInvariant() } | ForEach-Object { "          <remove fileExtension=`"$_`" />" })
+    $allowSeg = @($IisHiddenSegments | Where-Object { $s = $_; @($segments | Where-Object { $_ -ieq $s }).Count -gt 0 } | ForEach-Object { "          <remove segment=`"$_`" />" })
+    $filtering = '      <requestFiltering allowDoubleEscaping="true" />'
+    if ($allowExt.Count + $allowSeg.Count -gt 0) {
+        $inner = @()
+        if ($allowExt.Count -gt 0) { $inner += '        <fileExtensions>'; $inner += $allowExt; $inner += '        </fileExtensions>' }
+        if ($allowSeg.Count -gt 0) { $inner += '        <hiddenSegments>'; $inner += $allowSeg; $inner += '        </hiddenSegments>' }
+        $filtering = "      <requestFiltering allowDoubleEscaping=`"true`">`n$($inner -join "`n")`n      </requestFiltering>"
+    }
     Write-TextFile $path @"
 <?xml version="1.0" encoding="utf-8"?>
 <!-- $comment -->
@@ -300,7 +324,7 @@ function Write-DistWebConfig([string] $path, [string[]] $extensions, [string] $c
 $maps
     </staticContent>
     <security>
-      <requestFiltering allowDoubleEscaping="true" />
+$filtering
     </security>
   </system.webServer>
 </configuration>

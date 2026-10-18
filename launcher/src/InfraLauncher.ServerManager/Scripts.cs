@@ -51,7 +51,7 @@ internal static class Scripts
     /// 同じ PowerShell 5.1 で動かす（このツールは管理者として動いているので、そのまま管理者で動く）。
     /// 画面が閉じられたら <paramref name="exited"/> を呼ぶ。
     /// </summary>
-    public static string? OpenInteractive(string folder, string script, Action exited)
+    public static string? OpenInteractive(string folder, string script, Action exited, IEnumerable<KeyValuePair<string, object?>>? arguments = null)
     {
         var path = Path.Combine(folder, script);
         if (!File.Exists(path))
@@ -59,7 +59,7 @@ internal static class Scripts
             return $"{script} が見つかりません: {path}";
         }
         var command = PowerShellCommand.BuildInteractive(path,
-            "終わりました。この画面を閉じると、サーバー管理ツールの表示が新しくなります。");
+            "終わりました。この画面を閉じると、サーバー管理ツールの表示が新しくなります。", arguments);
         var start = new ProcessStartInfo("powershell.exe") { WorkingDirectory = folder, UseShellExecute = false };
         foreach (var arg in new[] { "-NoProfile", "-ExecutionPolicy", "Bypass", "-NoExit", "-OutputFormat", "Text", "-EncodedCommand", PowerShellCommand.Encode(command) })
         {
