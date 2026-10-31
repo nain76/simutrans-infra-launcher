@@ -74,7 +74,7 @@ public sealed class EngineComponentsTests : IDisposable
         var server = Default();
         var settings = new LauncherSettings();
         await _service.SyncServerAsync(server, settings);
-        var dir = Path.Combine(_layout.DefaultInstallRoot, "r1");
+        var dir = Path.Combine(_layout.DefaultInstallRoot, "s");
         var conf = Path.Combine(dir, "config", "simuconf.tab");
         File.WriteAllText(conf, "my settings");
         var plan = _service.Sync.Plan(server, settings);
@@ -96,10 +96,10 @@ public sealed class EngineComponentsTests : IDisposable
         var first = (await _service.Sync.CheckAsync(_service.Sync.Plan(server, settings))).Single(r => r.Item.Kind == SyncItemKind.Engine);
         Assert.False(first.UpToDate);
         Assert.Equal(3, first.Files);
-        Assert.False(Directory.Exists(Path.Combine(_layout.DefaultInstallRoot, "r1")));
+        Assert.False(Directory.Exists(Path.Combine(_layout.DefaultInstallRoot, "s")));
 
         await _service.SyncServerAsync(server, settings);
-        var music = Path.Combine(_layout.DefaultInstallRoot, "r1", "music", "a.ogg");
+        var music = Path.Combine(_layout.DefaultInstallRoot, "s", "music", "a.ogg");
         File.WriteAllText(music, "changed!");
         var results = await _service.Sync.CheckAsync(_service.Sync.Plan(server, settings));
         Assert.True(results.Single(r => r.Item.Kind == SyncItemKind.Pakset).UpToDate);
@@ -133,7 +133,7 @@ public sealed class EngineComponentsTests : IDisposable
     {
         var server = Default();
         await _service.SyncServerAsync(server, new LauncherSettings());
-        var dir = Path.Combine(_layout.DefaultInstallRoot, "r1");
+        var dir = Path.Combine(_layout.DefaultInstallRoot, "s");
         Directory.CreateDirectory(Path.Combine(dir, "save"));
         File.WriteAllText(Path.Combine(dir, "save", "my.sve"), "x");
         File.WriteAllText(Path.Combine(dir, "config", "simuconf.tab"), "edited");
@@ -146,7 +146,7 @@ public sealed class EngineComponentsTests : IDisposable
     {
         var server = Default();
         await _service.SyncServerAsync(server, new LauncherSettings());
-        var dir = _layout.EngineDir("r1");
+        var dir = _layout.EngineDir("s");
         Assert.True(File.Exists(Path.Combine(dir, "sim.exe")));
         Assert.True(File.Exists(Path.Combine(dir, "config", "simuconf.tab")));
         Assert.True(File.Exists(Path.Combine(dir, "music", "a.ogg")));
@@ -161,7 +161,7 @@ public sealed class EngineComponentsTests : IDisposable
         var server = Default();
         var settings = new LauncherSettings();
         await _service.SyncServerAsync(server, settings);
-        var dir = _layout.EngineDir("r1");
+        var dir = _layout.EngineDir("s");
         File.WriteAllText(Path.Combine(dir, "my-notes.txt"), "user file");
 
         // カスタム: 音楽を外してマップを足す
@@ -181,20 +181,62 @@ public sealed class EngineComponentsTests : IDisposable
     }
 
     [Fact]
+    public async Task UpdatesTheSameFolderWhenTheRevisionChanges()
+    {
+        var settings = new LauncherSettings();
+        await _service.SyncServerAsync(Default(), settings);
+        var dir = _layout.EngineDir("s");
+        File.WriteAllText(Path.Combine(dir, "config", "simuconf.tab"), "my settings");
+
+        // 本体の版が変わっても、同じフォルダを更新する（フォルダは増えず、手元の設定も残る）
+        var v2 = Publish(("sim.exe", "exe2", "core"), ("config/simuconf.tab", "conf", "core"), ("music/a.ogg", "music", "music"));
+        v2.Engine!.Revision = "r2";
+        await _service.SyncServerAsync(v2, settings);
+        Assert.Equal("exe2", File.ReadAllText(Path.Combine(dir, "sim.exe")));
+        Assert.Equal("my settings", File.ReadAllText(Path.Combine(dir, "config", "simuconf.tab")));
+        Assert.True(File.Exists(Path.Combine(dir, "p", "a.pak")));
+        Assert.Equal([dir], Directory.GetDirectories(_layout.DefaultInstallRoot));
+    }
+
+    [Fact]
+    public async Task FindsOldPerRevisionFoldersAndCleansThemUp()
+    {
+        var server = Default();
+        var settings = new LauncherSettings();
+        // 以前の版の置き方（本体の版ごとのフォルダ）で入れたものがある
+        server.InstallFolderName = "r1";
+        await _service.SyncServerAsync(server, settings);
+        var old = _layout.EngineDir("r1");
+        server.InstallFolderName = "s-abc123";
+        await _service.SyncServerAsync(server, settings);
+        var now = _layout.EngineDir("s-abc123");
+
+        var unused = Assert.Single(_service.Sync.FindUnusedEngineInstalls([now]));
+        Assert.Equal(old, unused.Dir);
+        Assert.True(unused.Bytes > 0);
+        Assert.Equal(0, unused.UserFiles);
+        Assert.False(_service.Sync.ForgetInstall(unused.Dir, deleteFiles: true));
+        Assert.False(Directory.Exists(old));
+        Assert.Empty(_service.Sync.FindUnusedEngineInstalls([now]));
+        Assert.True(File.Exists(Path.Combine(now, "sim.exe")));
+        Assert.True(File.Exists(Path.Combine(now, "p", "a.pak")));
+    }
+
+    [Fact]
     public async Task InstallsIntoChosenFolder()
     {
         var server = Default();
         var root = Path.Combine(_dir, "games", "simutrans");
         await _service.SyncServerAsync(server, new LauncherSettings(), options: new InstallOptions { InstallRoot = root });
-        Assert.True(File.Exists(Path.Combine(root, "r1", "sim.exe")));
-        Assert.True(File.Exists(Path.Combine(root, "r1", "p", "a.pak")));
+        Assert.True(File.Exists(Path.Combine(root, "s", "sim.exe")));
+        Assert.True(File.Exists(Path.Combine(root, "s", "p", "a.pak")));
 
         // 全体の既定のフォルダも使える
         var global = Path.Combine(_dir, "global");
         await _service.SyncServerAsync(server, new LauncherSettings { InstallRoot = global });
-        Assert.True(File.Exists(Path.Combine(global, "r1", "sim.exe")));
+        Assert.True(File.Exists(Path.Combine(global, "s", "sim.exe")));
         var info = _service.PrepareLaunch(server, new LauncherSettings { InstallRoot = global });
-        Assert.Equal(Path.Combine(global, "r1", "sim.exe"), info.ExePath);
+        Assert.Equal(Path.Combine(global, "s", "sim.exe"), info.ExePath);
     }
 
     [Fact]
@@ -205,7 +247,7 @@ public sealed class EngineComponentsTests : IDisposable
         var before = new InstallOptions { InstallRoot = Path.Combine(_dir, "old") };
         var after = new InstallOptions { InstallRoot = Path.Combine(_dir, "new") };
         await _service.SyncServerAsync(server, settings, options: before);
-        var oldDir = Path.Combine(_dir, "old", "r1");
+        var oldDir = Path.Combine(_dir, "old", "s");
         Assert.NotNull(InstalledState.Load(_layout).Get(oldDir));
         Assert.Null(_service.Sync.PreviousInstallDir(server, settings, before, before));
         Assert.Equal(oldDir, _service.Sync.PreviousInstallDir(server, settings, before, after));
@@ -223,7 +265,7 @@ public sealed class EngineComponentsTests : IDisposable
         var settings = new LauncherSettings();
         var before = new InstallOptions { InstallRoot = Path.Combine(_dir, "old") };
         await _service.SyncServerAsync(server, settings, options: before);
-        var oldDir = Path.Combine(_dir, "old", "r1");
+        var oldDir = Path.Combine(_dir, "old", "s");
         // 自分で置いたセーブデータは消さない
         Directory.CreateDirectory(Path.Combine(oldDir, "save"));
         File.WriteAllText(Path.Combine(oldDir, "save", "my.sve"), "x");
@@ -235,8 +277,8 @@ public sealed class EngineComponentsTests : IDisposable
 
         // 何も置いていなければ、フォルダごと消える
         await _service.SyncServerAsync(server, settings, options: new InstallOptions { InstallRoot = Path.Combine(_dir, "old2") });
-        Assert.False(_service.Sync.ForgetInstall(Path.Combine(_dir, "old2", "r1"), deleteFiles: true));
-        Assert.False(Directory.Exists(Path.Combine(_dir, "old2", "r1")));
+        Assert.False(_service.Sync.ForgetInstall(Path.Combine(_dir, "old2", "s"), deleteFiles: true));
+        Assert.False(Directory.Exists(Path.Combine(_dir, "old2", "s")));
     }
 
     [Fact]
@@ -267,7 +309,7 @@ public sealed class EngineComponentsTests : IDisposable
     {
         var server = Publish(("sim.exe", "exe", "core"), ("SDL2.dll", "dll", "core"));
         await _service.SyncServerAsync(server, new LauncherSettings());
-        Assert.True(File.Exists(Path.Combine(_layout.EngineDir("r1"), "SDL2.dll")));
+        Assert.True(File.Exists(Path.Combine(_layout.EngineDir("s"), "SDL2.dll")));
     }
 
     [Fact]

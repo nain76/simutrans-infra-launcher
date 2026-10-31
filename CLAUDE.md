@@ -54,6 +54,7 @@ server-setup のバッチファイルと、中で動くスクリプトの対応�
 - 署名の鍵は `%LOCALAPPDATA%\InfraLauncherServer\signing-key.dat`（DPAPI CurrentUser）。バックアップは PBKDF2-SHA256 30万回、AES-256-CBC、HMAC-SHA256。
 - 公開の設定は `server-setup/publish-settings.json`（manifest、share_url、paksets）。サーバーリストの場所は `Resolve-ManifestPath` で決める。新しく決めたランダムな名前はすぐ設定に保存し、続けて呼ばれたスクリプトも同じ名前を使う。
 - 本体は許可リスト（`engine-files.default.json`、上書きは `engine-files.json`）の部品だけ配る。追加分は本体フォルダごとに engine-extras.json に持ち、公開のとき部品 extra になる（以前の版で engine-files.json に書いた extra は Move-LegacyEngineExtra が移す）。絶対に配らないものの一覧は Common.ps1 の `$EngineNeverFolders` と `$EngineNeverFiles`。`themes/*.tab` のような「フォルダ/名前」は直下のファイルだけ。paksetのフォルダは本体と別に公開する。
+- 本体はダウンロード先（既定は Windows で `C:\Games\simutrans`）の下に、サーバーごとに1つのフォルダ（`id-配信元から作った6文字`、ServerEntry.EngineFolderName）を作って入れ、版が変わっても同じフォルダを更新する。以前の版ごとのフォルダは、同期のあと FindUnusedEngineInstalls で見つけて、確認してから片付ける。
 - ランチャーの同期は差分ダウンロード。30秒データが来なければ打ち切り、途切れたら3回まで再試行。途中のファイルは `%LOCALAPPDATA%\InfraLauncher\downloads\partial`、記録は `logs/sync.log`。
 - `config/simuconf.tab` は同期で上書きしない。プレイヤー名は起動のたびにこのファイルの先頭に印付きで書く（simutransに名前の起動オプションがなく、tabファイルは最初に出たキーを使うため）。
 
@@ -94,7 +95,7 @@ dotnet publish src/InfraLauncher.App -c Release -r win-x64 --self-contained \
 
 - テストは127件。PowerShellのスクリプトはLinuxのpwshで構文と一部の動作を確かめられる。署名の鍵はDPAPIを使うので、Linuxでは環境変数 `INFRA_SIGNING_INSECURE_TEST=1` を付けて試す（テスト専用）。
 - 配るzipは2つに分けている（アップロードの上限30MiBを超えるため）。`simutrans_Launcher.zip` はランチャーのexeと遊ぶ人向けの説明、`simutrans_ServerTools.zip` は server-setup 一式（管理ツールのexeを含む）と管理者向けの説明と manifest。
-- zipはPythonの zipfile で作り、日本語のファイル名にUTF-8のフラグ（0x800）を立てる。付けないとWindowsで文字化けする。
+- zipはPythonの zipfile で作り、日本語のファイル名にUTF-8のフラグ（0x800）を立てる。付けないとWindowsで文字化けする。手順は `dist/build-zips.py`（`python3 -I dist/build-zips.py <exeのフォルダ> <出力先>`）。zipに入れる「はじめにお読みください.md」は `dist/readme-*.md`。
 
 ## 今の状態と、まだWindowsで確かめていないこと
 
@@ -109,6 +110,5 @@ dotnet publish src/InfraLauncher.App -c Release -r win-x64 --self-contained \
 
 そのほか
 
-- `docs/server-manager.png` は古い画面のまま。
 - 構成図（AWSの構成図ふう）は claude.ai のArtifactとして作った（リポジトリには入っていない）。
 - 元のリポジトリ（TID_simutrans）の作業ブランチ `claude/modest-carson-ln7cuy` では、`tools/infra-launcher` を移転の案内だけにした。main に取り込むかはまだ決めていない。

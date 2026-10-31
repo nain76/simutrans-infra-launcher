@@ -379,6 +379,7 @@ public partial class MainWindow : Window
             StatusText.Text = summary.Downloads == 0 && summary.Removed == 0
                 ? $"{row.Name}: すでに最新です。「起動」で接続できます"
                 : $"{row.Name}: 同期しました（ダウンロード{summary.Downloads}件）。「起動」で接続できます";
+            await OfferCleanUpAsync();
         }
         catch (OperationCanceledException) when (cts.IsCancellationRequested)
         {
@@ -436,6 +437,49 @@ public partial class MainWindow : Window
             UpdateButtons();
         }
     }
+
+    /// <summary>
+    /// どのサーバーも使っていない本体のフォルダ（以前の版は本体の版ごとにフォルダを分けていたので、版が変わるたびに残っていた）を
+    /// 見つけたら、片付けるか聞く。消すのはランチャーが入れたファイルだけで、自分で置いたファイル（セーブデータなど）は残す。
+    /// </summary>
+    private async Task OfferCleanUpAsync()
+    {
+        var inUse = new List<string>();
+        foreach (var row in _rows.Where(r => r.Server is not null))
+        {
+            try
+            {
+                inUse.AddRange(_service.Sync.Plan(row.Server!, _settings, OptionsFor(row)).Items
+                    .Where(i => i.Kind == SyncItemKind.Engine).Select(i => i.TargetDir));
+            }
+            catch (SyncException) { }
+        }
+        var unused = _service.Sync.FindUnusedEngineInstalls(inUse);
+        if (unused.Count == 0)
+        {
+            return;
+        }
+        var total = unused.Sum(u => u.Bytes);
+        var list = string.Join("\n", unused.Select(u => $"・{u.Dir}（{FormatBytes(u.Bytes)}" +
+            (u.UserFiles > 0 ? $"、自分で置いたファイル{u.UserFiles}個" : "") + "）"));
+        var userFiles = unused.Sum(u => u.UserFiles);
+        var keep = userFiles > 0
+            ? "\n\n自分で置いたファイル（セーブデータなど）は消さずに残します。念のため、要るものは別の場所へコピーしておいてください。"
+            : "";
+        if (!await Dialogs.ConfirmAsync(this, "古いフォルダの片付け",
+                $"今は使っていない、以前の版のsimutrans本体とpaksetのフォルダがあります（合わせて{FormatBytes(total)}）。\n\n{list}\n\n" +
+                $"ランチャーが入れたファイルを消して、空き容量を増やしますか？{keep}", "片付ける"))
+        {
+            return;
+        }
+        var left = unused.Where(u => _service.Sync.ForgetInstall(u.Dir, deleteFiles: true)).ToList();
+        StatusText.Text += left.Count == 0
+            ? $"\n古いフォルダを片付けました（{FormatBytes(total)}）"
+            : $"\n古いフォルダを片付けました。自分で置いたファイルが残っているフォルダ: {string.Join("、", left.Select(u => u.Dir))}";
+    }
+
+    private static string FormatBytes(long bytes) =>
+        bytes >= 1L << 30 ? $"{bytes / (double)(1L << 30):0.0}GB" : bytes >= 1L << 20 ? $"{bytes / (double)(1L << 20):0}MB" : $"{bytes / 1024}KB";
 
     private InstallOptions? OptionsFor(ServerRow row) => _settings.ServerInstall.GetValueOrDefault(row.FavoriteKey);
 

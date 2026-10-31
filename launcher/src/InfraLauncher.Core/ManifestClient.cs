@@ -36,6 +36,13 @@ public sealed partial class ManifestClient(HttpClient http)
             info = Check(bytes, signature, pinnedKey);
         }
         var manifest = Parse(Decode(bytes), uri, trusted: pinnedKey is not null);
+        // 本体のフォルダ名に付ける文字。配信元（ホストとポート）から作るので、サーバーリストの名前を変えても変わらない
+        var origin = uri.IsFile ? Path.GetDirectoryName(uri.LocalPath) ?? uri.LocalPath : uri.Authority;
+        var tag = Convert.ToHexStringLower(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(origin.ToLowerInvariant())))[..6];
+        foreach (var s in manifest.Servers)
+        {
+            s.InstallFolderName = $"{s.Id}-{tag}";
+        }
         manifest.Signature = info;
         manifest.Trusted = pinnedKey is not null;
         return manifest;

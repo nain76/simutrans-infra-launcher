@@ -45,6 +45,17 @@ public sealed class ServerEntry
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public bool EngineDownloadAllowed { get; set; }
+
+    /// <summary>
+    /// 本体を入れるフォルダの名前（ダウンロード先の下）。サーバーごとに1つで、本体の版が変わっても同じフォルダを更新する。
+    /// 別のサーバーリストに同じidのサーバーがあっても重ならないよう、配信元から作った短い文字を付ける（<see cref="ManifestClient"/>が設定する）。
+    /// 設定されていなければidを使う。
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string InstallFolderName { get; set; } = "";
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string EngineFolderName => InstallFolderName.Length > 0 ? InstallFolderName : Id;
 }
 
 public sealed class EngineInfo

@@ -64,7 +64,7 @@ public sealed class SyncServiceTests : IDisposable
         Assert.All(plan.Items, i => Assert.True(i.Needed));
         await _sync.SyncAsync(plan);
 
-        var engineDir = _layout.EngineDir("r1");
+        var engineDir = _layout.EngineDir("s");
         // zip の最上位のフォルダ1つは取り除かれ、pakset は実行ファイルの横に入る
         Assert.Equal("engine", File.ReadAllText(Path.Combine(engineDir, "simutrans.exe")));
         Assert.Equal("pak", File.ReadAllText(Path.Combine(engineDir, "pak64", "ground.pak")));
@@ -94,11 +94,11 @@ public sealed class SyncServiceTests : IDisposable
         Assert.True(plan.Items.Single(i => i.Kind == SyncItemKind.Pakset).Needed);
         await _sync.SyncAsync(plan);
 
-        var pakDir = Path.Combine(_layout.EngineDir("r1"), "pak64");
+        var pakDir = Path.Combine(_layout.EngineDir("s"), "pak64");
         Assert.True(File.Exists(Path.Combine(pakDir, "new.pak")));
         Assert.False(File.Exists(Path.Combine(pakDir, "old.pak")));
         // ランチャーが入れたものは退避せずに消す
-        Assert.Empty(Directory.GetDirectories(_layout.EngineDir("r1"), "pak64.backup-*"));
+        Assert.Empty(Directory.GetDirectories(_layout.EngineDir("s"), "pak64.backup-*"));
     }
 
     [Fact]
@@ -111,7 +111,7 @@ public sealed class SyncServiceTests : IDisposable
 
         var e = await Assert.ThrowsAsync<SyncException>(() => _sync.SyncAsync(_sync.Plan(Server(engine, pak), new LauncherSettings())));
         Assert.Contains("ハッシュ", e.Message);
-        Assert.False(Directory.Exists(_layout.EngineDir("r1")));
+        Assert.False(Directory.Exists(_layout.EngineDir("s")));
         Assert.Empty(Directory.GetFiles(_layout.DownloadDir));
     }
 

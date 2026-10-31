@@ -33,6 +33,9 @@ public sealed record SyncProgress(SyncItem Item, string Stage, long BytesDone, l
 /// <summary>アップデートチェックの結果。UpToDateでなければ、落とすファイルの数と大きさ（zip方式なら大きさは0）と片付けるファイルの数。</summary>
 public sealed record CheckResult(SyncItem Item, bool UpToDate, int Files, long Bytes, int Removals);
 
+/// <summary>使っていない本体のフォルダ。Bytesはランチャーが入れたファイルの大きさ、UserFilesは自分で置いたファイル（セーブデータなど）の数。</summary>
+public sealed record OldInstall(string Dir, long Bytes, int UserFiles);
+
 public sealed record SyncSummary(int Downloads, long Bytes, int Removed)
 {
     public SyncSummary Add(SyncSummary o) => new(Downloads + o.Downloads, Bytes + o.Bytes, Removed + o.Removed);
@@ -70,7 +73,7 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         var oldRoot = InstallRoot(settings, before);
         return string.Equals(oldRoot, InstallRoot(settings, after), StringComparison.OrdinalIgnoreCase) || server.Engine is null
             ? null
-            : Path.Combine(oldRoot, server.Engine.Revision);
+            : Path.Combine(oldRoot, server.EngineFolderName);
     }
 
     /// <summary>
@@ -144,6 +147,33 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
     }
 
     /// <summary>
+    /// どのサーバーも使っていない本体のフォルダ（以前の版は本体の版ごとにフォルダを分けていたので、版が変わるたびに残っていた）。
+    /// <paramref name="inUseDirs"/>は今使っている本体のフォルダ。ランチャーが入れた本体（記録に直下のexeがあるもの）だけを探す。
+    /// </summary>
+    public IReadOnlyList<OldInstall> FindUnusedEngineInstalls(IEnumerable<string> inUseDirs)
+    {
+        var inUse = inUseDirs.Select(d => Path.TrimEndingDirectorySeparator(Path.GetFullPath(d))).ToList();
+        bool Related(string a, string b) => a.Equals(b, StringComparison.OrdinalIgnoreCase)
+            || a.StartsWith(b + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || b.StartsWith(a + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        var state = InstalledState.Load(layout);
+        var result = new List<OldInstall>();
+        foreach (var (dir, record) in state.Items)
+        {
+            var isEngine = record.Files?.Keys.Any(k => !k.Contains('/') && k.EndsWith(".exe", StringComparison.OrdinalIgnoreCase)) == true;
+            if (!isEngine || !Directory.Exists(dir) || inUse.Any(u => Related(dir, u)))
+            {
+                continue;
+            }
+            // 中のpaksetなども含めた、ランチャーが入れたファイルの大きさ
+            var bytes = state.Items.Where(kv => Related(kv.Key, dir) && kv.Key.Length >= dir.Length)
+                .Sum(kv => kv.Value.Files?.Values.Sum(f => f.Size) ?? 0);
+            result.Add(new OldInstall(dir, bytes, UserFilesIn(dir).Count));
+        }
+        return result;
+    }
+
+    /// <summary>
     /// 残骸を片付ける。消されたフォルダの記録と、長いあいだ使われていない一時ファイル（ダウンロード途中のもの、取得済みのファイル一覧）を捨てる。
     /// </summary>
     private void CleanUp()
@@ -198,7 +228,8 @@ public sealed class SyncService(InstallLayout layout, HttpClient http)
         }
         if (build is not null)
         {
-            var engineDir = Path.Combine(InstallRoot(settings, options), server.Engine!.Revision);
+            // 本体はサーバーごとに1つのフォルダに入れ、版が変わっても同じフォルダを更新する（版ごとに分けるとフォルダが積み重なるため）
+            var engineDir = Path.Combine(InstallRoot(settings, options), server.EngineFolderName);
             exe = Path.GetFullPath(Path.Combine(engineDir, build.Exe));
             EnsureInside(engineDir, exe, "engineのexe");
             var record = state.Get(engineDir);

@@ -82,6 +82,15 @@ public sealed class SignatureTests : IDisposable
         Assert.Equal(expected, ManifestSignature.SignatureUriFor(new Uri(list)).AbsoluteUri);
 
     [Fact]
+    public async Task GivesEachServerItsOwnInstallFolderName()
+    {
+        var m = await Client().LoadAsync(Write(ManifestBytes, null));
+        var s = m.Servers[0];
+        Assert.Matches("^" + System.Text.RegularExpressions.Regex.Escape(s.Id) + "-[0-9a-f]{6}$", s.InstallFolderName);
+        Assert.Equal(s.InstallFolderName, s.EngineFolderName);
+    }
+
+    [Fact]
     public async Task UnpinnedListsNeverInstallEngines()
     {
         var unsigned = await Client().LoadAsync(Write(ManifestBytes, null));
